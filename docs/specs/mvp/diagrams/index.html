@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newsdock mvp — design diagrams</title>
+<style>
+:root{--bg:#fff;--fg:#1c1e21;--muted:#5f6670;--card:#f6f7f9;--line:#d8dce1;--accent:#1d63d6;--check:#fff7e0;--checkline:#e5c25a}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--card:#1d2026;--line:#323843;--accent:#6ea2ff;--check:#2b2615;--checkline:#7a6420}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:5}
+nav a{margin-right:12px;color:var(--accent);text-decoration:none;white-space:nowrap;display:inline-block}
+main{max-width:980px;margin:0 auto;padding:0 16px 60px}
+section{margin-top:36px}
+h1{font-size:1.3rem;margin:0 0 6px}h2{font-size:1.15rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto}
+.check{background:var(--check);border:1px solid var(--checkline);border-radius:8px;padding:8px 14px;margin-top:10px}
+.check b{display:block}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<header><h1>newsdock mvp — design diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Ingest sequence</a><a href="#a">3 Agent sequence</a><a href="#e">4 Data model</a><a href="#t">5 Article lifecycle</a><a href="#d">6 Deployment</a></nav></header>
+<main>
+<p class="muted">Matches design.md. Component ids C-n are the same everywhere.</p>
+
+<section id="c"><h2>1 Components</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  G[GDELT GKG] --> C1[C-1 Ingester]
+  C1 --> K[(C-2 Kafka<br/>raw / clean / dlq)]
+  K --> C3[C-3 Processor]
+  C3 --> K
+  K --> C4[C-4 Sink + retention]
+  C4 --> C5[(C-5 Postgres)]
+  C1 --> C5
+  C5 --> C6[C-6 API: MCP + REST]
+  C6 --> C7[C-7 Demo agent]
+  C7 --> O[C-9 Ollama on host]
+  C6 --> C8[C-8 Next.js UI]
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Is there any path by which the agent (C-7) can reach Postgres other than through C-6?</li>
+<li>Is a separate sink (C-4) worth having versus the processor writing Postgres itself (ADR-0002)?</li>
+<li>Should the UI (C-8) go through the same service as agents (ADR-0003)?</li></ul></div></section>
+
+<section id="s"><h2>2 Primary sequence: one ingest cycle</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant I as C-1 Ingester
+  participant G as GDELT
+  participant K as C-2 Kafka
+  participant F as C-3 Processor
+  participant S as C-4 Sink
+  participant P as C-5 Postgres
+  I->>G: GET lastupdate.txt
+  I->>G: GET gkg.csv.zip
+  alt 404 or empty
+    I->>P: slot stays pending, attempts+1
+  else ok
+    I->>K: gkg.raw per row
+    I->>P: slot published
+    K->>F: consume raw
+    F->>K: gkg.clean (valid) or gkg.dlq (bad)
+    K->>S: consume clean
+    S->>P: INSERT ON CONFLICT DO NOTHING
+    S->>K: commit offset
+  end
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>If the processor re-reads a message, what stops duplicates in Postgres?</li>
+<li>If the ingester dies after publishing half a slot, what happens on the next cycle?</li>
+<li>Where does an empty-title row end up, and who can see why?</li></ul></div></section>
+
+<section id="a"><h2>3 Agent run</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as C-7 Agent
+  participant M as C-6 MCP
+  participant P as C-5 Postgres
+  participant O as C-9 Ollama
+  A->>M: list_new_articles(cursor)
+  M->>P: seq greater than cursor
+  M-->>A: articles, next_cursor
+  loop each article
+    A->>O: score (JSON schema output)
+    A->>M: submit_analysis(id, name, payload)
+    M->>P: upsert analysis
+  end
+  A->>A: save next_cursor
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Where does the agent persist its cursor, and what if it crashes mid-loop (is re-scoring harmless)?</li>
+<li>Should the agent save the cursor only after all submissions succeed?</li>
+<li>What does a first run with no cursor return (design-detail: last 24 h)?</li></ul></div></section>
+
+<section id="e"><h2>4 Data model</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  articles ||--o{ analyses : has
+  articles {
+    text url_hash PK
+    bigint seq UK
+    text url
+    text title
+    text domain
+    timestamptz published_at
+    timestamptz ingested_at
+    text_arr themes
+    text_arr persons
+    text_arr orgs
+    real tone
+  }
+  analyses {
+    text article_id PK
+    text agent_name PK
+    jsonb payload
+    timestamptz created_at
+  }
+  ingest_slot {
+    text slot PK
+    text status
+    int attempts
+  }
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Is <code>url_hash</code> acceptable as the public article id?</li>
+<li>One analysis per (article, agent), latest wins: enough for the MVP?</li>
+<li>Retention uses <code>ingested_at</code>: is that the clock you want?</li></ul></div></section>
+
+<section id="t"><h2>5 Article lifecycle</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Raw: published to gkg.raw
+  Raw --> DeadLetter: invalid row
+  Raw --> Clean: valid row
+  Clean --> Stored: upsert Postgres
+  Clean --> Dropped: URL already stored
+  Dropped --> [*]
+  Stored --> Analysed: submit_analysis
+  Stored --> Expired: older than 7 days
+  Analysed --> Expired: older than 7 days
+  Expired --> [*]
+  DeadLetter --> [*]
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Once an article expires, may it re-enter if GDELT lists the URL again later?</li>
+<li>Are dead-letter messages ever replayed, or only inspected?</li></ul></div></section>
+
+<section id="d"><h2>6 Deployment (docker-compose)</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  subgraph data[network: data]
+    kafka[kafka]; pg[(postgres)]; proc[processor]; sink[sink]; ing[ingester]
+  end
+  subgraph shared[both networks]
+    api[api]
+  end
+  subgraph agentnet[network: agent]
+    agent[agent]; web[web]
+  end
+  host[Ollama on host]
+  agent --> host
+  api --- data
+  api --- agentnet
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Does the agent container have any route or credential for Postgres or Kafka?</li>
+<li>Is a ~8 GB budget realistic with Kafka, Postgres and Next.js together?</li>
+<li>Are all published ports bound to 127.0.0.1?</li></ul></div></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+mermaid.initialize({startOnLoad:true,theme:dark?'dark':'default',securityLevel:'loose'});
+</script>
+</body>
+</html>

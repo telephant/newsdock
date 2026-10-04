@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.*
+!.env.example
+CLAUDE.local.md
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# node
+node_modules/
+.next/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,21 @@
+feature: mvp
+stage: design
+updated: 2026-10-04
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided}
+gates: {init: approved, design: approved, plan: pending, implement: pending, verify: pending}
+acs:
+  AC-1: {status: todo}
+  AC-2: {status: todo}
+  AC-3: {status: todo}
+  AC-4: {status: todo}
+  AC-5: {status: todo}
+  AC-6: {status: todo}
+  AC-7: {status: todo}
+  AC-8: {status: todo}
+  AC-9: {status: todo}
+  AC-10: {status: todo}
+  AC-11: {status: todo}
+  AC-12: {status: todo}
+  AC-13: {status: todo}
+  AC-14: {status: todo}
+  AC-15: {status: todo}
