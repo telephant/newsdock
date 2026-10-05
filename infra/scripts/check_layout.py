@@ -20,6 +20,7 @@ ROOT_FILES = {
     "uv.lock",
     ".python-version",
     ".env.example",
+    ".env",  # local settings, git-ignored; make up requires it
     ".gitignore",
     ".dockerignore",
     "README.md",

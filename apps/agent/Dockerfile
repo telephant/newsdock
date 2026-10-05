@@ -15,7 +15,7 @@ COPY apps/agent/src apps/agent/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-agent
 
 FROM python:3.12-slim
-RUN useradd --create-home --uid 1000 app
+RUN useradd --create-home --uid 1000 app && mkdir /data && chown app /data
 COPY --from=build /app/.venv /app/.venv
 ENV PATH=/app/.venv/bin:$PATH
 USER app

@@ -15,7 +15,7 @@ Option 3, chosen by the user for the standard Python stack and portfolio value. 
 - New shared package `packages/db` (`newsdock_db`): `config.py` (`DATABASE_URL` via pydantic-settings), engine factory, and the shared `MetaData`. Empty in M0 (no domain tables); M1 adds tables.
 - Alembic project in `infra/migrations/` (`alembic.ini`, `env.py`, `versions/NNNN_<name>.py`, `Dockerfile`); revision ids are numeric (`0001`). `env.py` takes its URL from `newsdock_db.config`, not from `os.environ` (DR-9).
 - `newsdock_core` and every `domain/` must not import `newsdock_db`, `sqlalchemy`, `alembic` or `psycopg`; only `adapters/` may (DR-6, DR-7).
-- Core versus ORM-mapped classes is left to the M1 design; M0 only provides the metadata container.
+- Core versus ORM-mapped classes was left to the M1 design; decided there 2026-10-05 (R-14): **ORM, 2.0 declarative mapped classes** in `newsdock_db`.
 
 ## Consequences
 + Industry-standard stack, composable queries for optional search filters, one place for table definitions, migrations versioned in Python. − One more shared package and a migration image (not one of the six apps); schema defined in two ways if both `Table` objects and hand-written migrations are used (review discipline or autogenerate checks, decided in M1); the M1 docs must say which SQLAlchemy layer is used. dbmate and psycopg-only were rejected as simpler but less standard.

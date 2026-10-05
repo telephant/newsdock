@@ -1,22 +1,22 @@
 feature: mvp
-stage: design
-updated: 2026-10-04
-reviews: {design: approve-with-changes, date: 2026-10-04}
+stage: done
+updated: 2026-10-05
+reviews: {design: retired 2026-10-05 (verdict approve; carried findings in plan.md)}
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided}
-gates: {init: approved, design: approved, plan: pending, implement: pending, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}
 acs:
-  AC-1: {status: todo}
-  AC-2: {status: todo}
-  AC-3: {status: todo}
-  AC-4: {status: todo}
-  AC-5: {status: todo}
-  AC-6: {status: todo}
-  AC-7: {status: todo}
-  AC-8: {status: todo}
-  AC-9: {status: todo}
-  AC-10: {status: todo}
-  AC-11: {status: todo}
-  AC-12: {status: todo}
-  AC-13: {status: todo}
-  AC-14: {status: todo}
-  AC-15: {status: todo}
+  AC-1: {status: passing}  # TC-1 unit + TC-2 docker green (T-04, 2026-10-05)
+  AC-2: {status: passing}  # TC-3, TC-4, TC-5 green (T-04, 2026-10-05)
+  AC-3: {status: passing}  # TC-6 green (T-06, 2026-10-05)
+  AC-4: {status: passing}  # TC-7, TC-8 (T-02), TC-9 (T-05), TC-31 (T-06) all green 2026-10-05
+  AC-5: {status: passing}  # TC-10, TC-11 (T-02), TC-34 (T-03) green 2026-10-05
+  AC-6: {status: passing}  # TC-12 green (T-06, 2026-10-05)
+  AC-7: {status: passing}  # TC-13 (T-06), TC-14 (T-03) green 2026-10-05
+  AC-8: {status: passing}  # TC-15 green (T-07, 2026-10-05)
+  AC-9: {status: passing}  # TC-16, TC-17, TC-18 green (T-07, 2026-10-05)
+  AC-10: {status: passing}  # TC-19, TC-20 (T-07), TC-32 (T-08) green 2026-10-05
+  AC-11: {status: passing}  # TC-21…TC-24 green (T-07, 2026-10-05)
+  AC-12: {status: manual-ok}  # TC-26 green; TC-25 owner-confirmed 2026-10-05 (post CORS fix)
+  AC-13: {status: passing}  # TC-35 (T-08), TC-27 (T-11) green 2026-10-05
+  AC-14: {status: passing}  # TC-28, TC-29 green (T-09, 2026-10-05); real ≥50-label run at /spec-verify
+  AC-15: {status: manual-ok}  # TC-33 + 8/8 healthy on fresh-volume live run; owner accepted as TC-30, 2026-10-05

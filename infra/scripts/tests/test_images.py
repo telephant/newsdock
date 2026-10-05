@@ -60,7 +60,12 @@ def test_image_runs_as_non_root_and_holds_no_env_file(app: str) -> None:  # TC-1
 
 
 @pytest.mark.parametrize("app", PYTHON_APPS)
-def test_python_image_default_command_exits_zero(app: str) -> None:  # TC-18
-    result = run("docker", "run", "--rm", f"newsdock-{app}:dev")
+def test_python_image_entrypoint_imports(app: str) -> None:  # TC-18
+    """M0 asserted "default command prints and exits 0"; since M1 (T-04…T-08)
+    the apps are long-running daemons needing env/Kafka/DB, so the image
+    contract is now: the venv works and the entrypoint module imports."""
+    result = run(
+        "docker", "run", "--rm", "--entrypoint", "python",
+        f"newsdock-{app}:dev", "-c", f"import newsdock_{app}.__main__",
+    )  # fmt: skip
     assert result.returncode == 0, result.stdout + result.stderr
-    assert f"newsdock-{app}" in result.stdout

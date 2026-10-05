@@ -72,8 +72,32 @@ test-rules-python: ## Rule tests that need no pnpm (used by the CI check-python 
 build: ## Build app images: make build [APP=<name>] (no .env needed)
 	$(COMPOSE) --profile apps build $(APP)
 
-test-infra: ## Docker-based tests (images, stack); needs Docker running
-	uv run pytest -m docker infra/scripts/tests
+# Scenes for scoped docker tests: make test-infra SCENE=<name>
+#   db        schema, migrations, cascade            (Postgres only, ~30 s)
+#   kafka     raw publish + processor routing        (Kafka only, ~1 min)
+#   sink      dedup, retention, poison fallback      (Postgres, ~30 s)
+#   api       MCP tools, REST, cursor, CORS          (Postgres, ~30 s)
+#   pipeline  ingest -> process -> store re-ingest   (Postgres, ~40 s)
+#   e2e       full 8-service stack, agent isolation  (~2 min, builds images)
+#   stack     M0 make up/down lifecycle              (~2.5 min)
+#   images    image builds and contracts             (~1 min warm)
+SCENE ?=
+SCENE_db       := packages/db
+SCENE_kafka    := apps/ingester/tests/integration apps/processor/tests/integration
+SCENE_sink     := apps/sink/tests/integration
+SCENE_api      := apps/api/tests/integration
+SCENE_pipeline := infra/scripts/tests/test_reingest.py
+SCENE_e2e      := infra/scripts/tests/test_agent_isolation.py
+SCENE_stack    := infra/scripts/tests/test_stack.py
+SCENE_images   := infra/scripts/tests/test_images.py
+
+test-infra: ## Docker tests; all scenes, or one: make test-infra SCENE=<db|kafka|sink|api|pipeline|e2e|stack|images>
+ifeq ($(SCENE),)
+	uv run pytest -m docker
+else
+	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api pipeline e2e stack images)" >&2; exit 2; }
+	uv run pytest -m docker $(SCENE_$(SCENE))
+endif
 
 up: ## Start Kafka and Postgres, wait until healthy (needs .env)
 	@test -f .env || { echo "missing .env: copy .env.example to .env (cp .env.example .env)" >&2; exit 1; }

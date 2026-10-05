@@ -3,7 +3,12 @@ name = "newsdock-sink"
 version = "0.0.0"
 description = "newsdock sink app"
 requires-python = ">=3.12"
-dependencies = ["newsdock-core", "pydantic-settings>=2.15"]
+dependencies = [
+    "newsdock-core",
+    "newsdock-db",
+    "pydantic-settings>=2.15",
+    "confluent-kafka>=2.15",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -14,3 +19,4 @@ packages = ["src/newsdock_sink"]
 
 [tool.uv.sources]
 newsdock-core = { workspace = true }
+newsdock-db = { workspace = true }

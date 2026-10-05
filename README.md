@@ -2,7 +2,23 @@
 
 A shared "news dock" for AI agents: ingest the GDELT GKG news feed once (clean, dedup, 7-day store) so any custom agent can plug in through an MCP server or REST. Kafka and Postgres run locally in Docker; there is no hosted demo.
 
-**Status:** milestone M0 `foundation` (monorepo, tooling, CI, docs) is implemented. The data pipeline, API, agent and UI arrive in M1; see the [roadmap](docs/roadmap.md).
+**Status:** M1 `mvp` implemented: live GDELT GKG → Kafka → processor → Postgres (7-day retention) → MCP + REST → demo financial-relevance agent (Ollama) → Next.js UI. See the [roadmap](docs/roadmap.md).
+
+## Architecture
+
+```
+GDELT GKG (15-min slots) → ingester → Kafka gkg.raw → processor → gkg.clean / gkg.dlq
+                                                            → sink → Postgres (7 days)
+Postgres → api (MCP /mcp + REST /api/*) → demo agent (Ollama, host) and web UI (:3000)
+```
+
+Component map and diagrams: [design](docs/specs/mvp/design.md), [diagrams](docs/specs/mvp/diagrams/index.html).
+
+### Honest notes
+
+- **Kafka is here for learning and decoupling, not throughput.** The GKG feed is ~30–50k rows/day; a single Postgres would cope easily.
+- **Downtime leaves slot gaps.** Only slots seen in `lastupdate.txt` while the ingester runs are fetched; there is no history backfill (backlog). A listed-but-404 slot is retried up to 4 times, then marked `failed`.
+- **Data: [GDELT Project](https://www.gdeltproject.org/)** — free open data; this project polls the 15-minute index no faster than every 15 minutes and stores no article bodies.
 
 ## Prerequisites (macOS on Apple silicon)
 
@@ -37,9 +53,10 @@ make down            # stop everything (data volumes are kept)
 | `make test APP=<name>` | Tests of one app: `ingester processor sink api agent web` |
 | `make build [APP=<name>]` | Build images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); no `.env` needed |
 | `make up` / `make down` | Start (and wait for) Kafka and Postgres, create topics, migrate / stop |
+| `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics, apply Alembic migrations (both idempotent) |
 | `make test-rules` | Prove each enforced rule fails when violated |
-| `make test-infra` | Docker-based tests (images and stack); needs Docker running and ports 5433 and 29092 free |
+| `make test-infra [SCENE=<name>]` | Docker tests; scenes scope the run to what you're working on: `db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images` (no scene = everything, ~4 min warm). Needs Docker and ports 5433/29092 free |
 | `make docs-check` | README sections and relative links |
 
 ## Layout
@@ -73,5 +90,6 @@ The directory and layering rules (`domain/` pure, `adapters/` for I/O, apps neve
 - **`make up` says `missing .env`:** run `cp .env.example .env`.
 - **Raw `docker compose` complains about missing variables:** pass the env file, e.g. `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - **Port already in use:** Postgres defaults to host port 5433 (a local Postgres often owns 5432); change `POSTGRES_PORT` in `.env`. Kafka uses 29092.
-- **`ollama list` shows no model:** run `ollama pull <model>`; only `make doctor` warns about it in M0.
+- **`ollama list` shows no model:** run `ollama pull llama3.2:3b` (the demo agent's model, chosen in the M1 spike).
+- **Agent logs `batch failed`:** usually Ollama is not running on the host (`ollama list` must answer); the agent retries with its cursor unchanged.
 - Only macOS on Apple silicon is documented and tested.

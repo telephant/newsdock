@@ -1,8 +1,17 @@
 import { render, screen } from "@testing-library/react";
-import { expect, test } from "vitest";
+import { expect, test, vi } from "vitest";
 import Home from "./page";
 
-test("home page shows the product name", () => {
+vi.stubGlobal(
+  "fetch",
+  vi.fn(
+    async () =>
+      new Response(JSON.stringify({ articles: [], next_before: null })),
+  ),
+);
+
+test("home page shows the product name and the feed", () => {
   render(<Home />);
   expect(screen.getByRole("heading", { name: "newsdock" })).toBeTruthy();
+  expect(screen.getByRole("form", { name: "filters" })).toBeTruthy();
 });

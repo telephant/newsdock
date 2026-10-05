@@ -13,5 +13,7 @@ D-2: MCP + REST. Official `mcp` Python SDK is at 2.3.0 (2026-10-02), v1.30 legac
 ## Decision
 Option 1, `mcp>=2,<3`. If v2 proves awkward at implementation, drop to `mcp` 1.x with the same tool contract (tool names/schemas are the contract, not the SDK).
 
+**2026-10-05:** `mcp` 2.3.0 verified by a spike round-trip (FastAPI mount of `streamable_http_app()` + `session_manager.run()` lifespan); the 1.x fallback is not needed. See `docs/specs/mvp/spike.md`.
+
 ## Consequences
 + One DB role, one deploy, shared validation (AC-9 identical for UI and agents). − UI and agents share a failure domain; split later (backlog M6). − SDK major version risk.

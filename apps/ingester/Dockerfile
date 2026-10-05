@@ -8,9 +8,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY apps/ingester/pyproject.toml apps/ingester/pyproject.toml
 COPY packages/core/pyproject.toml packages/core/pyproject.toml
+COPY packages/db/pyproject.toml packages/db/pyproject.toml
 RUN uv sync --frozen --no-dev --no-install-workspace --package newsdock-ingester
 # Layer 2: sources
 COPY packages/core/src packages/core/src
+COPY packages/db/src packages/db/src
 COPY apps/ingester/src apps/ingester/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-ingester
 

@@ -1,12 +1,27 @@
-"""Entrypoint for newsdock-processor: wires config and starts the app."""
+"""Entrypoint for newsdock-processor: consume gkg.raw, route, loop forever."""
 
+import logging
+from pathlib import Path
+
+from newsdock_processor.adapters.kafka import KafkaProcessorLoop
 from newsdock_processor.config import Settings
 
 
 def main() -> int:
     settings = Settings()
-    print(f"newsdock-processor (log level {settings.log_level})")
-    return 0
+    logging.basicConfig(level=settings.log_level)
+    logging.getLogger(__name__).info("newsdock-processor starting")
+    loop = KafkaProcessorLoop(settings)
+    heartbeat = Path(settings.heartbeat_file)
+    try:
+        while True:
+            loop.run_once(
+                max_messages=settings.batch_size,
+                timeout_seconds=settings.poll_timeout_seconds,
+            )
+            heartbeat.touch()
+    finally:
+        loop.close()
 
 
 if __name__ == "__main__":

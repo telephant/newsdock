@@ -71,7 +71,7 @@ Summary form (`articles[]` items): `article_id, title, url, domain, published_at
 
 ## 6. Technology
 
-Python 3.12 + `confluent-kafka` **[memory]**; Apache Kafka 4.x KRaft **[assumption]**; PostgreSQL 16 + pgvector **[memory]**; FastAPI + official `mcp` SDK 2.x streamable HTTP **[verified: v2.3.0 current, 2026-10-02; v2 API not read, see ADR-0003]**; Ollama with a ~3–4B instruct model and JSON-schema structured output **[memory]**; Next.js + TypeScript; docker-compose; pytest. Flink dropped (2026-10-04, ADR-0001). Diagrams: Mermaid 11.15 (cdnjs).
+Python 3.12 + `confluent-kafka` **[memory]**; Apache Kafka 4.x KRaft **[assumption]**; PostgreSQL 16 + pgvector **[memory]**; FastAPI + official `mcp` SDK 2.x streamable HTTP **[verified: v2.3.0 round-trip run in the T-01 spike, 2026-10-05; ADR-0003]**; Ollama with `llama3.2:3b` and JSON-schema structured output (the prompt must state the 0–1 score range; the grammar enforces shape, not bounds) **[verified: T-01 spike 2026-10-05, 1.37 s/score, see spike.md]**; SQLAlchemy 2 ORM (2.0 declarative) + Alembic (ADR-0008, layer decided 2026-10-05); Next.js + TypeScript; docker-compose; pytest. Flink dropped (2026-10-04, ADR-0001). Diagrams: Mermaid 11.15 (cdnjs).
 
 ## 7. AC coverage
 

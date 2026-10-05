@@ -1,16 +1,14 @@
-"""Smoke test: newsdock-api imports, has its layers and its entrypoint runs."""
+"""Smoke test: newsdock-api imports and has its layers."""
 
 import importlib
 
 import pytest
-from newsdock_api.__main__ import main
-
-
-def test_main_returns_zero(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main() == 0
-    assert "newsdock-api" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize("layer", ["domain", "adapters"])
 def test_layer_packages_exist(layer: str) -> None:
     assert importlib.import_module(f"newsdock_api.{layer}")
+
+
+def test_entrypoint_imports() -> None:
+    assert importlib.import_module("newsdock_api.__main__")

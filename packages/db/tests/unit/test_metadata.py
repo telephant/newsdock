@@ -1,10 +1,15 @@
-"""The shared MetaData is empty in M0 and carries a naming convention."""
+"""The shared MetaData carries the M1 tables and a naming convention.
 
+M0 asserted an empty MetaData; since T-03 (2026-10-05) the models module
+registers the three M1 tables on import (ADR-0008).
+"""
+
+import newsdock_db.models  # noqa: F401  (registers the tables)
 from newsdock_db.metadata import NAMING_CONVENTION, metadata
 
 
-def test_metadata_has_no_tables_in_m0() -> None:
-    assert len(metadata.tables) == 0
+def test_metadata_holds_exactly_the_m1_tables() -> None:
+    assert set(metadata.tables) == {"articles", "analyses", "ingest_slot"}
 
 
 def test_naming_convention_covers_constraints() -> None:

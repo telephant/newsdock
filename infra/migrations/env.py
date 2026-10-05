@@ -1,6 +1,7 @@
 """Alembic environment: URL and metadata come from newsdock_db (DR-9, ADR-0008)."""
 
 from alembic import context
+from newsdock_db import models  # noqa: F401  (registers tables on the metadata)
 from newsdock_db.config import Settings
 from newsdock_db.engine import make_engine
 from newsdock_db.metadata import metadata

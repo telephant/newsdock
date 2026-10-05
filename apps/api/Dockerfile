@@ -8,9 +8,11 @@ WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY packages/core/pyproject.toml packages/core/pyproject.toml
+COPY packages/db/pyproject.toml packages/db/pyproject.toml
 RUN uv sync --frozen --no-dev --no-install-workspace --package newsdock-api
 # Layer 2: sources
 COPY packages/core/src packages/core/src
+COPY packages/db/src packages/db/src
 COPY apps/api/src apps/api/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-api
 

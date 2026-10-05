@@ -3,7 +3,7 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` done and verified (pass, 2026-10-05; CI green on `main`). Current milestone M1 `mvp`: update its docs for M0 decisions first (`docs/specs/mvp/backlog.md` Design TODOs, `/spec-design mvp`), then `/spec-plan mvp`. Only skeleton code exists (apps print their name; no domain logic yet).
+- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). Next milestone: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
 - Roadmap: `docs/roadmap.md` (current milestone: M1).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
@@ -66,7 +66,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 
 ## Commands (run from the repo root; `make help` lists them)
 - `make doctor` check tools; `make setup` install from lockfiles; `make check` everything (`check-python`, `check-web`, `docs-check`).
-- `make test APP=<ingester|processor|sink|api|agent|web>` one app's tests; `make test-rules` proves each enforced rule fails when violated (`test-rules-python` skips the pnpm-dependent ones; CI uses it); `make test-infra` Docker tests (needs Docker, ports 5433 and 29092 free, no `.env` surprises: it backs up and restores your own).
+- `make test APP=<ingester|processor|sink|api|agent|web>` one app's tests; `make test-rules` proves each enforced rule fails when violated (`test-rules-python` skips the pnpm-dependent ones; CI uses it); `make test-infra [SCENE=<db|kafka|sink|api|pipeline|e2e|stack|images>]` Docker tests, scoped to one scene or all (needs Docker, ports 5433 and 29092 free, no `.env` surprises: it backs up and restores your own).
 - `make build [APP=<name>]` images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); `cp .env.example .env` then `make up` / `make down`; `make topics`, `make migrate` are idempotent.
 - Raw compose needs the env file: `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - Python: `uv run ...` (never `pip`); one workspace, `uv sync --all-packages --locked`. Web: `pnpm --dir apps/web run <script>`; Node 24 comes from pnpm, not the system.
