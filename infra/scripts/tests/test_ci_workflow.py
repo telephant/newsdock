@@ -145,7 +145,7 @@ def test_jobs_and_gate_are_wired() -> None:
     assert "web" in jobs["check-web"]["if"]
 
 
-def test_every_action_is_pinned_by_major_tag() -> None:
+def test_every_action_is_pinned_by_tag() -> None:
     uses = [
         step["uses"]
         for job in load()["jobs"].values()
@@ -154,7 +154,9 @@ def test_every_action_is_pinned_by_major_tag() -> None:
     ]
     assert uses
     for reference in uses:
-        assert re.search(r"@v\d+$", reference), f"{reference} is not pinned by tag"
+        assert re.search(r"@v\d+(\.\d+\.\d+)?$", reference), (
+            f"{reference} is not tag-pinned"
+        )
 
 
 def test_every_make_target_used_in_ci_exists() -> None:
@@ -169,3 +171,16 @@ def test_every_make_target_used_in_ci_exists() -> None:
     used = {t for c in commands for t in re.findall(r"\bmake ([a-z-]+)", c)}
     assert used, "CI should call make targets"
     assert used <= defined, f"unknown make targets in CI: {used - defined}"
+
+
+def test_setup_uv_is_pinned_to_an_exact_release() -> None:
+    """setup-uv has no floating major tag: `@v10` fails the job setup."""
+    refs = {
+        step["uses"]
+        for job in load()["jobs"].values()
+        for step in job["steps"]
+        if str(step.get("uses", "")).startswith("astral-sh/setup-uv@")
+    }
+    assert refs
+    for reference in refs:
+        assert re.search(r"@v\d+\.\d+\.\d+$", reference), reference
