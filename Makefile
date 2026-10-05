@@ -8,7 +8,7 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/compose.yaml
 
 .PHONY: doctor help setup setup-python setup-web test lint-python types-python
 .PHONY: imports-python layout-python check-python check-web check test-rules
-.PHONY: build up down topics migrate docs-check test-infra
+.PHONY: build up down topics migrate docs-check test-infra test-rules-python
 
 doctor: ## Check the required tools are installed (docker, uv, pnpm, ollama)
 	@bash infra/scripts/doctor.sh
@@ -65,6 +65,9 @@ check: check-python check-web docs-check ## Everything: Python, web and docs che
 
 test-rules: ## Rule tests: prove each enforced rule fails when violated
 	uv run pytest -m rules infra/scripts/tests/rules
+
+test-rules-python: ## Rule tests that need no pnpm (used by the CI check-python job)
+	uv run pytest -m "rules and not web" infra/scripts/tests/rules
 
 build: ## Build app images: make build [APP=<name>] (no .env needed)
 	$(COMPOSE) --profile apps build $(APP)

@@ -4,7 +4,7 @@ import pytest
 
 from .conftest import ROOT, output, run
 
-pytestmark = pytest.mark.rules
+pytestmark = [pytest.mark.rules, pytest.mark.web]
 
 PACKAGE_JSON = ROOT / "apps" / "web" / "package.json"
 

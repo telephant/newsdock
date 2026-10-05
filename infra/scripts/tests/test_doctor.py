@@ -1,6 +1,7 @@
 """TC-1…TC-3: doctor.sh reports missing tools and an unreachable Docker daemon."""
 
 import json
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -37,9 +38,21 @@ def stub(directory: Path, name: str, body: str) -> None:
     path.chmod(path.stat().st_mode | stat.S_IEXEC)
 
 
+UTILITIES = ["awk", "grep", "sed", "tr", "head", "dirname", "cat"]
+
+
+def stub_path(bin_dir: Path) -> str:
+    """PATH for doctor.sh in tests: stubs and symlinked basics only, no /usr/bin."""
+    return str(bin_dir)
+
+
 def make_bin(tmp: Path, tools: list[str]) -> Path:
     directory = tmp / "bin"
     directory.mkdir()
+    for utility in UTILITIES:
+        found = shutil.which(utility)
+        assert found, f"{utility} is needed by doctor.sh"
+        (directory / utility).symlink_to(found)
     stub(directory, "python3.12", PYTHON)
     scripts = {
         "docker": DOCKER,
@@ -55,7 +68,7 @@ def make_bin(tmp: Path, tools: list[str]) -> Path:
 def run_doctor(
     bin_dir: Path, root: Path, extra_env: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
-    env = {"PATH": f"{bin_dir}:/usr/bin:/bin", "DOCTOR_ROOT": str(root)}
+    env = {"PATH": stub_path(bin_dir), "DOCTOR_ROOT": str(root)}
     env.update(extra_env or {})
     return subprocess.run(
         ["/bin/bash", str(DOCTOR)], env=env, capture_output=True, text=True, check=False
@@ -119,3 +132,18 @@ def test_node_is_not_required_on_path(tmp_path: Path) -> None:
     result = run_doctor(make_bin(tmp_path, ALL), tmp_path)
     assert "MISSING node" not in result.stdout + result.stderr
     assert "scaffolded" in result.stdout.lower() or "node" in result.stdout.lower()
+
+
+def test_stub_path_cannot_see_system_tools(tmp_path: Path) -> None:
+    """CI runners ship a real /usr/bin/docker: the test PATH must hold stubs only."""
+    bin_dir = make_bin(tmp_path, ["pnpm"])
+    path = stub_path(bin_dir)
+    assert "/usr/bin" not in path.split(":")
+    probe = subprocess.run(
+        ["/bin/bash", "-c", "command -v docker"],
+        env={"PATH": path},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert probe.returncode != 0

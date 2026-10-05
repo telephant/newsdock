@@ -65,7 +65,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 
 ## Commands (run from the repo root; `make help` lists them)
 - `make doctor` check tools; `make setup` install from lockfiles; `make check` everything (`check-python`, `check-web`, `docs-check`).
-- `make test APP=<ingester|processor|sink|api|agent|web>` one app's tests; `make test-rules` proves each enforced rule fails when violated; `make test-infra` Docker tests (needs Docker, ports 5433 and 29092 free, no `.env` surprises: it backs up and restores your own).
+- `make test APP=<ingester|processor|sink|api|agent|web>` one app's tests; `make test-rules` proves each enforced rule fails when violated (`test-rules-python` skips the pnpm-dependent ones; CI uses it); `make test-infra` Docker tests (needs Docker, ports 5433 and 29092 free, no `.env` surprises: it backs up and restores your own).
 - `make build [APP=<name>]` images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); `cp .env.example .env` then `make up` / `make down`; `make topics`, `make migrate` are idempotent.
 - Raw compose needs the env file: `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - Python: `uv run ...` (never `pip`); one workspace, `uv sync --all-packages --locked`. Web: `pnpm --dir apps/web run <script>`; Node 24 comes from pnpm, not the system.

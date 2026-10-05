@@ -184,3 +184,14 @@ def test_setup_uv_is_pinned_to_an_exact_release() -> None:
     assert refs
     for reference in refs:
         assert re.search(r"@v\d+\.\d+\.\d+$", reference), reference
+
+
+def test_python_job_does_not_run_rule_tests_that_need_pnpm() -> None:
+    """The check-python job has no pnpm: web rule tests run via check-web or locally."""
+    commands = " ".join(
+        str(step.get("run", "")) for step in load()["jobs"]["check-python"]["steps"]
+    )
+    assert "make test-rules-python" in commands
+    assert "make test-rules\n" not in commands + "\n"
+    makefile = (REPO / "Makefile").read_text()
+    assert 'pytest -m "rules and not web"' in makefile

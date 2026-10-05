@@ -21,6 +21,7 @@ pythonpath = ["infra/scripts"]
 markers = [
     "rules: mutation tests that prove each enforced rule fails when violated (make test-rules)",
     "docker: tests that need Docker (make test-infra)",
+    "web: rule tests that need pnpm and the web project (make test-rules only)",
 ]
 
 [tool.ruff.lint]
