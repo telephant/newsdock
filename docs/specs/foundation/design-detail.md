@@ -33,16 +33,18 @@ dev = ["ruff", "mypy", "pytest", "import-linter"]
 select = ["E", "F", "I", "TID"]
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
 "os.environ".msg = "DR-9: read env only in config.py"
-"os.getenv".msg = "DR-9: read env only in config.py"      # [assumption: same mechanism]
+"os.getenv".msg = "DR-9: read env only in config.py"      # [verified in T-04]
 [tool.ruff.lint.per-file-ignores]
 "**/config.py" = ["TID251"]
 [tool.mypy]
 strict = true
+plugins = ["pydantic.mypy"]   # needed for pydantic-settings classes (T-11)
 explicit_package_bases = true
 mypy_path = ["apps/ingester/src", "...", "packages/core/src"]
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib"
-testpaths = ["apps", "packages"]
+testpaths = ["apps", "packages", "infra/scripts"]
+pythonpath = ["infra/scripts"]   # lets tests import check_layout and check_docs
 ```
 
 **import-linter** (`include_external_packages = true`, `root_packages` = every `newsdock_*`):
@@ -64,7 +66,7 @@ Wildcards in contracts (`newsdock_*.domain`) are not needed: list modules explic
 | DR-3 | required skeleton files exist per app type | `DR-3 apps/<app> missing <path>` |
 | DR-4 | every `*.py` under an app is below `src/newsdock_<app>/` or `tests/`; Python apps contain `domain/` and `adapters/` | `DR-4 <path> outside src/ or tests/` |
 
-Also fails if an app is missing from the import-linter contracts (keeps AC-7 honest). Own unit tests live in `infra/scripts/tests/`.
+Also fails if an app is missing from the import-linter contracts (keeps AC-7 honest). `PENDING_UNTIL` (required items later tasks create) is empty after T-08. Tool caches (`.import_linter_cache`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`, `.next`) are ignored. mypy also covers `infra/migrations`. Own unit tests live in `infra/scripts/tests/`.
 
 ## 4. Makefile and doctor
 
@@ -87,7 +89,7 @@ Also fails if an app is missing from the import-linter contracts (keeps AC-7 hon
 |---|---|---|
 | `kafka` | `apache/kafka:4.2.2` | KRaft single node **[verified, T-01]** with: `KAFKA_NODE_ID=1`, `KAFKA_PROCESS_ROLES=broker,controller`, `KAFKA_LISTENERS=INTERNAL://:9092,CONTROLLER://:9093,EXTERNAL://:29092`, `KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka:9092,EXTERNAL://127.0.0.1:29092`, `KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT`, `KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL`, `KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER`, `KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka:9093`, the three replication/ISR settings = 1, `KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0`. Containers use `kafka:9092`; host tools use `127.0.0.1:29092` (published only on 127.0.0.1); both worked, the host side with `confluent-kafka` 2.15.1 on Python 3.12 arm64. Healthcheck **[verified]**: `/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092` (interval 5 s, retries 20, start_period 10 s) |
 | `postgres` | `pgvector/pgvector:0.8.7-pg16-trixie` | host port `127.0.0.1:${POSTGRES_PORT}` → container 5432; **default `POSTGRES_PORT=5433`** because a local Postgres already listens on 5432 on the owner's machine (T-01, decided 2026-10-05); volume; healthcheck `pg_isready` **[verified]**; `vector` 0.8.7 is available and `CREATE EXTENSION IF NOT EXISTS vector` works **[verified]**; credentials from `.env` |
-| `topics` (job) | `apache/kafka:4.2.2` | `kafka-topics.sh --create --if-not-exists` for the 3 topics; `depends_on kafka: service_healthy`; run via `docker compose run --rm topics`; entrypoint `/bin/bash -c` with a loop over `kafka-topics.sh --create --if-not-exists` (use `$$t` inside compose YAML). **[verified, T-01]**: creates 3 topics with 1 partition and replication 1; a second run exits 0 and leaves them unchanged; it still succeeds right after `restart kafka`. The "`.` and `_` metric-name collision" warning from Kafka is harmless (all names use dots only) |
+| `topics` (job) | `apache/kafka:4.2.2` | `kafka-topics.sh --create --if-not-exists` for the 3 topics; `depends_on kafka: service_healthy`; run via `docker compose run --rm topics`; entrypoint `/bin/bash /create-topics.sh` with the script `infra/kafka/create-topics.sh` mounted read-only (a loop over `kafka-topics.sh --create --if-not-exists`). **[verified, T-01]**: creates 3 topics with 1 partition and replication 1; a second run exits 0 and leaves them unchanged; it still succeeds right after `restart kafka`. The "`.` and `_` metric-name collision" warning from Kafka is harmless (all names use dots only) |
 | `migrate` (job) | built from `infra/migrations/Dockerfile` | `python:3.12-slim` + uv; installs `newsdock-db` with its `migrate` extra (alembic, psycopg) **[assumption: verified in the spike]**; env `DATABASE_URL`; command `alembic -c infra/migrations/alembic.ini upgrade head`; `depends_on postgres: service_healthy` |
 | `<app>` ×6 | built from `apps/<app>/Dockerfile` | profile `apps`, build only in M0 |
 
@@ -101,7 +103,7 @@ Also fails if an app is missing from the import-linter contracts (keeps AC-7 hon
 
 ## 7. CI (`ci.yml`)
 
-Triggers: `pull_request`, `push` to `main`. Jobs: `changes` (paths-filter; outputs per-app flags and `python`, `web`, `infra`) → `check-python` (if `python`), `check-web` (if `web`), `build` (matrix of changed apps; all Python apps when `packages/core/**`, `pyproject.toml` or `uv.lock` changed), `ci-ok` (`needs` all, `if: always()`, fails on any failure/cancel). Steps use `make` targets so CI equals local. Filters: `python` = `apps/{ingester,processor,sink,api,agent}/**`, `packages/**`, `pyproject.toml`, `uv.lock`, `infra/scripts/**`; `web` = `apps/web/**`; per-app = `apps/<app>/**` plus the shared Python set.
+Triggers: `pull_request`, `push` to `main`. Jobs: `changes` (paths-filter; outputs per-app flags, `python`, `web` and `tooling` (= `Makefile` or `.github/workflows/**`, which reruns both check jobs); a shell step turns the app flags into the JSON matrix `apps`) → `check-python` (if `python` or `tooling`; also runs `make test-rules`), `check-web` (if `web` or `tooling`), `docs` (always: `make docs-check`), `build` (matrix of changed apps; all Python apps when `packages/core/**`, `pyproject.toml` or `uv.lock` changed), `ci-ok` (`needs` all, `if: always()`, fails on any failure/cancel). Steps use `make` targets so CI equals local. Filters: `python` = `apps/{ingester,processor,sink,api,agent}/**`, `packages/**`, `pyproject.toml`, `uv.lock`, `infra/scripts/**`; `web` = `apps/web/**`; per-app = `apps/<app>/**` plus the shared Python set.
 
 ## 8. Web scaffold (verified in T-02, 2026-10-05)
 

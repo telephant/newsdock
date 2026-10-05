@@ -42,6 +42,7 @@ M0 has no runtime services of its own; its components are the tools and files th
 | `up` / `down` | start / stop infra; `up` runs `topics` and `migrate` | `.env` missing, a service not healthy |
 | `topics`, `migrate` | one-shot jobs via `docker compose run --rm` (`migrate` = `alembic upgrade head` in its own small image) | job fails |
 | `docs-check` | README sections and relative links | missing section or broken link |
+| `lint-python`, `types-python`, `imports-python`, `layout-python` | the four parts of `check-python` (ruff, mypy, import-linter, `check_layout.py`), usable alone; `help` lists all targets | the part fails |
 | `test-rules` | mutation tests that prove each enforced rule fails (marker `rules`) | a rule does not fail when violated |
 | `test-infra` | Docker-based tests (marker `docker`) | a stack or image test fails |
 

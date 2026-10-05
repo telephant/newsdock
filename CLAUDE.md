@@ -72,7 +72,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Quality tools: ruff (lint, format, `TID251` bans `os.environ`/`os.getenv` outside `config.py`), mypy strict with the pydantic plugin, import-linter contracts in `pyproject.toml`, `infra/scripts/check_layout.py`, `infra/scripts/check_docs.py`.
 
 ## Environment notes
-- Machine: macOS arm64. Docker Desktop 4.93, uv, pnpm and Ollama are installed; no Ollama model is pulled yet (needed for the manual AC-2 check and M1).
+- Machine: macOS arm64. Docker Desktop 4.93, uv, pnpm and Ollama are installed; Ollama has `llama3.2:1b` pulled (enough for AC-2; the M1 spike picks the demo-agent model).
 - A local Postgres already listens on 5432, so compose publishes Postgres on 5433 (`POSTGRES_PORT`).
 - Spike findings and verified versions: `docs/specs/foundation/design-detail.md` §5, §6, §8, §11.
 
