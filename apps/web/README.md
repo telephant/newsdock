@@ -24,3 +24,5 @@ make test APP=web       # vitest
 make check-web          # lint, format check, type check, tests
 make build APP=web      # build the image newsdock-web:dev
 ```
+
+<!-- ci path-filter test: touches only apps/web/README.md -->
