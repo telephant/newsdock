@@ -9,4 +9,5 @@ Priority: P1 next, P2 soon, P3 later. Project-level milestones live in `../../ro
 - **CI speed (P3):** layer and dependency caching, per-app build matrix.
 - **Dev container (P3):** reproducible editor environment for contributors.
 - **Linux and Windows setup notes (P3):** M0 documents macOS arm64 only.
+- **Runner image (P2):** `ubuntu-latest` becomes Ubuntu 26 on 2026-10-19 (GitHub notice in the CI run). Pin `ubuntu-24.04` or run the workflow once on the new image before that date.
 - **Image scanning and SBOM (P3):** supply-chain checks, relevant for M5 cloud deploy.

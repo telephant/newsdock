@@ -3,8 +3,8 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` implemented (tasks T-00…T-14 done), next `/spec-verify foundation`. M1 `mvp` design is approved; update its docs for M0 decisions (`packages/db`, SQLAlchemy layer, tooling) in `/spec-design mvp`, then `/spec-plan mvp`. Only skeleton code exists (apps print their name; no domain logic yet).
-- Roadmap: `docs/roadmap.md` (current milestone: M0).
+- Stage: M0 `foundation` done and verified (pass, 2026-10-05; CI green on `main`). Current milestone M1 `mvp`: update its docs for M0 decisions first (`docs/specs/mvp/backlog.md` Design TODOs, `/spec-design mvp`), then `/spec-plan mvp`. Only skeleton code exists (apps print their name; no domain logic yet).
+- Roadmap: `docs/roadmap.md` (current milestone: M1).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
 - Open items: `docs/specs/mvp/backlog.md` ("Design TODOs").
@@ -25,6 +25,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Web `src/`: `app/` thin routes, `features/<name>/` feature code, `components/` shared UI without data fetching, `lib/api/` generated client (never hand-edited).
 
 ## Workflow
+- A local pass is not CI: the first GitHub run found a non-existent action tag (`setup-uv@v10`), a test PATH that hid a real `/usr/bin/docker`, and a job without pnpm. After touching `.github/`, push and read the run (`gh run watch`, `gh run view --log-failed`).
 - Work follows the spec pipeline: `/spec-init` → `/spec-design` → `/spec-plan` → `/spec-implement` → `/spec-verify`, one folder per feature under `docs/specs/<name>/`.
 - Implement one task at a time from `docs/specs/mvp/tasks/T-NN.md`, test first. Use only the context that task names.
 - Every acceptance criterion `AC-n` in `spec.md` must end up covered by a test or a manual check listed in `tests.md`.

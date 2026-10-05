@@ -16,6 +16,7 @@ Priority: P1 next, P2 soon, P3 later.
 - **M6 Hosted LLM option (P3):** Claude or other provider behind a provider-agnostic layer.
 
 ## Design TODOs (flow details not yet specified; resolve in /spec-plan or early tasks)
+- [ ] Update these M1 docs for M0 decisions (from foundation verify D-6): `design-detail.md` §8 (tooling and layout now decided: `src/newsdock_<app>/`, `domain/` + `adapters/`, `packages/db`, `make` targets), name the SQLAlchemy layer (Core versus ORM mapping) on top of `newsdock_db`, and drop the migrations and compose-startup TODOs that M0 resolved (Alembic in `infra/migrations/`, `make up` order).
 - [x] Agent cursor persistence: decided 2026-10-04 (R-2): file on named volume `agent_state`, saved after the whole batch succeeds; re-scoring is harmless (upsert).
 - [x] Expired-URL re-entry: accepted for the MVP (2026-10-04, R-12). Still to do: measure the cross-slot duplicate rate over several consecutive slots and revisit if material.
 - [ ] Compose startup order and health gating; Kafka topic creation (init job or auto-create).

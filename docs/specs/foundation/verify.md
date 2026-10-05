@@ -1,10 +1,10 @@
 # foundation — Verification
 
-Verified 2026-10-05 on commit `5fcbe7a` (branch `docs/foundation-plan`, not pushed) plus uncommitted doc-drift fixes. Machine: macOS 26.5.1 arm64, Docker Desktop 4.93.0 (engine 29.8.1).
+Verified 2026-10-05 on `main` at `ecd26fa` (pushed; CI green) after the first local pass on `5fcbe7a`. Machine: macOS 26.5.1 arm64, Docker Desktop 4.93.0 (engine 29.8.1). CI: GitHub Actions on ubuntu-24.04.
 
-## Verdict: **pending, 2 ACs need GitHub** (AC-12, AC-13)
+## Verdict: **pass**
 
-15 of 17 ACs are verified. AC-12 and AC-13 can only be proven by real pull requests; the owner chose to pause, push and open them, then re-run `/spec-verify foundation`. Nothing found so far is a defect: the unit proxies for AC-12/13 pass, and the workflow just has not run on GitHub yet. If the first CI run is clean the verdict becomes **pass**.
+All 17 ACs are verified: 15 `passing` by automated tests run in this session and CI, and 4 manual ACs (AC-2, AC-12, AC-13, AC-15) `manual-ok` with evidence. The first real CI run found three defects in the CI setup (below); all are fixed and CI is green on `main`. Open items are follow-ups for later milestones, not for M0.
 
 ## Runs in this session
 
@@ -61,8 +61,8 @@ Notes: import-linter reports the violating module name, not a file path (equival
 
 Scope: nothing outside the spec was implemented (extras are `make help` and the granular `*-python` targets already in the design); no backlog item leaked into code (grep for OpenAPI, heartbeat, pre-commit, Dependabot, gitleaks, trivy in code: none).
 
-## To finish verification (owner)
+## Follow-ups (moved to backlogs)
 
-1. Put the work on GitHub and let the first run validate the workflow: `git switch main && git merge --ff-only docs/foundation-plan && git push origin main` (a push to `main` runs the full workflow).
-2. Open three small pull requests against `main` that each change one file: `apps/web/README.md` only (expect `check-web` and the web build only), `apps/api/README.md` only (expect `check-python` and the api build only), `packages/core/README.md` only (expect all five Python builds, no web build). Each must end with `ci-ok` green.
-3. Re-run `/spec-verify foundation`: it will read the runs, fill M-4 and settle AC-12 and AC-13.
+- `ubuntu-latest` migrates to Ubuntu 26 on 2026-10-19 (GitHub annotation): pin `ubuntu-24.04` or run once on the new image (`docs/specs/foundation/backlog.md`).
+- Update the M1 docs for M0 decisions (`docs/specs/mvp/backlog.md`, Design TODOs).
+- Branch cleanup: local branches `docs/foundation-plan`, `fix/ci-pin-setup-uv`, `fix/doctor-test-isolation` are fully merged into `main` and can be deleted.
