@@ -54,7 +54,7 @@ Roles: `ingester_rw` (ingest_slot), `sink_rw` (articles, analyses delete via cas
 
 **Cursor.** `next_cursor = b64("seq:<max seq returned>")`; no cursor → the server returns articles with `ingested_at` ≥ now − 1 h (constant `FIRST_RUN_WINDOW`), so a first run never scores the whole store.
 
-**Demo agent loop.** `list_new_articles(cursor)` → skip articles whose `themes` match none of `AGENT_THEME_PREFIXES` (default `ECON_`, `WB_` + finance; ~24% of rows, per `research.md`; articles with empty themes are skipped by design) → score each remaining article with Ollama → `submit_analysis` → **after the whole batch succeeded**, save `next_cursor` to `/data/cursor.json` on the named volume `agent_state`. A crash mid-batch re-scores that batch (harmless: `analyses` upserts). The spike measures seconds per score to confirm the agent keeps up with ~500 rows per 15 min.
+**Demo agent loop.** `list_new_articles(cursor)` → skip articles whose `themes` match none of `AGENT_THEME_PREFIXES` (default `ECON_`, `WB_` + finance; ~24% of rows, per `docs/research.md`; articles with empty themes are skipped by design) → score each remaining article with Ollama → `submit_analysis` → **after the whole batch succeeded**, save `next_cursor` to `/data/cursor.json` on the named volume `agent_state`. A crash mid-batch re-scores that batch (harmless: `analyses` upserts). The spike measures seconds per score to confirm the agent keeps up with ~500 rows per 15 min.
 
 **Search.** Parameterized SQL; `text` = `title ILIKE '%…%'` (escape `%`, `_`); `theme` = `themes @> ARRAY[$1]`; limit clamped.
 

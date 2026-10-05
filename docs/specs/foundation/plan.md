@@ -34,18 +34,18 @@ Effort is relative (S/M/L), no dates **[assumption]**.
 | 0 Prerequisites and spikes | [x] T-00 (2026-10-05; Ollama model pull and docs commit deferred to the owner, needed before AC-2 and T-03) | Owner prerequisites (no code) | none | S | enables AC-2, 8–11, 15 |
 | | [x] T-01 (2026-10-05) | SPIKE: Docker, Kafka, Postgres, uv-in-Docker | T-00 | M | de-risks AC-8–11 |
 | | [x] T-02 (2026-10-05) | SPIKE: web toolchain and Node pin | T-00 | S | de-risks AC-3, 4, 6 |
-| 1 Python skeleton and gate | [ ] T-03 | Python workspace skeleton, `make test` | T-00 | M | AC-3, AC-6 (Python) |
-| | [ ] T-04 | Python quality gate and rule tests | T-03 | L | AC-4 (Python), AC-5, AC-7, AC-17 |
-| | [ ] T-05 | Layout check script, move `research.md` | T-04 | M | AC-16 |
-| | [ ] T-06 | `make doctor` | T-03 | S | AC-1, AC-2 |
-| 2 Web | [ ] T-07 | Web scaffold and gate | T-02, T-03 | M | AC-3, AC-4, AC-6 (web) |
-| 3 Images and infra | [ ] T-08 | App Dockerfiles, `apps` profile, `make build` | T-01, T-03, T-07 | L | AC-8 |
-| | [ ] T-09 | Compose Kafka + Postgres, `up`/`down` | T-01, T-03 | M | AC-9 |
-| | [ ] T-10 | Topic setup job | T-09 | S | AC-10 |
-| | [ ] T-11 | `packages/db`, Alembic, `make migrate` | T-09, T-03 | L | AC-11 |
-| 4 Docs, CI, onboarding | [ ] T-12 | Docs, `docs-check`, full `make check` | T-05, T-07, T-11 | M | AC-14, AC-15 (README) |
-| | [ ] T-13 | CI workflow | T-04, T-07, T-08, T-11, T-12 | M | AC-12, AC-13 |
-| | [ ] T-14 | Clean-clone dry run, CLAUDE.md commands | T-00…T-13 | S | AC-15, AC-2 (dry runs) |
+| 1 Python skeleton and gate | [x] T-03 (2026-10-05) | Python workspace skeleton, `make test` | T-00 | M | AC-3, AC-6 (Python) |
+| | [x] T-04 (2026-10-05) | Python quality gate and rule tests | T-03 | L | AC-4 (Python), AC-5, AC-7, AC-17 |
+| | [x] T-05 (2026-10-05) | Layout check script, move `research.md` | T-04 | M | AC-16 |
+| | [x] T-06 (2026-10-05) | `make doctor` | T-03 | S | AC-1, AC-2 |
+| 2 Web | [x] T-07 (2026-10-05) | Web scaffold and gate | T-02, T-03 | M | AC-3, AC-4, AC-6 (web) |
+| 3 Images and infra | [x] T-08 (2026-10-05) | App Dockerfiles, `apps` profile, `make build` | T-01, T-03, T-07 | L | AC-8 |
+| | [x] T-09 (2026-10-05) | Compose Kafka + Postgres, `up`/`down` | T-01, T-03 | M | AC-9 |
+| | [x] T-10 (2026-10-05) | Topic setup job | T-09 | S | AC-10 |
+| | [x] T-11 (2026-10-05) | `packages/db`, Alembic, `make migrate` | T-09, T-03 | L | AC-11 |
+| 4 Docs, CI, onboarding | [x] T-12 (2026-10-05) | Docs, `docs-check`, full `make check` | T-05, T-07, T-11 | M | AC-14, AC-15 (README) |
+| | [x] T-13 (2026-10-05) | CI workflow | T-04, T-07, T-08, T-11, T-12 | M | AC-12, AC-13 |
+| | [x] T-14 (2026-10-05) | Clean-clone dry run, CLAUDE.md commands | T-00…T-13 | S | AC-15, AC-2 (dry runs) |
 
 ## Milestone markers
 
@@ -69,3 +69,9 @@ A multi-part AC (AC-3, AC-4, AC-6) is marked `passing` only after its last part 
 
 ## Out of scope for M0 (stay in `backlog.md`)
 OpenAPI type generation, running services with healthchecks, pre-commit hooks, dependency bots, secret and image scanning, CI caching, dev containers, Linux/Windows notes, any M1 domain code.
+
+## Implementation notes (T-14 dry run, 2026-10-05)
+
+Dry run in a clean copy (tracked plus untracked-not-ignored files only, no `.venv` or `node_modules`), following only `README.md`: `make doctor`, `make setup`, `make check` (86 Python tests, web, docs; about 24 s with warm caches), `make build` (7 images, about 11 s warm), `cp .env.example .env`, `make up` (about 12 s: Kafka and Postgres healthy, 3 topics, revision `0001`, `vector`), `make down`, `make up` again. Stumbling point found and fixed: raw `docker compose` needs `--env-file .env` (README troubleshooting and `CLAUDE.md`). Image sizes: Python apps 229 MB, web 402 MB. These are dry-run numbers for the measurements table, not the formal evidence.
+
+**Left for `/spec-verify`:** TC-4 (AC-2, needs an Ollama model pulled), TC-31 and TC-32 (AC-12, AC-13: push the branch and open pull requests that change only `apps/web` and only `apps/api`, plus one touching `packages/core`), TC-36 (AC-15 on a real clone of a pushed commit), measurements M-1…M-4, and a re-run of `make check`, `make test-rules` and `make test-infra`.

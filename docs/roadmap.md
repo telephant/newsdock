@@ -3,7 +3,7 @@
 **Vision:** a shared "news dock" that ingests GDELT news once (clean, dedup, 7-day store) so any custom AI agent, such as a financial-relevance agent, can plug in. Also the owner's path from frontend engineer to AI production / full-stack engineer.
 
 **Current milestone:** M0 (spec folder `foundation`), stage: **plan approved**, next `/spec-implement foundation`. M1 (`mvp`) is design-approved and waits for M0 before `/spec-plan mvp`.
-Specs: [mvp spec](specs/mvp/spec.md) · Items: [backlog](specs/mvp/backlog.md) · Decisions: [ADRs](adr/) · Evidence: [research](../research.md)
+Specs: [mvp spec](specs/mvp/spec.md) · Items: [backlog](specs/mvp/backlog.md) · Decisions: [ADRs](adr/) · Evidence: [research](research.md)
 
 | M | Goal | Skills it teaches / proves | Exit condition | Depends on | Status |
 |---|---|---|---|---|---|

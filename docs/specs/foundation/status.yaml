@@ -2,22 +2,22 @@ feature: foundation
 stage: implement
 updated: 2026-10-05
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided}
-gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: pending}
 acs:
-  AC-1: {status: todo}
-  AC-2: {status: todo}
-  AC-3: {status: todo}
-  AC-4: {status: todo}
-  AC-5: {status: todo}
-  AC-6: {status: todo}
-  AC-7: {status: todo}
-  AC-8: {status: todo}
-  AC-9: {status: todo}
-  AC-10: {status: todo}
-  AC-11: {status: todo}
-  AC-12: {status: todo}
-  AC-13: {status: todo}
-  AC-14: {status: todo}
-  AC-15: {status: todo}
-  AC-16: {status: todo}
-  AC-17: {status: todo}
+  AC-1: {status: passing}
+  AC-2: {status: in-progress}
+  AC-3: {status: passing}
+  AC-4: {status: passing}
+  AC-5: {status: passing}
+  AC-6: {status: passing}
+  AC-7: {status: passing}
+  AC-8: {status: passing}
+  AC-9: {status: passing}
+  AC-10: {status: passing}
+  AC-11: {status: passing}
+  AC-12: {status: in-progress}
+  AC-13: {status: in-progress}
+  AC-14: {status: passing}
+  AC-15: {status: in-progress}
+  AC-16: {status: passing}
+  AC-17: {status: passing}

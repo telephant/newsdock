@@ -3,10 +3,10 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` plan approved (15 tasks, T-00…T-14), next `/spec-implement foundation T-00` (owner prerequisites). M1 `mvp` design is approved and its plan waits for M0. No application code exists yet.
+- Stage: M0 `foundation` implemented (tasks T-00…T-14 done), next `/spec-verify foundation`. M1 `mvp` design is approved; update its docs for M0 decisions (`packages/db`, SQLAlchemy layer, tooling) in `/spec-design mvp`, then `/spec-plan mvp`. Only skeleton code exists (apps print their name; no domain logic yet).
 - Roadmap: `docs/roadmap.md` (current milestone: M0).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
-- Real GDELT evidence and a sample row: `research.md`. Check it before assuming anything about the data.
+- Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
 - Open items: `docs/specs/mvp/backlog.md` ("Design TODOs").
 
 ## Repo layout (monorepo, Python + TypeScript in one git repo)
@@ -44,7 +44,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Dead-letter reasons: `missing_url`, `missing_title`, `bad_column_count`, `bad_field`.
 - Agent score payload: `{relevant, score (0–1), reason}`; `submit_analysis` accepts any JSON object.
 
-## GDELT rules (verified in `research.md`)
+## GDELT rules (verified in `docs/research.md`)
 - Follow redirects; `http://` URLs in the index redirect to `https://`.
 - A slot can be listed yet return 404 or an empty body. Treat 404, empty body or md5 mismatch as "retry later" (slot stays `pending`, max 4 attempts), never as an error or as data.
 - Poll interval is configurable but never below 900 s.
@@ -63,9 +63,17 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Keep `design.md` ≤ ~150 lines; detail goes in `design-detail.md`. Each design diagram has ≤ ~12 nodes and a "Check" box.
 - ADRs live in `docs/adr/NNNN-<decision>.md` with a Status line; never treat a Proposed ADR as decided.
 
+## Commands (run from the repo root; `make help` lists them)
+- `make doctor` check tools; `make setup` install from lockfiles; `make check` everything (`check-python`, `check-web`, `docs-check`).
+- `make test APP=<ingester|processor|sink|api|agent|web>` one app's tests; `make test-rules` proves each enforced rule fails when violated; `make test-infra` Docker tests (needs Docker, ports 5433 and 29092 free, no `.env` surprises: it backs up and restores your own).
+- `make build [APP=<name>]` images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); `cp .env.example .env` then `make up` / `make down`; `make topics`, `make migrate` are idempotent.
+- Raw compose needs the env file: `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
+- Python: `uv run ...` (never `pip`); one workspace, `uv sync --all-packages --locked`. Web: `pnpm --dir apps/web run <script>`; Node 24 comes from pnpm, not the system.
+- Quality tools: ruff (lint, format, `TID251` bans `os.environ`/`os.getenv` outside `config.py`), mypy strict with the pydantic plugin, import-linter contracts in `pyproject.toml`, `infra/scripts/check_layout.py`, `infra/scripts/check_docs.py`.
+
 ## Environment notes
-- Docker and Ollama are not installed yet; installing them is part of M0 `foundation` (the owner installs Docker Desktop and Ollama; see `docs/specs/foundation/spec.md`).
-- Git repo initialised on `main`, no commits yet. `uv` and `pnpm` are not installed; system Python is 3.9 (need 3.12+). M0 provisions Python 3.12 via uv and Node 24 via pnpm (ADR-0009).
-- Build, test and run commands do not exist yet. Add them here when the first tasks create them, instead of guessing.
+- Machine: macOS arm64. Docker Desktop 4.93, uv, pnpm and Ollama are installed; no Ollama model is pulled yet (needed for the manual AC-2 check and M1).
+- A local Postgres already listens on 5432, so compose publishes Postgres on 5433 (`POSTGRES_PORT`).
+- Spike findings and verified versions: `docs/specs/foundation/design-detail.md` §5, §6, §8, §11.
 
 <!-- Maintainer note: keep this file under 200 lines; move topic-specific rules to .claude/rules/ with `paths` frontmatter once code exists. -->

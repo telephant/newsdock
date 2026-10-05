@@ -1,0 +1,116 @@
+[project]
+name = "newsdock"
+version = "0.0.0"
+description = "newsdock monorepo root: shared tooling configuration only, no code."
+requires-python = ">=3.12"
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/*", "packages/*"]
+exclude = ["apps/web"]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy", "import-linter", "alembic", "pyyaml", "types-pyyaml"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib -m 'not rules and not docker'"
+testpaths = ["apps", "packages", "infra/scripts"]
+pythonpath = ["infra/scripts"]
+markers = [
+    "rules: mutation tests that prove each enforced rule fails when violated (make test-rules)",
+    "docker: tests that need Docker (make test-infra)",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.environ".msg = "DR-9: read environment variables only in config.py"
+"os.getenv".msg = "DR-9: read environment variables only in config.py"
+
+[tool.ruff.lint.per-file-ignores]
+"**/config.py" = ["TID251"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = [
+    "apps/ingester/src",
+    "apps/processor/src",
+    "apps/sink/src",
+    "apps/api/src",
+    "apps/agent/src",
+    "packages/core/src",
+    "packages/db/src",
+    "infra/scripts",
+]
+
+[tool.importlinter]
+root_packages = [
+    "newsdock_core",
+    "newsdock_db",
+    "newsdock_ingester",
+    "newsdock_processor",
+    "newsdock_sink",
+    "newsdock_api",
+    "newsdock_agent",
+]
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "DR-7 apps are independent"
+type = "independence"
+modules = [
+    "newsdock_ingester",
+    "newsdock_processor",
+    "newsdock_sink",
+    "newsdock_api",
+    "newsdock_agent",
+]
+
+[[tool.importlinter.contracts]]
+name = "DR-7 core imports no app, db or I/O library"
+type = "forbidden"
+source_modules = ["newsdock_core"]
+forbidden_modules = [
+    "newsdock_db",
+    "newsdock_ingester",
+    "newsdock_processor",
+    "newsdock_sink",
+    "newsdock_api",
+    "newsdock_agent",
+    "confluent_kafka",
+    "psycopg",
+    "sqlalchemy",
+    "alembic",
+    "httpx",
+    "fastapi",
+]
+
+[[tool.importlinter.contracts]]
+name = "DR-6 domain is pure"
+type = "forbidden"
+source_modules = [
+    "newsdock_ingester.domain",
+    "newsdock_processor.domain",
+    "newsdock_sink.domain",
+    "newsdock_api.domain",
+    "newsdock_agent.domain",
+]
+forbidden_modules = [
+    "newsdock_ingester.adapters",
+    "newsdock_processor.adapters",
+    "newsdock_sink.adapters",
+    "newsdock_api.adapters",
+    "newsdock_agent.adapters",
+    "newsdock_db",
+    "confluent_kafka",
+    "psycopg",
+    "sqlalchemy",
+    "alembic",
+    "httpx",
+    "fastapi",
+]

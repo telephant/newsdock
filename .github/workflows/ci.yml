@@ -1,0 +1,152 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      web: ${{ steps.filter.outputs.web }}
+      tooling: ${{ steps.filter.outputs.tooling }}
+      apps: ${{ steps.matrix.outputs.apps }}
+      has_apps: ${{ steps.matrix.outputs.has_apps }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'apps/ingester/**'
+              - 'apps/processor/**'
+              - 'apps/sink/**'
+              - 'apps/api/**'
+              - 'apps/agent/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.python-version'
+              - 'infra/scripts/**'
+              - 'infra/migrations/**'
+            tooling:
+              - 'Makefile'
+              - '.github/workflows/**'
+            ingester:
+              - 'apps/ingester/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            processor:
+              - 'apps/processor/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            sink:
+              - 'apps/sink/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            api:
+              - 'apps/api/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            agent:
+              - 'apps/agent/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            web:
+              - 'apps/web/**'
+            migrate:
+              - 'infra/migrations/**'
+              - 'packages/db/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+      - id: matrix
+        env:
+          INGESTER: ${{ steps.filter.outputs.ingester }}
+          PROCESSOR: ${{ steps.filter.outputs.processor }}
+          SINK: ${{ steps.filter.outputs.sink }}
+          API: ${{ steps.filter.outputs.api }}
+          AGENT: ${{ steps.filter.outputs.agent }}
+          WEB: ${{ steps.filter.outputs.web }}
+          MIGRATE: ${{ steps.filter.outputs.migrate }}
+        run: |
+          apps=()
+          [ "$INGESTER" = true ] && apps+=(ingester)
+          [ "$PROCESSOR" = true ] && apps+=(processor)
+          [ "$SINK" = true ] && apps+=(sink)
+          [ "$API" = true ] && apps+=(api)
+          [ "$AGENT" = true ] && apps+=(agent)
+          [ "$WEB" = true ] && apps+=(web)
+          [ "$MIGRATE" = true ] && apps+=(migrate)
+          if [ "${#apps[@]}" -eq 0 ]; then
+            echo "apps=[]" >> "$GITHUB_OUTPUT"
+            echo "has_apps=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "apps=$(printf '%s\n' "${apps[@]}" | jq -R . | jq -sc .)" >> "$GITHUB_OUTPUT"
+            echo "has_apps=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  check-python:
+    needs: changes
+    if: needs.changes.outputs.python == 'true' || needs.changes.outputs.tooling == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: make setup-python
+      - run: make check-python
+      - run: make test-rules
+
+  check-web:
+    needs: changes
+    if: needs.changes.outputs.web == 'true' || needs.changes.outputs.tooling == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          package_json_file: apps/web/package.json
+      - run: make setup-web
+      - run: make check-web
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+      - run: make docs-check
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.has_apps == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - run: make build APP=${{ matrix.app }}
+
+  ci-ok:
+    if: always()
+    needs: [changes, check-python, check-web, docs, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail when any needed job failed or was cancelled
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+        run: |
+          echo "$RESULTS"
+          if echo "$RESULTS" | grep -E '"(failure|cancelled)"'; then exit 1; fi

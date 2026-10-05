@@ -95,6 +95,8 @@ Also fails if an app is missing from the import-linter contracts (keeps AC-7 hon
 
 **`0001_baseline.py`:** `upgrade()` runs `CREATE EXTENSION IF NOT EXISTS vector`; `downgrade()` is a no-op (forward-only, DR-11). `env.py` imports `newsdock_db.config` for the URL and `newsdock_db.metadata` (empty in M0) as `target_metadata`. AC-11 check: after two `make migrate` runs, `select version_num from alembic_version` returns exactly `0001` and `pg_extension` lists `vector`.
 
+**Findings from T-11 [verified]:** the async engine needs `sqlalchemy[asyncio]` (greenlet); `uv sync --frozen --package newsdock-db --extra migrate` works in the migration image, so alembic stays an optional extra of `newsdock-db` and is also in the root dev group for type checking; mypy needs the `pydantic.mypy` plugin for pydantic-settings classes; `make migrate` runs `docker compose run --rm --no-deps migrate` (Postgres must already be up; `make up` guarantees it), while `depends_on postgres: service_healthy` stays in the compose file for a full `docker compose up` in M1; `.env.example` is passed to compose for `build` and `down`, `.env` for `up`.
+
 **`packages/db` (M0 content):** `config.py` (pydantic-settings, `DATABASE_URL`, driver `postgresql+psycopg`), `engine.py` (sync and async engine factories), `metadata.py` (empty `MetaData` with a naming convention), one smoke test. M1 adds tables here and the M1 design chooses Core versus mapped classes.
 
 ## 7. CI (`ci.yml`)
