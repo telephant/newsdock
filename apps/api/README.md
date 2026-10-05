@@ -23,3 +23,5 @@ make test APP=api                      # unit tests
 uv run python -m newsdock_api          # run the entrypoint
 make build APP=api                     # build the image newsdock-api:dev
 ```
+
+<!-- ci path-filter test: touches only apps/api/README.md -->
