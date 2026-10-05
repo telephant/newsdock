@@ -10,7 +10,7 @@ D-2: MCP + REST. Official `mcp` Python SDK is at 2.3.0 (2026-10-02), v1.30 legac
 2. Two processes.
 3. stdio MCP only.
 
-## Decision (proposed)
+## Decision
 Option 1, `mcp>=2,<3`. If v2 proves awkward at implementation, drop to `mcp` 1.x with the same tool contract (tool names/schemas are the contract, not the SDK).
 
 ## Consequences

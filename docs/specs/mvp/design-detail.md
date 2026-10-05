@@ -37,7 +37,7 @@ CREATE TABLE analyses (
 );
 
 CREATE TABLE ingest_slot (
-  slot text PRIMARY KEY, status text NOT NULL,  -- pending | published
+  slot text PRIMARY KEY, status text NOT NULL,  -- pending | published | failed
   attempts int NOT NULL DEFAULT 0, row_count int, updated_at timestamptz NOT NULL DEFAULT now()
 );
 ```
@@ -46,13 +46,15 @@ Roles: `ingester_rw` (ingest_slot), `sink_rw` (articles, analyses delete via cas
 
 ## 2. Algorithms
 
-**Ingester cycle.** `GET lastupdate.txt` (follow redirects) → take line ending `.gkg.csv.zip` → slot from file name → process this slot and every `pending` slot with attempts < 4. Per slot: GET (404, empty, or md5 mismatch → attempts+1, stay pending, log) → unzip → for each line produce `gkg.raw` keyed `<slot>:<row_no>` → `flush()` → mark `published`. Interval default 900 s, minimum enforced 900 s.
+**Ingester cycle.** `GET lastupdate.txt` (follow redirects) → take line ending `.gkg.csv.zip` → slot from file name → process this slot and every `pending` slot with attempts < 4; a slot whose 4th attempt fails becomes `failed` (logged, never retried automatically). Per slot: GET (404, empty, or md5 mismatch → attempts+1, stay pending, log) → unzip → for each line produce `gkg.raw` keyed `<slot>:<row_no>` → `flush()` → mark `published`. Interval default 900 s, minimum enforced 900 s.
 
-**Processor.** Kafka consumer group `processor` on `gkg.raw`, `enable.auto.commit=false`. Per message: split on `\t`; columns ≠ 27 → dlq `bad_column_count`; URL = col 5, title from `<PAGE_TITLE>` in col 27; empty → dlq; normalize URL (lower-case scheme/host, strip fragment and trailing `/`, keep query) → `url_hash`; themes = col 9 (V2, strip `,offset`) falling back to col 8, **empty is normal (86/527 rows)**; persons = col 13, orgs = col 15 (V2 names, strip offsets); tone = col 16 (7 numbers); published_at = col 2. Produce to `gkg.clean` (key `url_hash`) or `gkg.dlq`; flush, then commit offsets per batch. Stateless.
+**Processor.** Kafka consumer group `processor` on `gkg.raw`, `enable.auto.commit=false`. Per message: split on `\t`; columns ≠ 27 → dlq `bad_column_count`; `gkg_record_id` = col 1, `domain` = col 4 (may be empty → null), URL = col 5, title from `<PAGE_TITLE>` in col 27; empty → dlq; normalize URL (lower-case scheme/host, strip fragment and trailing `/`, keep query) → `url_hash`; themes = col 9 (V2, strip `,offset`) falling back to col 8, **empty is normal (86/527 rows)**; persons = col 13, orgs = col 15 (V2 names, strip offsets); tone = col 16 (7 numbers); published_at = `<PAGE_PRECISEPUBTIMESTAMP>` from col 27 when present and parseable, else col 2 (GDELT processing time). Produce to `gkg.clean` (key `url_hash`) or `gkg.dlq`; flush, then commit offsets per batch. Stateless.
 
-**Sink.** Kafka consumer group `sink`, `enable.auto.commit=false`; batch up to 200 messages / 1 s → `INSERT … ON CONFLICT (url_hash) DO NOTHING` → commit. Retention thread: hourly `DELETE FROM articles WHERE ingested_at < now() - interval '7 days'`.
+**Sink.** Kafka consumer group `sink`, `enable.auto.commit=false`; batch up to 200 messages / 1 s → `INSERT … ON CONFLICT (url_hash) DO NOTHING` → commit. If the batch insert fails, retry the rows one by one: a row that fails again (e.g. NUL byte, out-of-range value) goes to `gkg.dlq` with reason `bad_field`, the rest are written, then commit (a transient DB outage is not a row error: if the DB is unreachable, back off and retry without commit). Retention thread: hourly `DELETE FROM articles WHERE ingested_at < now() - interval '7 days'`.
 
-**Cursor.** `next_cursor = b64("seq:<max seq returned>")`; no cursor → start from now − 24 h worth (`seq` of the oldest article ≥ now−24 h) so a first run does not score the whole store (open to change).
+**Cursor.** `next_cursor = b64("seq:<max seq returned>")`; no cursor → the server returns articles with `ingested_at` ≥ now − 1 h (constant `FIRST_RUN_WINDOW`), so a first run never scores the whole store.
+
+**Demo agent loop.** `list_new_articles(cursor)` → skip articles whose `themes` match none of `AGENT_THEME_PREFIXES` (default `ECON_`, `WB_` + finance; ~24% of rows, per `research.md`; articles with empty themes are skipped by design) → score each remaining article with Ollama → `submit_analysis` → **after the whole batch succeeded**, save `next_cursor` to `/data/cursor.json` on the named volume `agent_state`. A crash mid-batch re-scores that batch (harmless: `analyses` upserts). The spike measures seconds per score to confirm the agent keeps up with ~500 rows per 15 min.
 
 **Search.** Parameterized SQL; `text` = `title ILIKE '%…%'` (escape `%`, `_`); `theme` = `themes @> ARRAY[$1]`; limit clamped.
 
@@ -66,7 +68,7 @@ Roles: `ingester_rw` (ingest_slot), `sink_rw` (articles, analyses delete via cas
 
 ## 4. Compose layout
 
-Services: `kafka`, `postgres`, `processor`, `sink`, `ingester`, `api`, `agent`, `web`. Networks: `data` (kafka, postgres, processor, sink, ingester, api) and `agent` (api, agent, web). `agent` has `MCP_URL` and `OLLAMA_URL` only. Healthchecks on kafka, postgres, api. Memory budget target ≤ 8 GB; measure; without a JVM it should be well under 8 GB **[assumption]**.
+Services: `kafka`, `postgres`, `processor`, `sink`, `ingester`, `api`, `agent`, `web`. Networks: `data` (kafka, postgres, processor, sink, ingester, api) and `agent` (api, agent, web). `agent` has `MCP_URL`, `OLLAMA_URL` and the named volume `agent_state` (cursor file) only. Healthchecks on **all 8 services** (needed for AC-15): kafka and postgres native probes; api `GET /api/health`; web `GET /`; ingester, processor, sink and agent touch a heartbeat file (`/tmp/healthy`) every loop and the check passes while its mtime is younger than 2× the loop interval (ingester: 20 min). Memory budget target ≤ 8 GB; measure; without a JVM it should be well under 8 GB **[assumption]**.
 
 ## 5. Full failure table
 
@@ -78,7 +80,8 @@ Services: `kafka`, `postgres`, `processor`, `sink`, `ingester`, `api`, `agent`, 
 | Row publish partially done | slot not `published` | whole slot re-published; downstream dedup absorbs |
 | Processor crash | container restart | resume from committed offset; downstream idempotent |
 | Poison message | exception in map | catch per row → dlq `bad_field` |
-| Sink DB error | exception | no commit, backoff retry |
+| Sink DB unreachable | exception (connection) | no commit, backoff retry |
+| Sink row rejected by Postgres | exception persists in row-by-row retry | row → `gkg.dlq` (`bad_field`), batch committed |
 | Retention delete races with sink | none | independent rows, no issue |
 | `submit_analysis` unknown article | FK violation | return MCP error `not_found` |
 | Oversized payload | size check > 64 KB | reject |

@@ -1,9 +1,8 @@
-feature: mvp
-stage: design
-updated: 2026-10-04
-reviews: {design: approve-with-changes, date: 2026-10-04}
-decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided}
-gates: {init: approved, design: approved, plan: pending, implement: pending, verify: pending}
+feature: foundation
+stage: implement
+updated: 2026-10-05
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided}
+gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
 acs:
   AC-1: {status: todo}
   AC-2: {status: todo}
@@ -20,3 +19,5 @@ acs:
   AC-13: {status: todo}
   AC-14: {status: todo}
   AC-15: {status: todo}
+  AC-16: {status: todo}
+  AC-17: {status: todo}

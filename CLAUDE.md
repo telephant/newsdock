@@ -3,18 +3,26 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: design approved; next is `/spec-plan mvp`. No application code exists yet.
-- Roadmap: `docs/roadmap.md` (current milestone: M1).
+- Stage: M0 `foundation` plan approved (15 tasks, T-00…T-14), next `/spec-implement foundation T-00` (owner prerequisites). M1 `mvp` design is approved and its plan waits for M0. No application code exists yet.
+- Roadmap: `docs/roadmap.md` (current milestone: M0).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `research.md`. Check it before assuming anything about the data.
-- Open items: `docs/specs/mvp/backlog.md` ("Design TODOs"). Pending change: `published_at` should prefer `<PAGE_PRECISEPUBTIMESTAMP>` over column 2 (not yet applied to design docs).
+- Open items: `docs/specs/mvp/backlog.md` ("Design TODOs").
 
 ## Repo layout (monorepo, Python + TypeScript in one git repo)
 - `apps/<service>/` one deployable per folder: `ingester`, `processor`, `sink`, `api`, `agent` (Python) and `web` (Next.js + TS). Each app owns its dependency file and Dockerfile.
-- `packages/core/` shared Python code (GKG parsing, URL normalisation, models). Apps may import `packages/*`, never another app.
-- `infra/` docker-compose, SQL migrations, Kafka topic setup. `docs/` specs and ADRs.
+- `packages/core/` shared pure Python code (GKG parsing, URL normalisation, models, contracts); `packages/db/` SQLAlchemy engine, config and metadata. Apps may import `packages/*`, never another app.
+- `infra/` docker-compose, Alembic migrations, Kafka topic setup, check scripts. `docs/` specs and ADRs.
 - The only link between Python and TS is the REST/OpenAPI contract; generate the UI's types from it instead of hand-writing them.
 - Python: one `uv` workspace at the root (planned); web: its own `package.json` in `apps/web`. CI jobs run only for the apps whose files changed.
+
+## Directory rules (foundation spec §6, DR-1…DR-13; enforced by `make check` once M0 builds it)
+- Repo root: only `apps/`, `packages/`, `infra/`, `docs/`, `.github/` and root tooling files. New app or top-level folder needs an ADR.
+- Python app: `pyproject.toml`, `Dockerfile`, `README.md`, `src/newsdock_<app>/`, `tests/`. Code only under `src/`, tests only under `tests/` (`unit/` mirrors `src/`, `integration/` marked).
+- Inside every Python app: `__main__.py` wires only; `domain/` is pure logic (stdlib, pydantic, `newsdock_core` only); `adapters/` holds all I/O. Adapters import domain, never the reverse.
+- Apps import `packages/*` only, never another app. `newsdock_core` imports no app and no I/O library. Shared contracts live once in `newsdock_core.contracts`; GDELT fixtures only in `packages/core/tests/fixtures/`.
+- Env is read only in `config.py`. SQL and query building only in `adapters/` and Alembic migrations (`infra/migrations/versions/NNNN_<name>.py`), always parameterized. DB access is SQLAlchemy 2 via the shared package `packages/db` (`newsdock_db`); `domain/` and `newsdock_core` never import it.
+- Web `src/`: `app/` thin routes, `features/<name>/` feature code, `components/` shared UI without data fetching, `lib/api/` generated client (never hand-edited).
 
 ## Workflow
 - Work follows the spec pipeline: `/spec-init` → `/spec-design` → `/spec-plan` → `/spec-implement` → `/spec-verify`, one folder per feature under `docs/specs/<name>/`.
@@ -56,8 +64,8 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - ADRs live in `docs/adr/NNNN-<decision>.md` with a Status line; never treat a Proposed ADR as decided.
 
 ## Environment notes
-- Docker and Ollama are not installed yet; installing them is the first implementation task (T-00).
-- Git repo initialised on `main`, no commits yet. `uv` and `pnpm` are not installed; system Python is 3.9 (need 3.12+). Add these to T-00.
+- Docker and Ollama are not installed yet; installing them is part of M0 `foundation` (the owner installs Docker Desktop and Ollama; see `docs/specs/foundation/spec.md`).
+- Git repo initialised on `main`, no commits yet. `uv` and `pnpm` are not installed; system Python is 3.9 (need 3.12+). M0 provisions Python 3.12 via uv and Node 24 via pnpm (ADR-0009).
 - Build, test and run commands do not exist yet. Add them here when the first tasks create them, instead of guessing.
 
 <!-- Maintainer note: keep this file under 200 lines; move topic-specific rules to .claude/rules/ with `paths` frontmatter once code exists. -->

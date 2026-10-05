@@ -9,7 +9,7 @@ The processor produces clean rows to `gkg.clean`; something must write them to P
 1. Processor → `gkg.clean` → Python consumer → Postgres.
 2. Processor writes Postgres directly.
 
-## Decision (proposed)
+## Decision
 Option 1. The sink also owns retention and assigns `seq` (single writer → monotone cursor).
 
 ## Consequences

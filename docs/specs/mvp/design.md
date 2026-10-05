@@ -21,7 +21,7 @@ Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not re
 ## 2. Key flows
 
 - **F-1 Ingest cycle:** C-1 → C-2 `gkg.raw` → C-3 → `gkg.clean` / `gkg.dlq` → C-4 → C-5. (Sequence diagram 2)
-- **F-2 Agent run:** C-7 → C-6 `list_new_articles(cursor)` → Ollama → C-6 `submit_analysis`. (Sequence diagram 3)
+- **F-2 Agent run:** C-7 → C-6 `list_new_articles(cursor)` → theme pre-filter → Ollama → C-6 `submit_analysis`; cursor saved to the agent's own volume after the batch. (Sequence diagram 3)
 - **F-3 Human browse:** C-8 → C-6 REST `GET /api/articles` → C-5. (Component diagram 1)
 - **F-4 Retention:** C-4 scheduler deletes rows with `ingested_at` older than 7 days (analyses cascade). (State diagram 5)
 
@@ -42,6 +42,8 @@ Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not re
 | `search_articles` | `time_from?, time_to?, theme?, domain?, text?, limit (default 20, max 100)` | `articles[]` (summary form) |
 | `get_article` | `article_id` (= `url_hash`) | article + `analyses[]` |
 | `list_new_articles` | `cursor?, limit (default 50, max 200)` | `articles[], next_cursor` |
+
+Summary form (`articles[]` items): `article_id, title, url, domain, published_at, themes[]`.
 | `submit_analysis` | `article_id, agent_name, payload (JSON object)` | `{ok}` |
 
 **REST** (C-6, for UI): `GET /api/articles?theme&domain&text&from&to&limit&before`, `GET /api/articles/{article_id}`, `GET /api/health`. Detail in design-detail.
@@ -49,9 +51,10 @@ Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not re
 ## 4. Tricky parts
 
 - **Dedup + idempotency (AC-3, AC-6):** one layer, in Postgres: `PRIMARY KEY (url_hash)` + `ON CONFLICT DO NOTHING`. The processor is stateless, so `gkg.clean` may carry duplicates; the sink absorbs them. Re-ingesting a slot never changes the count.
-- **Slot state:** `ingest_slot` row per slot: `pending → published`. A slot is `published` only after every row is flushed to Kafka. Pending slots are retried each cycle up to 4 attempts, so a 404 never causes a gap (AC-2).
+- **Slot state:** `ingest_slot` row per slot: `pending → published`. A slot is `published` only after every row is flushed to Kafka. Pending slots are retried each cycle up to 4 attempts, then marked `failed`, so a slow-to-publish file (404) does not cause a gap (AC-2). Gaps still occur for slots never seen in `lastupdate.txt` (e.g. compose or laptop down for hours; backfill is backlog); the README must say so.
 - **Cursor (AC-10):** opaque base64 of the highest `seq` seen (`seq` = `bigserial`, assigned by the single writer C-4). Same cursor with no new data → empty list, same cursor back.
 - **Ordering:** none guaranteed across slots; the UI sorts by `published_at`, cursors use `seq` (insert order).
+- **`published_at`:** the precise publish timestamp from the extras column when present (65% of sampled rows), else GDELT's column 2 (processing time). Unparseable values fall back to column 2. Used for UI order and time filters; never for retention or the cursor.
 - **Retention clock:** `ingested_at` (not `published_at`), so old re-reported items are still kept 7 days after we first see them.
 
 ## 5. Top failure modes
@@ -62,6 +65,7 @@ Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not re
 | Processor crash/restart | messages redelivered | stateless, outputs idempotent downstream |
 | C-4 crash after write, before commit | message redelivered | upsert is a no-op |
 | Postgres down | sink stalls, Kafka buffers | no commit; resumes on recovery |
+| Row Postgres rejects (poison) | would block the sink batch forever | row-by-row retry, bad row → `gkg.dlq` `bad_field` |
 | Ollama down/slow | agent run fails | agent logs, leaves cursor unchanged, retries |
 | Malformed row | would poison the job | caught → `gkg.dlq` (AC-4) |
 

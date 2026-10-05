@@ -155,7 +155,7 @@ What the processor would store for this row:
 ## 4. Analysis and design consequences
 
 1. **Title lives inside column 27**, in an XML-like tag, not in its own column. The processor must extract `<PAGE_TITLE>` and send rows without it to the dead-letter topic.
-2. **Two timestamps.** Column 2 is when GDELT processed the record (here 08:15); `<PAGE_PRECISEPUBTIMESTAMP>` is when the article was published (here 06:52, 1 h 23 min earlier). The tag exists on only 65% of rows in this slot. **Proposed:** `published_at` = precise timestamp when present, else column 2. **Not yet applied:** `design.md` and `design-detail.md` still say column 2. Open TODO.
+2. **Two timestamps.** Column 2 is when GDELT processed the record (here 08:15); `<PAGE_PRECISEPUBTIMESTAMP>` is when the article was published (here 06:52, 1 h 23 min earlier). The tag exists on only 65% of rows in this slot. **Proposed:** `published_at` = precise timestamp when present, else column 2. **Applied 2026-10-04** to `design.md` and `design-detail.md` (design review R-3).
 3. **Empty fields are normal.** 16% of rows have no themes, 21% no persons, 28% no orgs. Missing themes/persons/orgs must not send a row to the dead-letter topic; only a missing URL or title does.
 4. **Use the V2 columns** (9, 13, 15) for themes, persons and orgs, stripping the `,offset` suffix, with V1 themes (col 8) as fallback. V1 persons/orgs are lower-cased, V2 keep original casing.
 5. **Dedup keying.** Record ids are unique per record, so dedup uses a normalised URL hash. No duplicate URLs were found inside one slot, so duplicates are expected mostly across slots, but that rate is unmeasured.
@@ -164,7 +164,7 @@ What the processor would store for this row:
 8. **Retry window.** Observed lag of ~12–27 min fits within the 4-cycle (1 h) retry cap in the design.
 
 ## 5. Open questions from this research
-- [ ] Apply the `published_at` change (precise timestamp, fallback column 2) to `design.md`, `design-detail.md` and the AC-5 fixture expectations.
+- [x] Apply the `published_at` change (precise timestamp, fallback column 2) to `design.md`, `design-detail.md` and the AC-5 fixture expectations.
 - [ ] Measure the cross-slot duplicate rate over several consecutive slots.
 - [ ] Measure the non-English share of titles.
 - [ ] Confirm GDELT attribution terms before any public demo.

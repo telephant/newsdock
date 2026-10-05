@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>newsdock foundation — design diagrams</title>
+<style>
+:root{--bg:#fff;--fg:#1c1e21;--muted:#5f6670;--card:#f6f7f9;--line:#d8dce1;--accent:#1d63d6;--check:#fff7e0;--checkline:#e5c25a}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8eb;--muted:#9aa2ad;--card:#1d2026;--line:#323843;--accent:#6ea2ff;--check:#2b2615;--checkline:#7a6420}}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 system-ui,sans-serif}
+header{position:sticky;top:0;background:var(--bg);border-bottom:1px solid var(--line);padding:10px 16px;z-index:5}
+nav a{margin-right:12px;color:var(--accent);text-decoration:none;white-space:nowrap;display:inline-block}
+main{max-width:980px;margin:0 auto;padding:0 16px 60px}
+section{margin-top:36px}
+h1{font-size:1.3rem;margin:0 0 6px}h2{font-size:1.15rem}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto}
+.check{background:var(--check);border:1px solid var(--checkline);border-radius:8px;padding:8px 14px;margin-top:10px}
+.check b{display:block}
+.muted{color:var(--muted)}
+</style>
+</head>
+<body>
+<header><h1>newsdock foundation (M0) — design diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Dev sequence</a><a href="#i">3 Import rules</a><a href="#ci">4 CI</a><a href="#d">5 Compose</a><a href="#t">6 Stack lifecycle</a></nav></header>
+<main>
+<p class="muted">Matches design.md. Component ids C-n are the same everywhere. No ER diagram: M0 has no data model beyond Alembic's <code>alembic_version</code> table.</p>
+
+<section id="c"><h2>1 Components</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  C1[C-1 Makefile] --> C2[C-2 doctor]
+  C1 --> C3[C-3 uv workspace + packages/db]
+  C1 --> C4[C-4 Python gate]
+  C1 --> C5[C-5 web + gate]
+  C1 --> C6[C-6 app images]
+  C1 --> C7[C-7 compose infra]
+  C7 --> C8[C-8 Alembic migrations]
+  C9[C-9 CI] --> C1
+  C10[C-10 docs + docs-check] --> C1
+  C3 --> C4
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Is every command a developer needs reachable through C-1, with CI using the same targets?</li>
+<li>Is any component here more than M0 needs (C-8 for a single baseline migration)?</li>
+<li>Is anything needed by the spec missing from this picture?</li></ul></div></section>
+
+<section id="s"><h2>2 Primary sequence: first-time setup to infra up</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant Dev as Developer
+  participant M as make
+  participant U as uv / pnpm
+  participant D as Docker Compose
+  participant K as kafka + postgres
+  Dev->>M: doctor
+  M-->>Dev: tool versions or MISSING tool
+  Dev->>M: setup
+  M->>U: uv sync --all-packages --locked, pnpm install --frozen-lockfile
+  Dev->>M: check
+  M->>U: ruff, mypy, import-linter, pytest, eslint, vitest
+  Dev->>M: build
+  M->>D: build 6 app images
+  Dev->>M: up
+  M->>D: up -d --wait kafka postgres
+  D->>K: start, wait healthy
+  M->>D: run topics, then run migrate
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>If <code>check</code> fails on one app, does the output name the app and the rule?</li>
+<li>What happens if <code>.env</code> is missing when you run <code>up</code>?</li>
+<li>Is the order doctor, setup, check, build, up the order a newcomer would follow from the README?</li></ul></div></section>
+
+<section id="i"><h2>3 Import rules enforced by <code>make check</code></h2><div class="card">
+<pre class="mermaid">
+flowchart TB
+  subgraph app[each Python app]
+    MAIN[__main__ + config] --> AD[adapters]
+    MAIN --> DOM[domain]
+    AD --> DOM
+  end
+  app --> CORE[newsdock_core]
+  DOM -. forbidden .-> IO[kafka, sqlalchemy, psycopg, httpx, fastapi]
+  CORE -. forbidden .-> IO
+  CORE -. forbidden .-> OTHER[any app]
+  app -. forbidden .-> APP2[another app]
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Can <code>domain/</code> still reach I/O indirectly, for example through a type from <code>newsdock_core</code>?</li>
+<li>Does the <code>api</code> app's HTTP/MCP handler layer fit under <code>adapters/</code>?</li>
+<li>Which rules are only reviewed, not enforced (DR-5, DR-8, DR-10…DR-12), and is that acceptable?</li></ul></div></section>
+
+<section id="ci"><h2>4 CI: one workflow, path-filtered</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  PR[pull request / push main] --> CH[changes job<br/>paths-filter]
+  CH -->|python files| CP[check-python]
+  CH -->|web files| CW[check-web]
+  CH -->|changed apps| B[build matrix<br/>one image per app]
+  CP --> OK[ci-ok]
+  CW --> OK
+  B --> OK
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>A PR changing only <code>apps/web</code>: which jobs run (AC-12)?</li>
+<li>A PR changing <code>packages/core</code>: do all five Python images rebuild?</li>
+<li>Should only <code>ci-ok</code> be the required status check?</li></ul></div></section>
+
+<section id="d"><h2>5 Compose deployment (M0)</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  subgraph host[macOS host, ports on 127.0.0.1]
+    P5432[5432]
+    P29092[29092]
+  end
+  subgraph compose[docker compose: default network]
+    K[kafka KRaft]
+    PG[postgres + pgvector]
+    T[topics job]
+    MG[migrate job Alembic]
+    APPS[6 app images, profile apps, build only]
+  end
+  T --> K
+  MG --> PG
+  P5432 --- PG
+  P29092 --- K
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Are all published ports bound to 127.0.0.1?</li>
+<li>Is a single default network fine until M1 splits <code>data</code> and <code>agent</code>?</li>
+<li>Can the Kafka listeners serve both containers (<code>kafka:9092</code>) and host tools (<code>localhost:29092</code>)?</li></ul></div></section>
+
+<section id="t"><h2>6 Stack lifecycle (<code>make up</code> / <code>down</code>)</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Down
+  Down --> InfraStarting: make up
+  InfraStarting --> InfraHealthy: kafka + postgres healthy
+  InfraStarting --> Failed: not healthy / no .env
+  InfraHealthy --> TopicsReady: topics job ok
+  TopicsReady --> Ready: migrate job ok
+  Ready --> Ready: make up again (no change)
+  Ready --> Down: make down
+  Failed --> Down: make down
+</pre></div>
+<div class="check"><b>Check</b><ul>
+<li>Is running <code>make up</code> twice safe (AC-10, AC-11 say yes)?</li>
+<li>Does <code>make down</code> keep the Postgres volume, and should it?</li>
+<li>Where does a failed job leave the stack, and does the message say what to do?</li></ul></div></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+const dark=matchMedia('(prefers-color-scheme: dark)').matches;
+mermaid.initialize({startOnLoad:true,theme:dark?'dark':'default',securityLevel:'loose'});
+</script>
+</body>
+</html>

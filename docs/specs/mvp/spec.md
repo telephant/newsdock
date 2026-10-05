@@ -65,7 +65,7 @@ News is high-volume and unstructured. Anyone building an AI agent over news (fin
 - **Quirk, reproduced twice:** the newest slot's GKG file (`20261004074500`, later `20261004081500`) returned **404 with 0 bytes** right after being listed; the Events file for `…081500` did too, while Mentions returned 200. The ingester must treat 404/empty as "retry later", not as failure or data. **[verified]**
 - Slots are every 15 minutes, UTC timestamp in the file name → 96/day, 672 per 7 days. **[assumption]** (arithmetic from cadence)
 
-**Observed sizes (one sample, not a statistical claim).** GKG `20261004071500`: 1.4 MB zipped, 342 rows, 27 columns, 4.3 MB unzipped. **[verified]** Extrapolation ≈ 30–35k rows/day, ≈ 230k per 7 days, ≈ 2.9 GB raw if all text is kept. **[assumption]** Volume is moderate: Kafka and Flink are justified by learning and decoupling, not throughput. Say so honestly in the README.
+**Observed sizes (one sample, not a statistical claim).** GKG `20261004071500`: 1.4 MB zipped, 342 rows, 27 columns, 4.3 MB unzipped. **[verified]** Extrapolation ≈ 30–35k rows/day, ≈ 230k per 7 days, ≈ 2.9 GB raw if all text is kept. **[assumption]** Volume is moderate: Kafka is justified by learning and decoupling, not throughput. Say so honestly in the README.
 
 **GKG record (tab-separated, no header, 27 columns).** Column count and content **[verified]** by sampling; column names **[memory]** from the GDELT 2.0 codebook.
 - Identity/time: `GKGRECORDID`, `DATE`.
@@ -184,7 +184,7 @@ AC-12 UI feed
 AC-13 Agent isolation
   Given the demo agent's container environment
   When  it runs
-  Then  it holds no database credentials and reaches data only via the MCP server
+  Then  it holds no database or Kafka credentials, has no network route to Postgres or Kafka, and reaches data only through the API service
   Verify: auto
 
 AC-14 Agent evaluation

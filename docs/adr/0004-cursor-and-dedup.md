@@ -10,7 +10,7 @@ AC-3/AC-6 need idempotent ingest and cross-slot dedup; AC-10 needs a cursor with
 2. Cursor = `published_at` timestamp (late/old items break it).
 3. Dedup also in processor state (needs Flink or a state store; rejected, see ADR-0001).
 
-## Decision (proposed)
+## Decision
 Option 1. Opaque base64 cursor so it can change later.
 
 ## Consequences
