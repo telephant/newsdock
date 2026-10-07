@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>dedup-syndication — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>dedup-syndication — Milestone 2a diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Grouping sequence</a><a href="#e">3 Data model</a><a href="#t">4 Story lifecycle</a></nav></header>
+
+<section id="c"><h2>1 Component delta (M1 components, changed parts highlighted)</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  K[(gkg.clean)] --> S["C-4 Sink *changed*"]
+  S -- story_key --> SK["C-10 story keyer (core, new)"]
+  S -->|"first copy"| A[("articles + story_key")]
+  S -->|"every copy"| SRC[("article_sources (new)")]
+  A --> API["C-6 API: +source_count, +sources"]
+  SRC --> API
+  API --> W["C-8 UI: 'N sites' badge"]
+  API --> AG["C-7 agent (unchanged)"]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is C-10 the only place the key is computed (no second implementation in SQL or UI)?</li>
+<li>Does anything besides the sink ever write articles or article_sources?</li>
+<li>Is the agent really untouched by this milestone?</li></ul></div></section>
+
+<section id="s"><h2>2 Primary sequence: grouping one batch</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant K as gkg.clean
+  participant S as Sink C-4
+  participant P as Postgres C-5
+  K->>S: copy #35;1 "T | SiteA" (url1)
+  S->>S: story_key -> "t"
+  S->>P: lookup (key "t", published ±48 h) -> none
+  S->>P: INSERT articles (canonical, story_key "t")
+  S->>P: INSERT article_sources (url1 -> canonical)
+  K->>S: copy #35;2 "T" (url2, 1 h later)
+  S->>S: story_key -> "t"
+  S->>P: lookup -> canonical found
+  S->>P: INSERT article_sources (url2 -> canonical)
+  Note over S,P: redelivery of url1/url2: both inserts ON CONFLICT DO NOTHING
+  S->>S: log "1 canonical, 1 grouped copy" (AC-12)
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Crash after the canonical insert but before the source insert: what does redelivery do?</li>
+<li>Both copies in the same batch: does the in-memory cache prevent a second canonical?</li>
+<li>Same key but published 3 days apart — where exactly does the window guard bite?</li></ul></div></section>
+
+<section id="e"><h2>3 Data model (delta)</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  articles ||--o{ article_sources : "has copies (CASCADE)"
+  articles ||--o{ analyses : "has (CASCADE, M1)"
+  articles {
+    text url_hash PK
+    bigint seq UK
+    text story_key "NULL = pre-feature row"
+    timestamptz published_at
+    timestamptz ingested_at
+  }
+  article_sources {
+    text url_hash PK
+    text article_id FK
+    text url
+    text domain
+    text slot
+    timestamptz published_at
+    timestamptz ingested_at
+  }
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>source_count for a pre-feature row (no sources): is the fallback to 1 right?</li>
+<li>Is PK url_hash on article_sources enough for AC-4's idempotency?</li>
+<li>Does any query need an index this model lacks (lookup is (story_key, published_at))?</li></ul></div></section>
+
+<section id="t"><h2>4 Story lifecycle</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Canonical: first copy stored (articles + 1 source)
+  Canonical --> Canonical: copy within ±48 h window -> +1 source
+  Canonical --> Scored: agent submits one analysis
+  Scored --> Scored: late copy -> +1 source (no re-emit, AC-8)
+  Scored --> [*]: retention deletes canonical -> sources + analyses cascade
+  Canonical --> [*]: retention (unscored)
+  note right of Canonical: same key OUTSIDE window -> a separate new story
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>A copy arriving after the canonical was retention-deleted: new story — acceptable?</li>
+<li>Does anything ever update a canonical in place (it shouldn't)?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad: true,
+  theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>

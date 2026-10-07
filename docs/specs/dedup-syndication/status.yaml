@@ -1,0 +1,18 @@
+feature: dedup-syndication
+stage: implement
+updated: 2026-10-05
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided}
+gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
+acs:
+  AC-1: {status: passing}  # TC-1 green (T-01, 2026-10-05)
+  AC-2: {status: passing}  # TC-2, TC-14 green (T-03, 2026-10-05)
+  AC-3: {status: passing}  # TC-3 green (T-03, 2026-10-05)
+  AC-4: {status: passing}  # TC-4 green (T-03, 2026-10-05)
+  AC-5: {status: passing}  # TC-5 green (T-03, 2026-10-05)
+  AC-6: {status: passing}  # TC-6 green (T-04, 2026-10-05)
+  AC-7: {status: passing}  # TC-7 green (T-04, 2026-10-05)
+  AC-8: {status: passing}  # TC-8 green (T-04, 2026-10-05)
+  AC-9: {status: passing}  # TC-9 green (T-04, 2026-10-05)
+  AC-10: {status: in-progress}  # TC-11 green (T-05); manual TC-10 checklist at /spec-verify
+  AC-11: {status: passing}  # TC-12 green (T-03, 2026-10-05)
+  AC-12: {status: passing}  # TC-13 green (T-03, 2026-10-05)

@@ -35,6 +35,18 @@ export function Detail({ articleId }: { articleId: string }) {
         <dt>Tone</dt>
         <dd>{article.tone ?? "n/a"}</dd>
       </dl>
+      <h2>Seen on {article.source_count} sites</h2>
+      <ul>
+        {article.sources.map((source) => (
+          <li key={source.url}>
+            <strong>{source.domain ?? "unknown"}</strong> —{" "}
+            <a href={source.url} rel="noreferrer noopener">
+              {source.url}
+            </a>{" "}
+            <small>{new Date(source.published_at).toLocaleString()}</small>
+          </li>
+        ))}
+      </ul>
       <h2>Agent analyses</h2>
       {article.analyses.length === 0 ? <p>None yet.</p> : null}
       <ul>

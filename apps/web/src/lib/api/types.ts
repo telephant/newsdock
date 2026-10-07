@@ -107,6 +107,10 @@ export interface components {
       word_count: number | null;
       /** Analyses */
       analyses: components["schemas"]["AnalysisRecord"][];
+      /** Sources */
+      sources: components["schemas"]["SourceRecord"][];
+      /** Source Count */
+      source_count: number;
     };
     /** ArticleSummary */
     ArticleSummary: {
@@ -129,6 +133,11 @@ export interface components {
       scores?: {
         [key: string]: number;
       } | null;
+      /**
+       * Source Count
+       * @default 1
+       */
+      source_count: number;
     };
     /**
      * FeedPage
@@ -153,6 +162,21 @@ export interface components {
       last_published_slot: string | null;
       /** Kafka */
       kafka: boolean;
+    };
+    /**
+     * SourceRecord
+     * @description One copy (URL) that carried the story (M2a).
+     */
+    SourceRecord: {
+      /** Url */
+      url: string;
+      /** Domain */
+      domain: string | null;
+      /**
+       * Published At
+       * Format: date-time
+       */
+      published_at: string;
     };
     /** ValidationError */
     ValidationError: {

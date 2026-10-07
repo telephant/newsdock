@@ -82,6 +82,9 @@ export function Feed() {
               {article.domain ?? "unknown"} ·{" "}
               {new Date(article.published_at).toLocaleString()}
             </small>{" "}
+            {article.source_count > 1 ? (
+              <small>· {article.source_count} sites</small>
+            ) : null}{" "}
             <ScoreBadge scores={article.scores ?? null} />
           </li>
         ))}

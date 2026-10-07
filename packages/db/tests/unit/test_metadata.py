@@ -8,8 +8,14 @@ import newsdock_db.models  # noqa: F401  (registers the tables)
 from newsdock_db.metadata import NAMING_CONVENTION, metadata
 
 
-def test_metadata_holds_exactly_the_m1_tables() -> None:
-    assert set(metadata.tables) == {"articles", "analyses", "ingest_slot"}
+def test_metadata_holds_exactly_the_known_tables() -> None:
+    # M1 tables + article_sources (M2a dedup-syndication, 2026-10-05)
+    assert set(metadata.tables) == {
+        "articles",
+        "analyses",
+        "ingest_slot",
+        "article_sources",
+    }
 
 
 def test_naming_convention_covers_constraints() -> None:

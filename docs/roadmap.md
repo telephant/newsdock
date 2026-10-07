@@ -2,7 +2,7 @@
 
 **Vision:** a shared "news dock" that ingests GDELT news once (clean, dedup, 7-day store) so any custom AI agent, such as a financial-relevance agent, can plug in. Also the owner's path from frontend engineer to AI production / full-stack engineer.
 
-**Current milestone:** M1 `mvp` is **done** (verified pass-with-follow-ups 2026-10-05, [verify](specs/mvp/verify.md): all 15 ACs pass, F1 0.83, live end-to-end). Next: `/spec-init` for M2 (push subscriptions + agent registry/auth, backlog P1). M0 `foundation` done (2026-10-05).
+**Current milestone:** M1 `mvp` is **done** (verified pass-with-follow-ups 2026-10-05, [verify](specs/mvp/verify.md): all 15 ACs pass, F1 0.83, live end-to-end). Current: **M2a `dedup-syndication`** (spec'd 2026-10-05, init approved — write-side canonical story dedup; next `/spec-design dedup-syndication`); then M2 (push subscriptions + agent registry/auth, backlog P1). M0 `foundation` done (2026-10-05).
 Specs: [foundation](specs/foundation/spec.md) · [mvp](specs/mvp/spec.md) · Items: [mvp backlog](specs/mvp/backlog.md), [foundation backlog](specs/foundation/backlog.md) · Decisions: [ADRs](adr/) · Evidence: [research](research.md)
 
 | M | Goal | Skills it teaches / proves | Exit condition | Depends on | Status |

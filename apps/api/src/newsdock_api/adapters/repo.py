@@ -3,16 +3,25 @@
 from datetime import datetime
 from typing import Any
 
-from newsdock_db.models import Analysis, Article, IngestSlot
+from newsdock_db.models import Analysis, Article, ArticleSource, IngestSlot
 from sqlalchemy import Engine, Select, func, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from newsdock_api.domain.records import AnalysisRecord, ArticleDetail, ArticleSummary
+from newsdock_api.domain.records import (
+    AnalysisRecord,
+    ArticleDetail,
+    ArticleSummary,
+    SourceRecord,
+)
 from newsdock_api.domain.service import escape_like
 
 
-def _summary(row: Article, scores: dict[str, float] | None = None) -> ArticleSummary:
+def _summary(
+    row: Article,
+    scores: dict[str, float] | None = None,
+    source_count: int = 1,
+) -> ArticleSummary:
     return ArticleSummary(
         article_id=row.url_hash,
         title=row.title,
@@ -22,6 +31,7 @@ def _summary(row: Article, scores: dict[str, float] | None = None) -> ArticleSum
         themes=row.themes,
         seq=row.seq,
         scores=scores,
+        source_count=source_count,
     )
 
 
@@ -87,8 +97,13 @@ class SqlArticleRepo:
             )
         with Session(self._engine) as session:
             rows: list[Article] = list(session.scalars(statement).all())
-            scores = self._scores(session, [r.url_hash for r in rows])
-            return [_summary(r, scores.get(r.url_hash)) for r in rows]
+            ids = [r.url_hash for r in rows]
+            scores = self._scores(session, ids)
+            counts = self._source_counts(session, ids)
+            return [
+                _summary(r, scores.get(r.url_hash), counts.get(r.url_hash, 1))
+                for r in rows
+            ]
 
     def list_new(
         self, *, after_seq: int | None, since: datetime | None, limit: int
@@ -100,7 +115,8 @@ class SqlArticleRepo:
             statement = statement.where(Article.ingested_at >= since)
         with Session(self._engine) as session:
             rows: list[Article] = list(session.scalars(statement).all())
-            return [_summary(r) for r in rows]
+            counts = self._source_counts(session, [r.url_hash for r in rows])
+            return [_summary(r, source_count=counts.get(r.url_hash, 1)) for r in rows]
 
     def get(self, article_id: str) -> ArticleDetail | None:
         with Session(self._engine) as session:
@@ -111,6 +127,11 @@ class SqlArticleRepo:
                 select(Analysis)
                 .where(Analysis.article_id == article_id)
                 .order_by(Analysis.agent_name)
+            ).all()
+            sources = session.scalars(
+                select(ArticleSource)
+                .where(ArticleSource.article_id == article_id)
+                .order_by(ArticleSource.published_at)
             ).all()
             return ArticleDetail(
                 article_id=row.url_hash,
@@ -133,6 +154,15 @@ class SqlArticleRepo:
                     )
                     for a in analyses
                 ],
+                sources=[
+                    SourceRecord(
+                        url=src.url,
+                        domain=src.domain,
+                        published_at=src.published_at,
+                    )
+                    for src in sources
+                ],
+                source_count=max(len(sources), 1),  # pre-feature rows: 1
             )
 
     def upsert_analysis(
@@ -153,6 +183,19 @@ class SqlArticleRepo:
             session.execute(statement)
             session.commit()
             return True
+
+    def _source_counts(
+        self, session: Session, article_ids: list[str]
+    ) -> dict[str, int]:
+        """Copies per story, one grouped query per page (design-detail §3)."""
+        if not article_ids:
+            return {}
+        rows = session.execute(
+            select(ArticleSource.article_id, func.count())
+            .where(ArticleSource.article_id.in_(article_ids))
+            .group_by(ArticleSource.article_id)
+        ).all()
+        return {str(article_id): max(int(n), 1) for article_id, n in rows}
 
     def _scores(
         self, session: Session, article_ids: list[str]

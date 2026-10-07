@@ -34,6 +34,8 @@ class Article(Base):
     __tablename__ = "articles"
 
     url_hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    # grouping key (ADR-0012); NULL = pre-feature row that never groups (D-4)
+    story_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     # insert order, cursor basis; identity = bigserial semantics
     seq: Mapped[int] = mapped_column(
         BigInteger, Identity(), unique=True, nullable=False
@@ -69,6 +71,7 @@ class Article(Base):
         Index("ix_articles_ingested_at", "ingested_at"),
         Index("ix_articles_themes", "themes", postgresql_using="gin"),
         Index("ix_articles_domain", "domain"),
+        Index("ix_articles_story_key_published_at", "story_key", "published_at"),
     )
 
 
@@ -87,6 +90,31 @@ class Analysis(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class ArticleSource(Base):
+    """One copy (URL) of a story; the canonical's own URL is also a source."""
+
+    __tablename__ = "article_sources"
+
+    url_hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    article_id: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("articles.url_hash", ondelete="CASCADE"),
+        nullable=False,
+    )
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    domain: Mapped[str | None] = mapped_column(Text, nullable=True)
+    slot: Mapped[str] = mapped_column(Text, nullable=False)
+    gkg_record_id: Mapped[str] = mapped_column(Text, nullable=False)
+    published_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (Index("ix_article_sources_article_id", "article_id"),)
 
 
 class IngestSlot(Base):

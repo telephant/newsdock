@@ -15,6 +15,15 @@ class ArticleSummary(BaseModel):
     themes: list[str]
     seq: int = Field(exclude=True)  # cursor basis; never exposed raw (CLAUDE.md)
     scores: dict[str, float] | None = None  # latest numeric score per agent (REST)
+    source_count: int = 1  # copies of this story; pre-feature rows read as 1 (M2a)
+
+
+class SourceRecord(BaseModel):
+    """One copy (URL) that carried the story (M2a)."""
+
+    url: str
+    domain: str | None
+    published_at: datetime
 
 
 class AnalysisRecord(BaseModel):
@@ -37,6 +46,8 @@ class ArticleDetail(BaseModel):
     tone: float | None
     word_count: int | None
     analyses: list[AnalysisRecord]
+    sources: list[SourceRecord]  # ordered by published_at (M2a)
+    source_count: int
 
 
 class NewArticlesPage(BaseModel):

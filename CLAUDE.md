@@ -41,9 +41,10 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 ## Fixed names (do not rename without updating all docs)
 - MCP tools: `search_articles`, `get_article`, `list_new_articles`, `submit_analysis`.
 - Public article id is `url_hash` (sha256 of the normalized URL). `seq` (bigserial) drives the cursor, never expose it raw: the cursor is opaque base64.
-- Tables: `articles`, `analyses`, `ingest_slot`. Slot format: `YYYYMMDDHHMMSS`.
+- Tables: `articles` (canonicals; `story_key` NULL = pre-M2a row), `analyses`, `ingest_slot`, `article_sources` (copies; PK `url_hash`, FK → canonical, CASCADE). Slot format: `YYYYMMDDHHMMSS`.
 - Dead-letter reasons: `missing_url`, `missing_title`, `bad_column_count`, `bad_field`.
 - Agent score payload: `{relevant, score (0–1), reason}`; `submit_analysis` accepts any JSON object.
+- Story grouping (M2a): key = `newsdock_core.stories.story_key` (normalized title, fixpoint suffix-strip) within ± `NEWSDOCK_STORY_WINDOW_HOURS` (48); API fields `source_count` and `sources[]`.
 
 ## GDELT rules (verified in `docs/research.md`)
 - Follow redirects; `http://` URLs in the index redirect to `https://`.

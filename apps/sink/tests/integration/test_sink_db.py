@@ -1,5 +1,6 @@
-"""TC-12, TC-13 against real Postgres (Docker): cross-slot dedup and retention."""
+"""M2a TC-2…TC-5, TC-12 + M1 cross-slot/retention against real Postgres (Docker)."""
 
+import hashlib
 import json
 import subprocess
 from collections.abc import Iterator
@@ -11,7 +12,7 @@ from alembic import command
 from alembic.config import Config
 from newsdock_core.contracts import CleanArticle
 from newsdock_db.engine import make_engine
-from newsdock_db.models import Article
+from newsdock_db.models import Article, ArticleSource
 from newsdock_sink.adapters.db import SqlArticleWriter
 from newsdock_sink.domain.retention import cutoff
 from newsdock_sink.domain.writer import SinkItem, process_batch
@@ -81,27 +82,98 @@ def _count(url: str) -> int:
     return int(n or 0)
 
 
-# TC-12: the same URL in two different slots stores one article
-def test_cross_slot_dedup(clean_db: str) -> None:
+def _fixture_article() -> CleanArticle:
     with (FIXTURES / "expected_articles.json").open() as f:
-        article = CleanArticle.model_validate(json.load(f)[0])
-    other_slot = article.model_copy(update={"slot": "20261004083000"})
-    engine = make_engine(clean_db)
-    writer = SqlArticleWriter(engine)
-    result = process_batch(
-        [
-            SinkItem(key=a.url_hash, value=a.model_dump_json().encode())
-            for a in (article, other_slot)
-        ],
-        writer,
-        NullDlq(),
-    )
-    assert result.written == 1 and result.conflicts == 1
-    assert _count(clean_db) == 1
+        return CleanArticle.model_validate(json.load(f)[0])
+
+
+def _copy(base: CleanArticle, *, url: str, slot: str | None = None,
+          hours: float = 0.0, title: str | None = None) -> CleanArticle:  # fmt: skip
+    return base.model_copy(update={
+        "url": url,
+        "url_hash": hashlib.sha256(url.encode()).hexdigest(),
+        "slot": slot or base.slot,
+        "title": title if title is not None else base.title,
+        "published_at": base.published_at + timedelta(hours=hours),
+    })  # fmt: skip
+
+
+def _items(*articles: CleanArticle) -> list[SinkItem]:
+    return [
+        SinkItem(key=a.url_hash, value=a.model_dump_json().encode()) for a in articles
+    ]
+
+
+def _source_rows(url: str) -> list[tuple[str, str]]:
+    engine = make_engine(url)
+    with Session(engine) as session:
+        rows = session.execute(
+            select(ArticleSource.url_hash, ArticleSource.article_id)
+        ).all()
     engine.dispose()
+    return [(r[0], r[1]) for r in rows]
 
 
-# TC-13: with an injected clock, the 8-day article is gone, the 6-day one kept
+# M1 TC-12: the same URL in two different slots stores one article
+def test_cross_slot_dedup_same_url(clean_db: str) -> None:
+    article = _fixture_article()
+    other_slot = article.model_copy(update={"slot": "20261004083000"})
+    writer = SqlArticleWriter(make_engine(clean_db))
+    result = process_batch(_items(article, other_slot), writer, NullDlq())
+    assert result.canonicals == 1 and result.url_duplicates == 1
+    assert _count(clean_db) == 1
+
+
+# M2a TC-2: two copies of one story → 1 canonical + 2 sources
+def test_two_copies_one_canonical_two_sources(clean_db: str) -> None:
+    base = _fixture_article()
+    copy = _copy(base, url="https://other.example/same-story", hours=1)
+    writer = SqlArticleWriter(make_engine(clean_db))
+    result = process_batch(_items(base, copy), writer, NullDlq())
+    assert result.canonicals == 1 and result.grouped == 1
+    assert _count(clean_db) == 1
+    sources = _source_rows(clean_db)
+    assert len(sources) == 2
+    assert {cid for _, cid in sources} == {base.url_hash}
+
+
+# M2a TC-3: a later-slot copy adds a source, not an article
+def test_cross_slot_copy_adds_source(clean_db: str) -> None:
+    base = _fixture_article()
+    writer = SqlArticleWriter(make_engine(clean_db))
+    process_batch(_items(base), writer, NullDlq())
+    late = _copy(base, url="https://late.example/copy",
+                 slot="20261004100000", hours=3)  # fmt: skip
+    result = process_batch(_items(late), writer, NullDlq())
+    assert result.canonicals == 0 and result.grouped == 1
+    assert _count(clean_db) == 1 and len(_source_rows(clean_db)) == 2
+
+
+# M2a TC-4: redelivering stored URLs adds nothing anywhere
+def test_redelivery_adds_no_rows(clean_db: str) -> None:
+    base = _fixture_article()
+    copy = _copy(base, url="https://other.example/x", hours=1)
+    writer = SqlArticleWriter(make_engine(clean_db))
+    process_batch(_items(base, copy), writer, NullDlq())
+    result = process_batch(_items(base, copy), writer, NullDlq())
+    assert result.canonicals == 0 and result.grouped == 0
+    assert result.url_duplicates == 2
+    assert _count(clean_db) == 1 and len(_source_rows(clean_db)) == 2
+
+
+# M2a TC-5: same key outside the 48 h window → two separate canonicals
+def test_window_guard_creates_second_canonical(clean_db: str) -> None:
+    base = _fixture_article()
+    far = _copy(base, url="https://muchlater.example/x", hours=72)
+    writer = SqlArticleWriter(make_engine(clean_db))
+    result = process_batch(_items(base, far), writer, NullDlq())
+    assert result.canonicals == 2 and result.grouped == 0
+    assert _count(clean_db) == 2
+    sources = _source_rows(clean_db)
+    assert {cid for _, cid in sources} == {base.url_hash, far.url_hash}
+
+
+# M1 TC-13 + M2a TC-12: retention deletes the canonical AND cascades its sources
 def test_retention_deletes_only_older_than_seven_days(clean_db: str) -> None:
     now = datetime(2026, 10, 5, 12, 0, 0, tzinfo=UTC)
     engine = make_engine(clean_db)
@@ -114,9 +186,17 @@ def test_retention_deletes_only_older_than_seven_days(clean_db: str) -> None:
                 themes=[], persons=[], orgs=[],
             ))  # fmt: skip
         session.commit()
+    with Session(engine) as session:
+        session.add(ArticleSource(
+            url_hash="old-src", article_id="old", url="https://e.com/old2",
+            domain=None, slot=SLOT, gkg_record_id="x", published_at=now,
+        ))  # fmt: skip
+        session.commit()
     deleted = SqlArticleWriter(engine).delete_ingested_before(cutoff(now))
     assert deleted == 1
     with Session(engine) as session:
         remaining = session.scalars(select(Article.url_hash)).all()
+        orphan_sources = session.scalars(select(ArticleSource.url_hash)).all()
     assert remaining == ["fresh"]
+    assert orphan_sources == []  # AC-11: sources cascade with the canonical
     engine.dispose()

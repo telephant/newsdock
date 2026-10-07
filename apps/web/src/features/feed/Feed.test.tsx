@@ -1,5 +1,5 @@
 // TC-26: the feed renders articles; agent payload text is escaped, never HTML.
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { Feed } from "./Feed";
 import type { FeedPage } from "./api";
@@ -14,6 +14,7 @@ const page: FeedPage = {
       published_at: "2026-10-05T10:00:00Z",
       themes: ["ECON_INFLATION"],
       scores: { "demo-financial": 0.91 },
+      source_count: 3,
     },
     {
       article_id: "bbb2",
@@ -23,12 +24,16 @@ const page: FeedPage = {
       published_at: "2026-10-05T09:00:00Z",
       themes: [],
       scores: null,
+      source_count: 1,
     },
   ],
   next_before: null,
 };
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function stubFetch(): void {
   vi.stubGlobal(
@@ -43,6 +48,14 @@ test("feed lists articles newest first with the agent score where present", asyn
   const headings = await screen.findAllByRole("link", { name: /Fed|script/ });
   expect(headings[0].textContent).toContain("Fed raises rates");
   expect(screen.getByText("0.91")).toBeTruthy();
+});
+
+test("a grouped story shows the sites badge; single-source items do not", async () => {
+  stubFetch();
+  render(<Feed />);
+  await screen.findByText(/Fed raises rates/);
+  expect(screen.getByText("· 3 sites")).toBeTruthy(); // TC-11 (AC-10)
+  expect(screen.queryByText("· 1 sites")).toBeNull();
 });
 
 test("payload-ish text renders escaped, never as HTML", async () => {

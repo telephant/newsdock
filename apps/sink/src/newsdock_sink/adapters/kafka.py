@@ -2,16 +2,17 @@
 
 import logging
 import time
+from datetime import timedelta
 
 from confluent_kafka import Consumer, Producer
 from newsdock_core.contracts import DlqMessage
 
 from newsdock_sink.config import Settings
 from newsdock_sink.domain.writer import (
-    ArticleWriter,
     BatchResult,
     DbUnavailable,
     SinkItem,
+    StoryWriter,
     process_batch,
 )
 
@@ -34,7 +35,7 @@ class KafkaDlqSink:
 
 class KafkaSinkLoop:
     def __init__(
-        self, settings: Settings, writer: ArticleWriter, *, group_id: str = "sink"
+        self, settings: Settings, writer: StoryWriter, *, group_id: str = "sink"
     ) -> None:
         self._settings = settings
         self._writer = writer
@@ -68,7 +69,12 @@ class KafkaSinkLoop:
         if not items:
             return None
         try:
-            result = process_batch(items, self._writer, self._dlq)
+            result = process_batch(
+                items,
+                self._writer,
+                self._dlq,
+                window=timedelta(hours=self._settings.story_window_hours),
+            )
         except DbUnavailable as exc:  # no commit: redelivered after backoff (R-1)
             logger.warning("database unavailable, backing off: %s", exc)
             time.sleep(self._settings.db_backoff_seconds)

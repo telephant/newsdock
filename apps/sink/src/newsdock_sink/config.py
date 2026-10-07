@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     batch_window_seconds: float = 1.0
     db_backoff_seconds: float = 5.0
     retention_interval_seconds: int = 3600
+    story_window_hours: int = 48  # D-5 / ADR-0012; env NEWSDOCK_STORY_WINDOW_HOURS
     kafka_bootstrap_servers: str = Field(
         default="127.0.0.1:29092",
         validation_alias=AliasChoices(

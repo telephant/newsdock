@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react";
-import { expect, test, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, expect, test, vi } from "vitest";
 import Home from "./page";
 
 vi.stubGlobal(
@@ -9,6 +9,8 @@ vi.stubGlobal(
       new Response(JSON.stringify({ articles: [], next_before: null })),
   ),
 );
+
+afterEach(cleanup);
 
 test("home page shows the product name and the feed", () => {
   render(<Home />);

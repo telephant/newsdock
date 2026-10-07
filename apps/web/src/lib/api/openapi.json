@@ -318,6 +318,17 @@
             },
             "type": "array",
             "title": "Analyses"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRecord"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count"
           }
         },
         "type": "object",
@@ -334,7 +345,9 @@
           "orgs",
           "tone",
           "word_count",
-          "analyses"
+          "analyses",
+          "sources",
+          "source_count"
         ],
         "title": "ArticleDetail"
       },
@@ -388,6 +401,11 @@
               }
             ],
             "title": "Scores"
+          },
+          "source_count": {
+            "type": "integer",
+            "title": "Source Count",
+            "default": 1
           }
         },
         "type": "object",
@@ -465,6 +483,34 @@
         "type": "object",
         "required": ["db", "last_published_slot", "kafka"],
         "title": "HealthStatus"
+      },
+      "SourceRecord": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": ["url", "domain", "published_at"],
+        "title": "SourceRecord",
+        "description": "One copy (URL) that carried the story (M2a)."
       },
       "ValidationError": {
         "properties": {
