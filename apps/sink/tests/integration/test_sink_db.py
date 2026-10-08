@@ -19,6 +19,8 @@ from newsdock_sink.domain.writer import SinkItem, process_batch
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
+WINDOW = timedelta(hours=48)
+
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
@@ -119,7 +121,9 @@ def test_cross_slot_dedup_same_url(clean_db: str) -> None:
     article = _fixture_article()
     other_slot = article.model_copy(update={"slot": "20261004083000"})
     writer = SqlArticleWriter(make_engine(clean_db))
-    result = process_batch(_items(article, other_slot), writer, NullDlq())
+    result = process_batch(
+        _items(article, other_slot), writer, NullDlq(), window=WINDOW
+    )
     assert result.canonicals == 1 and result.url_duplicates == 1
     assert _count(clean_db) == 1
 
@@ -129,7 +133,7 @@ def test_two_copies_one_canonical_two_sources(clean_db: str) -> None:
     base = _fixture_article()
     copy = _copy(base, url="https://other.example/same-story", hours=1)
     writer = SqlArticleWriter(make_engine(clean_db))
-    result = process_batch(_items(base, copy), writer, NullDlq())
+    result = process_batch(_items(base, copy), writer, NullDlq(), window=WINDOW)
     assert result.canonicals == 1 and result.grouped == 1
     assert _count(clean_db) == 1
     sources = _source_rows(clean_db)
@@ -141,10 +145,10 @@ def test_two_copies_one_canonical_two_sources(clean_db: str) -> None:
 def test_cross_slot_copy_adds_source(clean_db: str) -> None:
     base = _fixture_article()
     writer = SqlArticleWriter(make_engine(clean_db))
-    process_batch(_items(base), writer, NullDlq())
+    process_batch(_items(base), writer, NullDlq(), window=WINDOW)
     late = _copy(base, url="https://late.example/copy",
                  slot="20261004100000", hours=3)  # fmt: skip
-    result = process_batch(_items(late), writer, NullDlq())
+    result = process_batch(_items(late), writer, NullDlq(), window=WINDOW)
     assert result.canonicals == 0 and result.grouped == 1
     assert _count(clean_db) == 1 and len(_source_rows(clean_db)) == 2
 
@@ -154,8 +158,8 @@ def test_redelivery_adds_no_rows(clean_db: str) -> None:
     base = _fixture_article()
     copy = _copy(base, url="https://other.example/x", hours=1)
     writer = SqlArticleWriter(make_engine(clean_db))
-    process_batch(_items(base, copy), writer, NullDlq())
-    result = process_batch(_items(base, copy), writer, NullDlq())
+    process_batch(_items(base, copy), writer, NullDlq(), window=WINDOW)
+    result = process_batch(_items(base, copy), writer, NullDlq(), window=WINDOW)
     assert result.canonicals == 0 and result.grouped == 0
     assert result.url_duplicates == 2
     assert _count(clean_db) == 1 and len(_source_rows(clean_db)) == 2
@@ -166,7 +170,7 @@ def test_window_guard_creates_second_canonical(clean_db: str) -> None:
     base = _fixture_article()
     far = _copy(base, url="https://muchlater.example/x", hours=72)
     writer = SqlArticleWriter(make_engine(clean_db))
-    result = process_batch(_items(base, far), writer, NullDlq())
+    result = process_batch(_items(base, far), writer, NullDlq(), window=WINDOW)
     assert result.canonicals == 2 and result.grouped == 0
     assert _count(clean_db) == 2
     sources = _source_rows(clean_db)
@@ -192,7 +196,7 @@ def test_retention_deletes_only_older_than_seven_days(clean_db: str) -> None:
             domain=None, slot=SLOT, gkg_record_id="x", published_at=now,
         ))  # fmt: skip
         session.commit()
-    deleted = SqlArticleWriter(engine).delete_ingested_before(cutoff(now))
+    deleted = SqlArticleWriter(engine).delete_ingested_before(cutoff(now, 7))
     assert deleted == 1
     with Session(engine) as session:
         remaining = session.scalars(select(Article.url_hash)).all()

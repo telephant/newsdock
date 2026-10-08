@@ -43,7 +43,7 @@ def kafka() -> Iterator[str]:
 
 def test_one_raw_message_per_row(kafka: str) -> None:
     lines = FIXTURE.read_text().splitlines()
-    publisher = KafkaRawPublisher(bootstrap_servers=kafka)
+    publisher = KafkaRawPublisher(bootstrap_servers=kafka, topic="gkg.raw")
     for row_no, line in enumerate(lines):
         publisher.publish(
             f"{SLOT}:{row_no}", RawMessage(slot=SLOT, row_no=row_no, line=line)

@@ -4,6 +4,7 @@ version = "0.0.0"
 description = "newsdock processor app"
 requires-python = ">=3.12"
 dependencies = [
+    "newsdock-config",
     "newsdock-core",
     "pydantic-settings>=2.15",
     "confluent-kafka>=2.15",
@@ -17,4 +18,5 @@ build-backend = "hatchling.build"
 packages = ["src/newsdock_processor"]
 
 [tool.uv.sources]
+newsdock-config = { workspace = true }
 newsdock-core = { workspace = true }

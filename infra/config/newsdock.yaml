@@ -1,0 +1,34 @@
+# newsdock configuration (ADR-0013). Committed on purpose: NO secrets here.
+#   Order of precedence: environment variables > this file > code defaults.
+#   `common:` is inherited by every service; a service section may override any key.
+#   Nested keys flatten with "_" to the setting name: kafka.topics.clean ->
+#   kafka_topics_clean, env NEWSDOCK_KAFKA_TOPICS_CLEAN.
+#   Secrets (DATABASE_URL, passwords) stay in .env / the environment; the loader
+#   rejects secret-looking keys in this file.
+# Every value below equals the built-in default, so an empty file changes nothing.
+
+common:
+  log_level: INFO
+  heartbeat_file: /tmp/healthy
+  kafka:
+    bootstrap_servers: 127.0.0.1:29092   # compose overrides with kafka:9092 (env)
+    topics:
+      raw: gkg.raw
+      clean: gkg.clean
+      dlq: gkg.dlq
+
+ingester:
+  gdelt_base_url: http://data.gdeltproject.org/gdeltv2
+  gdelt_index_path: /lastupdate.txt
+  poll_interval_seconds: 900     # GDELT rule: never below 900, enforced in code
+  http_timeout_seconds: 60
+  max_attempts: 4
+
+processor: {}
+sink: {}
+api: {}
+agent: {}
+web:                              # read at web server start (ADR-0014); env NEWSDOCK_WEB_* wins
+  api_base_url: http://127.0.0.1:8000   # what the BROWSER calls (the host-published API)
+  poll_ms: 60000
+  # page_size: 20                   # unset: the API's own default applies

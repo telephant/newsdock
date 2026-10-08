@@ -36,8 +36,8 @@ from newsdock_api.domain.service import (
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
-    repo = SqlArticleRepo(make_engine(DbSettings().database_url))
-    service = ArticleService(repo)
+    repo = SqlArticleRepo(make_engine(DbSettings()))
+    service = ArticleService(repo, limits=settings.limits())
 
     mcp = MCPServer("newsdock")
 
@@ -95,8 +95,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.add_middleware(  # the web UI calls /api/* from the browser (TC-25)
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
-        allow_methods=["GET"],
-        allow_headers=["*"],
+        allow_methods=settings.cors_methods_list,
+        allow_headers=settings.cors_headers_list,
     )
 
     @app.get("/api/articles")
@@ -140,7 +140,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return HealthStatus(
             db=bool(health["db"]),
             last_published_slot=health["last_published_slot"],
-            kafka=kafka_reachable(settings.kafka_bootstrap_servers),
+            kafka=kafka_reachable(
+                settings.kafka_bootstrap_servers,
+                settings.kafka_probe_timeout_seconds,
+            ),
         )
 
     app.mount(

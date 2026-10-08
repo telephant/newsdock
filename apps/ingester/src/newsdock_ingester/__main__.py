@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+from newsdock_config import load_settings, log_effective_config
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
@@ -15,14 +16,23 @@ from newsdock_ingester.domain.cycle import Ingester
 
 
 async def run(settings: Settings) -> None:
-    engine = make_engine(DbSettings().database_url)
+    engine = make_engine(DbSettings())
     ingester = Ingester(
-        HttpGdeltSource(settings.gdelt_base_url),
-        KafkaRawPublisher(settings.kafka_bootstrap_servers),
+        HttpGdeltSource(
+            settings.gdelt_base_url,
+            timeout_seconds=settings.http_timeout_seconds,
+            index_path=settings.gdelt_index_path,
+        ),
+        KafkaRawPublisher(
+            settings.kafka_bootstrap_servers, topic=settings.kafka_topics_raw
+        ),
         SqlSlotRepo(engine),
         base_url=settings.gdelt_base_url,
+        max_attempts=settings.max_attempts,
     )
-    heartbeat = Heartbeat(settings.heartbeat_file)
+    heartbeat = Heartbeat(
+        settings.heartbeat_file, max_age_seconds=settings.heartbeat_max_age_seconds
+    )
     while True:
         await asyncio.to_thread(ingester.run_cycle)
         heartbeat.touch()
@@ -30,8 +40,9 @@ async def run(settings: Settings) -> None:
 
 
 def main() -> int:
-    settings = Settings()
+    settings = load_settings(Settings)
     logging.basicConfig(level=settings.log_level)
+    log_effective_config(logging.getLogger(__name__), settings)
     logging.getLogger(__name__).info(
         "newsdock-ingester starting (interval %ss)", settings.poll_interval_seconds
     )

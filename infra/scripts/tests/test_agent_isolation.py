@@ -72,11 +72,11 @@ def test_agent_reaches_the_api(stack: None) -> None:
     assert probe.returncode == 0, "agent cannot reach the api service"
 
 
-# TC-33: the heartbeat check passes on a fresh file and fails on a stale one
+# TC-33 / externalize-config TC-22: the app healthcheck passes on a fresh heartbeat
+# (max age written by the worker itself) and fails on a stale one
 @pytest.mark.parametrize("service", ["ingester", "processor", "sink", "agent"])
 def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
-    minutes = "20" if service == "ingester" else "2"
-    check = f'test -n "$(find /tmp/healthy -mmin -{minutes})"'
+    check = f"python -m newsdock_{service}.adapters.healthcheck"
     fresh = _exec(service, "sh", "-c", check)
     assert fresh.returncode == 0, f"{service}: heartbeat missing or stale"
     stale = _exec(

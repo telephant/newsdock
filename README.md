@@ -54,18 +54,29 @@ make down            # stop everything (data volumes are kept)
 | `make build [APP=<name>]` | Build images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); no `.env` needed |
 | `make up` / `make down` | Start (and wait for) Kafka and Postgres, create topics, migrate / stop |
 | `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
-| `make topics`, `make migrate` | Create the Kafka topics, apply Alembic migrations (both idempotent) |
+| `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
+| `make config-python` | Check `infra/config/newsdock.yaml` and that no tunable literal crept back into code |
 | `make test-rules` | Prove each enforced rule fails when violated |
 | `make test-infra [SCENE=<name>]` | Docker tests; scenes scope the run to what you're working on: `db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images` (no scene = everything, ~4 min warm). Needs Docker and ports 5433/29092 free |
 | `make docs-check` | README sections and relative links |
+
+## Configuration
+
+All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/config/newsdock.yaml): a `common:` section that every service inherits, and one section per service (`ingester`, `processor`, `sink`, `api`, `agent`, `web`). Docker env vars override any key (**env > file > built-in defaults**), and the file's values equal the defaults, so an empty file changes nothing. Nested keys flatten with `_` into the env name, e.g. `sink.retention_days` ↔ `NEWSDOCK_RETENTION_DAYS`, `common.kafka.topics.clean` ↔ `NEWSDOCK_KAFKA_TOPICS_CLEAN` (agent: prefix `NEWSDOCK_AGENT_`).
+
+- **Change a value:** edit the file and `docker compose ... up -d <service>`, or set the env var in `.env` / the compose `environment:`.
+- **Point a service at another file:** `NEWSDOCK_CONFIG_FILE=/path/to/newsdock.yaml` (compose mounts `infra/config` read-only at `/etc/newsdock`).
+- **Secrets** (`DATABASE_URL`, `POSTGRES_PASSWORD`) stay in `.env`; a secret-looking key in the file stops the service at startup.
+- **Host ports** (`API_PORT`, `WEB_PORT`, `POSTGRES_PORT`) are `.env` values because compose cannot read the YAML.
+- Details: [ADR-0013](docs/adr/0013-layered-config-package-and-yaml.md), [spec](docs/specs/externalize-config/spec.md).
 
 ## Layout
 
 ```
 apps/{ingester,processor,sink,api,agent}   Python services, one deployable each
 apps/web                                   Next.js + TypeScript UI
-packages/core, packages/db                 shared Python packages
-infra/                                     compose.yaml, kafka/, migrations/ (Alembic), scripts/
+packages/core, packages/db, packages/config   shared Python packages (config = layered settings loader)
+infra/                                     compose.yaml, config/newsdock.yaml, migrations/ (Alembic), scripts/
 docs/                                      roadmap, specs, ADRs, research
 ```
 

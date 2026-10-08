@@ -1,10 +1,8 @@
-"""Pure evaluation: same scorer as production, threshold 0.5 (AC-14)."""
+"""Pure evaluation: same scorer as production, configured threshold (AC-14)."""
 
 from dataclasses import dataclass
 
 from newsdock_agent.domain.loop import ScorerPort
-
-DEFAULT_THRESHOLD = 0.5
 
 
 @dataclass(frozen=True)
@@ -33,7 +31,7 @@ def evaluate(
     scorer: ScorerPort,
     rows: list[tuple[str, bool]],
     *,
-    threshold: float = DEFAULT_THRESHOLD,
+    threshold: float,
 ) -> EvalResult:
     tp = fp = tn = fn = skipped = 0
     for title, label in rows:

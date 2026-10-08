@@ -1,0 +1,46 @@
+{
+  "agent": {
+    "agent_name": "demo-financial",
+    "cursor_file": "/data/cursor.json",
+    "heartbeat_file": "/tmp/healthy",
+    "log_level": "INFO",
+    "loop_interval_seconds": 60,
+    "mcp_url": "http://127.0.0.1:8000/mcp",
+    "model": "llama3.2:3b",
+    "ollama_url": "http://127.0.0.1:11434",
+    "theme_prefixes": "ECON_"
+  },
+  "api": {
+    "cors_origins": "http://127.0.0.1:3000,http://localhost:3000",
+    "host": "0.0.0.0",
+    "kafka_bootstrap_servers": "127.0.0.1:29092",
+    "log_level": "INFO",
+    "mcp_allowed_hosts": "localhost:*,127.0.0.1:*,api:*",
+    "port": 8000
+  },
+  "db": {},
+  "ingester": {
+    "gdelt_base_url": "http://data.gdeltproject.org/gdeltv2",
+    "heartbeat_file": "/tmp/healthy",
+    "kafka_bootstrap_servers": "127.0.0.1:29092",
+    "log_level": "INFO",
+    "poll_interval_seconds": 900
+  },
+  "processor": {
+    "batch_size": 200,
+    "heartbeat_file": "/tmp/healthy",
+    "kafka_bootstrap_servers": "127.0.0.1:29092",
+    "log_level": "INFO",
+    "poll_timeout_seconds": 1.0
+  },
+  "sink": {
+    "batch_size": 200,
+    "batch_window_seconds": 1.0,
+    "db_backoff_seconds": 5.0,
+    "heartbeat_file": "/tmp/healthy",
+    "kafka_bootstrap_servers": "127.0.0.1:29092",
+    "log_level": "INFO",
+    "retention_interval_seconds": 3600,
+    "story_window_hours": 48
+  }
+}

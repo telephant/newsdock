@@ -5,8 +5,10 @@ COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PROJECT_ENVIRONMENT=/app/.venv
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
+COPY packages/config/pyproject.toml packages/config/pyproject.toml
 COPY packages/db/pyproject.toml packages/db/pyproject.toml
 RUN uv sync --frozen --no-dev --no-install-workspace --package newsdock-db --extra migrate
+COPY packages/config/src packages/config/src
 COPY packages/db/src packages/db/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-db --extra migrate
 

@@ -1,9 +1,7 @@
-"""Retention decision: 7 days on ingested_at, clock injected (AC-7, R-10)."""
+"""Retention decision: N days on ingested_at, clock injected (AC-7, R-10)."""
 
 from datetime import datetime, timedelta
 
-RETENTION_DAYS = 7
 
-
-def cutoff(now: datetime) -> datetime:
-    return now - timedelta(days=RETENTION_DAYS)
+def cutoff(now: datetime, retention_days: int) -> datetime:
+    return now - timedelta(days=retention_days)

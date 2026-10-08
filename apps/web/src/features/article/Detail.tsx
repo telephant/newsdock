@@ -2,15 +2,19 @@
 // Article detail (AC-12): fields + analyses. payload.reason is plain text —
 // React escapes it; never use dangerouslySetInnerHTML here (security §6).
 import { useEffect, useState } from "react";
+import { useRuntimeConfig } from "@/components/ConfigProvider";
 import { fetchArticle, type ArticleDetail } from "../feed/api";
 
 export function Detail({ articleId }: { articleId: string }) {
+  const { apiBaseUrl } = useRuntimeConfig();
   const [article, setArticle] = useState<ArticleDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchArticle(articleId).then(setArticle, (e) => setError(String(e)));
-  }, [articleId]);
+    fetchArticle({ apiBaseUrl }, articleId).then(setArticle, (e) =>
+      setError(String(e)),
+    );
+  }, [apiBaseUrl, articleId]);
 
   if (error) return <p role="alert">{error}</p>;
   if (!article) return <p>Loading…</p>;

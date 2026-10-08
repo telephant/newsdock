@@ -12,6 +12,7 @@ members = [
     "newsdock",
     "newsdock-agent",
     "newsdock-api",
+    "newsdock-config",
     "newsdock-core",
     "newsdock-db",
     "newsdock-ingester",
@@ -1019,6 +1020,7 @@ source = { editable = "apps/agent" }
 dependencies = [
     { name = "httpx" },
     { name = "mcp" },
+    { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "pydantic-settings" },
 ]
@@ -1027,6 +1029,7 @@ dependencies = [
 requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
     { name = "mcp", specifier = ">=2.3" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "pydantic-settings", specifier = ">=2.15" },
 ]
@@ -1038,6 +1041,7 @@ source = { editable = "apps/api" }
 dependencies = [
     { name = "fastapi" },
     { name = "mcp" },
+    { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "newsdock-db" },
     { name = "pydantic-settings" },
@@ -1048,10 +1052,26 @@ dependencies = [
 requires-dist = [
     { name = "fastapi", specifier = ">=0.115" },
     { name = "mcp", specifier = ">=2.3" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "newsdock-db", editable = "packages/db" },
     { name = "pydantic-settings", specifier = ">=2.15" },
     { name = "uvicorn", specifier = ">=0.30" },
+]
+
+[[package]]
+name = "newsdock-config"
+version = "0.0.0"
+source = { editable = "packages/config" }
+dependencies = [
+    { name = "pydantic-settings" },
+    { name = "pyyaml" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic-settings", specifier = ">=2.15" },
+    { name = "pyyaml", specifier = ">=6" },
 ]
 
 [[package]]
@@ -1070,6 +1090,7 @@ name = "newsdock-db"
 version = "0.0.0"
 source = { editable = "packages/db" }
 dependencies = [
+    { name = "newsdock-config" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
@@ -1083,6 +1104,7 @@ migrate = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", marker = "extra == 'migrate'", specifier = ">=1.20" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3" },
     { name = "pydantic-settings", specifier = ">=2.15" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1" },
@@ -1096,6 +1118,7 @@ source = { editable = "apps/ingester" }
 dependencies = [
     { name = "confluent-kafka" },
     { name = "httpx" },
+    { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "newsdock-db" },
     { name = "pydantic-settings" },
@@ -1105,6 +1128,7 @@ dependencies = [
 requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.15" },
     { name = "httpx", specifier = ">=0.28" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "newsdock-db", editable = "packages/db" },
     { name = "pydantic-settings", specifier = ">=2.15" },
@@ -1116,6 +1140,7 @@ version = "0.0.0"
 source = { editable = "apps/processor" }
 dependencies = [
     { name = "confluent-kafka" },
+    { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "pydantic-settings" },
 ]
@@ -1123,6 +1148,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.15" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "pydantic-settings", specifier = ">=2.15" },
 ]
@@ -1133,6 +1159,7 @@ version = "0.0.0"
 source = { editable = "apps/sink" }
 dependencies = [
     { name = "confluent-kafka" },
+    { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "newsdock-db" },
     { name = "pydantic-settings" },
@@ -1141,6 +1168,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "confluent-kafka", specifier = ">=2.15" },
+    { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "newsdock-db", editable = "packages/db" },
     { name = "pydantic-settings", specifier = ">=2.15" },

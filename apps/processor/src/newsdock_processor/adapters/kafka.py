@@ -1,4 +1,4 @@
-"""Kafka consumer/producer loop: gkg.raw → gkg.clean / gkg.dlq.
+"""Kafka consumer/producer loop: raw → clean / dlq (topic names from config).
 
 Manual offset commits after flush (at-least-once; downstream is idempotent).
 A message whose JSON envelope itself is broken goes to the dlq as `bad_field`.
@@ -11,22 +11,21 @@ from newsdock_core.contracts import DlqMessage, DlqReason, RawMessage
 from pydantic import ValidationError
 
 from newsdock_processor.config import Settings
-from newsdock_processor.domain.route import DLQ_TOPIC, route
+from newsdock_processor.domain.route import route
 
 logger = logging.getLogger(__name__)
 
-RAW_TOPIC = "gkg.raw"
-
 
 class KafkaProcessorLoop:
-    def __init__(self, settings: Settings, *, group_id: str = "processor") -> None:
+    def __init__(self, settings: Settings, *, group_id: str | None = None) -> None:
+        self._settings = settings
         self._consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
-            "group.id": group_id,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,
+            "group.id": group_id or settings.kafka_group_id,
+            "auto.offset.reset": settings.kafka_auto_offset_reset,
+            "enable.auto.commit": False,  # invariant: manual commit after flush
         })  # fmt: skip
-        self._consumer.subscribe([RAW_TOPIC])
+        self._consumer.subscribe([settings.kafka_topics_raw])
         self._producer = Producer(
             {"bootstrap.servers": settings.kafka_bootstrap_servers}
         )
@@ -45,7 +44,11 @@ class KafkaProcessorLoop:
             key = msg.key()
             try:
                 raw = RawMessage.model_validate_json(value or b"")
-                routed = route(raw)
+                routed = route(
+                    raw,
+                    self._settings.kafka_topics_clean,
+                    self._settings.kafka_topics_dlq,
+                )
             except ValidationError:
                 slot, _, row_no = (key or b"?:0").decode().partition(":")
                 dlq = DlqMessage(
@@ -55,7 +58,7 @@ class KafkaProcessorLoop:
                     line=(value or b"").decode("utf-8", errors="replace"),
                 )
                 routed_topic, routed_key, routed_value = (
-                    DLQ_TOPIC,
+                    self._settings.kafka_topics_dlq,
                     (key or b"?").decode(),
                     dlq.model_dump_json(),
                 )

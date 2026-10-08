@@ -18,8 +18,6 @@ from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_WINDOW = timedelta(hours=48)  # NEWSDOCK_STORY_WINDOW_HOURS (D-5)
-
 
 class DbUnavailable(Exception):
     """Connection-level failure: retry the whole batch later, do not commit."""
@@ -79,7 +77,7 @@ def process_batch(
     writer: StoryWriter,
     dlq: DlqSink,
     *,
-    window: timedelta = DEFAULT_WINDOW,
+    window: timedelta,
 ) -> BatchResult:
     """Write one batch. Raises DbUnavailable; never raises on bad rows."""
     canonicals = grouped = url_duplicates = dlq_count = 0

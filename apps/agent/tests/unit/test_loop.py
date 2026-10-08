@@ -40,10 +40,12 @@ class FakeMcp:
     def __init__(self, fail_on: str | None = None) -> None:
         self.fail_on = fail_on
         self.submitted: list[str] = []
+        self.limits: list[int] = []
 
     def list_new_articles(
         self, cursor: str | None, limit: int
     ) -> tuple[list[dict[str, object]], str]:
+        self.limits.append(limit)
         return list(ARTICLES), "cursor-2"
 
     def submit_analysis(
@@ -84,7 +86,14 @@ def loop(
     scorer = scorer or FakeScorer()
     cursor = MemCursor()
     return (
-        AgentLoop(mcp, scorer, cursor, agent_name="demo", theme_prefixes=("ECON_",)),
+        AgentLoop(
+            mcp,
+            scorer,
+            cursor,
+            agent_name="demo",
+            theme_prefixes=("ECON_",),
+            batch_limit=200,
+        ),
         mcp,
         scorer,
         cursor,
@@ -123,3 +132,20 @@ def test_cursor_unchanged_when_a_submit_fails_mid_batch() -> None:
         agent.run_once()
     assert cursor.value is None  # old cursor kept; batch re-scored next run
     assert mcp.submitted == ["h0"]  # crash mid-batch is harmless (upsert)
+
+
+# ---- TC-17 (agent half): batch_limit comes from the constructor --------------
+
+
+def test_tc17_batch_limit_is_passed_to_the_mcp_call() -> None:
+    mcp = FakeMcp()
+    agent = AgentLoop(
+        mcp,
+        FakeScorer(),
+        MemCursor(),
+        agent_name="demo",
+        theme_prefixes=("ECON_",),
+        batch_limit=17,
+    )
+    agent.run_once()
+    assert mcp.limits == [17]

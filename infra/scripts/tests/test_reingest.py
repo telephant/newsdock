@@ -8,6 +8,7 @@ import io
 import subprocess
 import zipfile
 from collections.abc import Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,7 @@ from newsdock_db.engine import make_engine
 from newsdock_db.models import Article
 from newsdock_ingester.domain.cycle import Ingester
 from newsdock_ingester.domain.ports import SlotState
-from newsdock_processor.domain.route import CLEAN_TOPIC, route
+from newsdock_processor.domain.route import route
 from newsdock_sink.adapters.db import SqlArticleWriter
 from newsdock_sink.domain.writer import SinkItem, process_batch
 from sqlalchemy import func, select, text
@@ -31,6 +32,8 @@ FIXTURES = ROOT / "packages" / "core" / "tests" / "fixtures"
 PROJECT = "newsdock-reingest-test"
 SLOT = "20261004081500"
 BASE = "http://x"
+CLEAN_TOPIC = "gkg.clean"
+DLQ_TOPIC = "gkg.dlq"
 
 
 def _compose(*args: str) -> subprocess.CompletedProcess[str]:
@@ -123,15 +126,17 @@ def test_reingest_is_idempotent_end_to_end(clean_db: str) -> None:
 
     def run_pipeline() -> None:
         published.clear()
-        ingester = Ingester(Source(), Collect(), MemRepo(), base_url=BASE)
+        ingester = Ingester(
+            Source(), Collect(), MemRepo(), base_url=BASE, max_attempts=4
+        )
         assert ingester.process_slot(SLOT, force=True)
-        routed = [route(m) for m in published]
+        routed = [route(m, CLEAN_TOPIC, DLQ_TOPIC) for m in published]
         batch = [
             SinkItem(key=r.key, value=r.value.encode())
             for r in routed
             if r.topic == CLEAN_TOPIC
         ]
-        process_batch(batch, writer, NullDlq())
+        process_batch(batch, writer, NullDlq(), window=timedelta(hours=48))
 
     run_pipeline()
     first = _count(clean_db)

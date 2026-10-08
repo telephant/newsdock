@@ -84,3 +84,26 @@ def test_env_reads_inside_config_py_are_allowed() -> None:  # TC-44, negative co
     with temp_module("apps/ingester/src/newsdock_ingester", source, name="config.py"):
         result = run("make", "lint-python")
     assert result.returncode == 0, output(result)
+
+
+# externalize-config TC-15: reintroducing a tunable literal fails the config check
+@pytest.mark.parametrize(
+    ("source", "needle"),
+    [
+        ('TOPIC = "gkg.clean"\n', "gkg.clean"),
+        ("MAX_ATTEMPTS = 4\n", "MAX_ATTEMPTS"),
+    ],
+)
+def test_tunable_literal_in_an_app_fails_the_config_check(
+    source: str, needle: str
+) -> None:
+    with temp_module("apps/sink/src/newsdock_sink/adapters", source) as path:
+        result = run("make", "config-python")
+    text = output(result)
+    assert result.returncode != 0
+    assert needle in text and path.name in text
+
+
+def test_clean_tree_passes_the_config_check() -> None:  # negative control
+    result = run("make", "config-python")
+    assert result.returncode == 0, output(result)

@@ -4,7 +4,7 @@ Python app, component C-3. Milestone M0 provides the skeleton only; the behaviou
 
 ## Purpose
 
-Stateless Kafka consumer: reads `gkg.raw`, parses the 27 GKG columns, validates and routes each row to `gkg.clean` or the dead-letter topic `gkg.dlq`.
+Stateless Kafka consumer: reads `gkg.raw`, parses the 27 GKG columns, validates and routes each row to `gkg.clean` or the dead-letter topic `gkg.dlq` (default names; `kafka.topics.*` in `infra/config/newsdock.yaml`). `python -m newsdock_processor.adapters.topics` creates the configured topics (the compose `topics` job).
 
 ## Entrypoint
 

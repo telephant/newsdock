@@ -6,7 +6,9 @@ cursor unchanged; the next loop retries the same batch (design.md §5).
 
 import logging
 import time
-from pathlib import Path
+
+from newsdock_config import load_settings, log_effective_config
+from newsdock_config.health import write_heartbeat
 
 from newsdock_agent.adapters.cursor import FileCursorStore
 from newsdock_agent.adapters.mcp import McpApiClient
@@ -18,23 +20,29 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    settings = Settings()
+    settings = load_settings(Settings)
     logging.basicConfig(level=settings.log_level)
+    log_effective_config(logger, settings)
     logger.info("newsdock-agent starting (model %s)", settings.model)
     loop = AgentLoop(
         McpApiClient(settings.mcp_url),
-        OllamaScorer(settings.ollama_url, settings.model),
+        OllamaScorer(
+            settings.ollama_url,
+            settings.model,
+            timeout_seconds=settings.ollama_timeout_seconds,
+            temperature=settings.ollama_temperature,
+        ),
         FileCursorStore(settings.cursor_file),
         agent_name=settings.agent_name,
         theme_prefixes=settings.prefixes,
+        batch_limit=settings.batch_limit,
     )
-    heartbeat = Path(settings.heartbeat_file)
     while True:
         try:
             loop.run_once()
         except Exception as exc:  # noqa: BLE001 — cursor unchanged, retry next loop
             logger.warning("batch failed, will retry: %s", exc)
-        heartbeat.touch()
+        write_heartbeat(settings.heartbeat_file, settings.heartbeat_max_age_seconds)
         time.sleep(settings.loop_interval_seconds)
 
 

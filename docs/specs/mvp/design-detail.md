@@ -1,5 +1,7 @@
 # mvp — Design detail
 
+> **Superseded in part (2026-10-07, [externalize-config](../externalize-config/spec.md)):** topic names are config defaults (`kafka.topics.*`), the topics job is `python -m newsdock_processor.adapters.topics` (ADR-0015; `infra/kafka/create-topics.sh` is gone), and healthchecks run `newsdock_<app>.adapters.healthcheck` instead of `find -mmin`. Text below describes the original M0/M1 design.
+
 **Reference only. Not required reading for design approval.** Overview: [design.md](design.md).
 
 ## 1. Postgres schema

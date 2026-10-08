@@ -4,7 +4,7 @@ Python app, component C-1. Milestone M0 provides the skeleton only; the behaviou
 
 ## Purpose
 
-Polls the GDELT GKG index every 15 minutes (never faster), downloads each new slot, checks its md5 and publishes one raw message per row to Kafka topic `gkg.raw`. Tracks slot state (`pending`, `published`, `failed`) in Postgres.
+Polls the GDELT GKG index every 15 minutes (never faster), downloads each new slot, checks its md5 and publishes one raw message per row to Kafka topic `gkg.raw` (default; `kafka.topics.raw` in `infra/config/newsdock.yaml`). Tracks slot state (`pending`, `published`, `failed`) in Postgres.
 
 ## Entrypoint
 

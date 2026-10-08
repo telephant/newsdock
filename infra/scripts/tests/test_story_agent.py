@@ -129,6 +129,7 @@ def test_three_copies_yield_one_analysis(stack: tuple[str, str]) -> None:
         MemCursor(),
         agent_name="demo-financial",
         theme_prefixes=("ECON_",),
+        batch_limit=200,
     )
     submitted = loop.run_once()
     assert submitted == 1  # the story appears once, so it is scored once

@@ -4,7 +4,7 @@ Python app, component C-4. Milestone M0 provides the skeleton only; the behaviou
 
 ## Purpose
 
-Kafka consumer that upserts `gkg.clean` messages into Postgres (`ON CONFLICT DO NOTHING`) and runs the hourly 7-day retention delete.
+Kafka consumer that upserts `gkg.clean` messages into Postgres (`ON CONFLICT DO NOTHING`) and runs the hourly retention delete (`retention_days`, default 7, in `infra/config/newsdock.yaml`).
 
 ## Entrypoint
 

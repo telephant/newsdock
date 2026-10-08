@@ -11,9 +11,15 @@ logger = logging.getLogger(__name__)
 
 class OllamaScorer:
     def __init__(
-        self, base_url: str, model: str, timeout_seconds: float = 120.0
+        self,
+        base_url: str,
+        model: str,
+        *,
+        timeout_seconds: float,
+        temperature: float,
     ) -> None:
         self._model = model
+        self._temperature = temperature
         self._client = httpx.Client(base_url=base_url, timeout=timeout_seconds)
 
     def score(self, title: str) -> Score | None:
@@ -24,7 +30,7 @@ class OllamaScorer:
                 "messages": [{"role": "user", "content": PROMPT.format(title=title)}],
                 "format": OUTPUT_SCHEMA,
                 "stream": False,
-                "options": {"temperature": 0},
+                "options": {"temperature": self._temperature},
             },
         )
         response.raise_for_status()

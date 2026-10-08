@@ -3,16 +3,16 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). Next milestone: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
-- Roadmap: `docs/roadmap.md` (current milestone: M1).
+- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` committed (verification pending). In progress: M2b `externalize-config` (one YAML config file + env overrides, spec `docs/specs/externalize-config/`). Next milestone after: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
+- Roadmap: `docs/roadmap.md` (current milestone: M2b).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
 - Open items: `docs/specs/mvp/backlog.md` ("Design TODOs").
 
 ## Repo layout (monorepo, Python + TypeScript in one git repo)
 - `apps/<service>/` one deployable per folder: `ingester`, `processor`, `sink`, `api`, `agent` (Python) and `web` (Next.js + TS). Each app owns its dependency file and Dockerfile.
-- `packages/core/` shared pure Python code (GKG parsing, URL normalisation, models, contracts); `packages/db/` SQLAlchemy engine, config and metadata. Apps may import `packages/*`, never another app.
-- `infra/` docker-compose, Alembic migrations, Kafka topic setup, check scripts. `docs/` specs and ADRs.
+- `packages/core/` shared pure Python code (GKG parsing, URL normalisation, models, contracts); `packages/db/` SQLAlchemy engine, config and metadata; `packages/config/` the layered config loader (`newsdock_config`, ADR-0013). Apps may import `packages/*`, never another app.
+- `infra/` docker-compose, `infra/config/newsdock.yaml` (the one config file), Alembic migrations, check scripts. `docs/` specs and ADRs.
 - The only link between Python and TS is the REST/OpenAPI contract; generate the UI's types from it instead of hand-writing them.
 - Python: one `uv` workspace at the root (planned); web: its own `package.json` in `apps/web`. CI jobs run only for the apps whose files changed.
 
@@ -33,7 +33,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Changing a decided item (`D-n` in the spec, an Accepted ADR) needs the user's approval; record the change in the spec/ADR with the date.
 
 ## Architecture (ids are used in all docs)
-- C-1 Ingester → C-2 Kafka (`gkg.raw`, `gkg.clean`, `gkg.dlq`) → C-3 Python processor (stateless: parse, validate, route) → C-4 sink + retention → C-5 Postgres 16 + pgvector (unused in MVP).
+- C-1 Ingester → C-2 Kafka (default topics `gkg.raw`, `gkg.clean`, `gkg.dlq`; names are config, ADR-0013) → C-3 Python processor (stateless: parse, validate, route) → C-4 sink + retention → C-5 Postgres 16 + pgvector (unused in MVP).
 - C-6 API: one FastAPI process serving MCP (streamable HTTP, `/mcp`) and REST (`/api/*`) over one service layer.
 - C-7 demo agent (MCP client + Ollama on host), C-8 Next.js UI (REST only).
 - Flink was deliberately dropped (ADR-0001). Do not reintroduce stateful stream engines in the MVP.
@@ -60,6 +60,12 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Secrets live in `.env` (git-ignored). Never commit credentials or put them in docs.
 - The demo agent must have no database credentials and no route to Postgres or Kafka; it reaches data only through the MCP server (AC-13).
 
+## Configuration (ADR-0013, spec `externalize-config`)
+- Every tunable lives in `infra/config/newsdock.yaml`: a `common:` parent inherited by the `ingester`, `processor`, `sink`, `api`, `agent`, `web` sections. Precedence: env > file > code defaults. Nested keys flatten with `_` to the setting name (`kafka.topics.clean` → `kafka_topics_clean` → env `NEWSDOCK_KAFKA_TOPICS_CLEAN`); agent env prefix is `NEWSDOCK_AGENT_`.
+- Secrets (`DATABASE_URL`, passwords) stay in `.env`/the environment; the loader rejects secret-looking keys in the file. The file holds the defaults, so an empty file changes nothing.
+- A new setting = a field on that app's `Settings` (extends `newsdock_config.LayeredSettings`) with the old literal as default, plus its row in the file if you want it visible. `make config-python` fails on unknown keys, values that differ from defaults, and tunable literals (topic names, retry/retention constants) reintroduced in code. Manual offset commits and `follow_redirects=True` stay in code (invariants, not tunables).
+- Healthchecks are app code (`newsdock_<app>.adapters.healthcheck`); the worker writes its own allowed heartbeat age into `heartbeat_file`. Host ports come from `.env` (`API_PORT`, `WEB_PORT`, `POSTGRES_PORT`); container ports are fixed. The web app reads its `web:` section at server start (no rebuild to change the API base).
+
 ## Docs conventions
 - Tag factual claims in specs/designs as **[verified]**, **[memory]** or **[assumption]**; only tag **[verified]** after checking this session.
 - Keep `design.md` ≤ ~150 lines; detail goes in `design-detail.md`. Each design diagram has ≤ ~12 nodes and a "Check" box.
@@ -71,7 +77,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - `make build [APP=<name>]` images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); `cp .env.example .env` then `make up` / `make down`; `make topics`, `make migrate` are idempotent.
 - Raw compose needs the env file: `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - Python: `uv run ...` (never `pip`); one workspace, `uv sync --all-packages --locked`. Web: `pnpm --dir apps/web run <script>`; Node 24 comes from pnpm, not the system.
-- Quality tools: ruff (lint, format, `TID251` bans `os.environ`/`os.getenv` outside `config.py`), mypy strict with the pydantic plugin, import-linter contracts in `pyproject.toml`, `infra/scripts/check_layout.py`, `infra/scripts/check_docs.py`.
+- Quality tools: ruff (lint, format, `TID251` bans `os.environ`/`os.getenv` outside `config.py`), mypy strict with the pydantic plugin, import-linter contracts in `pyproject.toml`, `infra/scripts/check_layout.py`, `infra/scripts/check_docs.py`, `infra/scripts/check_config.py` (`make config-python`).
 
 ## Environment notes
 - Machine: macOS arm64. Docker Desktop 4.93, uv, pnpm and Ollama are installed; Ollama has `llama3.2:1b` pulled (enough for AC-2; the M1 spike picks the demo-agent model).

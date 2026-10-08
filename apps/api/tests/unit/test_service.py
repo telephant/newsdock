@@ -5,16 +5,24 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from newsdock_api.domain.records import ArticleSummary
 from newsdock_api.domain.service import (
-    FIRST_RUN_WINDOW,
     ArticleService,
     NotFoundError,
     PayloadTooLargeError,
+    ServiceLimits,
     decode_cursor,
     encode_cursor,
     escape_like,
 )
 
 NOW = datetime(2026, 10, 5, 12, 0, 0, tzinfo=UTC)
+LIMITS = ServiceLimits(
+    search_default=20,
+    search_max=100,
+    list_new_default=50,
+    list_new_max=200,
+    max_payload_bytes=64 * 1024,
+    first_run_window=timedelta(hours=1),
+)
 
 
 def summary(seq: int) -> ArticleSummary:
@@ -49,9 +57,11 @@ class FakeRepo:
         return self.articles_exist
 
 
-def service(repo: FakeRepo | None = None) -> tuple[ArticleService, FakeRepo]:
+def service(
+    repo: FakeRepo | None = None, limits: ServiceLimits = LIMITS
+) -> tuple[ArticleService, FakeRepo]:
     repo = repo or FakeRepo()
-    return ArticleService(repo, now=lambda: NOW), repo
+    return ArticleService(repo, limits=limits, now=lambda: NOW), repo
 
 
 # TC-17: ILIKE wildcards in the text filter are escaped
@@ -79,7 +89,6 @@ def test_list_new_limit_clamped() -> None:
 # TC-20: no cursor → only articles ingested within the last hour
 def test_first_run_window_is_one_hour() -> None:
     svc, repo = service()
-    assert FIRST_RUN_WINDOW == timedelta(hours=1)
     svc.list_new(cursor=None, limit=10)
     (after_seq, since, _) = repo.list_calls[0]
     assert after_seq is None and since == NOW - timedelta(hours=1)
@@ -123,3 +132,37 @@ def test_resubmission_upserts() -> None:
     svc.submit_analysis("h", "demo", {"score": 0.1})
     svc.submit_analysis("h", "demo", {"score": 0.9})
     assert repo.upserts == [("h", "demo"), ("h", "demo")]
+
+
+# TC-16: limits and windows come from the injected ServiceLimits, not constants
+CUSTOM = ServiceLimits(
+    search_default=5,
+    search_max=7,
+    list_new_default=6,
+    list_new_max=8,
+    max_payload_bytes=100,
+    first_run_window=timedelta(minutes=10),
+)
+
+
+def test_tc16_custom_search_and_list_limits() -> None:
+    svc, repo = service(limits=CUSTOM)
+    svc.search(limit=None)
+    svc.search(limit=999)
+    svc.list_new(cursor=None, limit=None)
+    svc.list_new(cursor=None, limit=999)
+    assert repo.search_limits == [5, 7]
+    assert [c[2] for c in repo.list_calls] == [6, 8]
+
+
+def test_tc16_custom_first_run_window() -> None:
+    svc, repo = service(limits=CUSTOM)
+    svc.list_new(cursor=None, limit=10)
+    assert repo.list_calls[0][1] == NOW - timedelta(minutes=10)
+
+
+def test_tc16_custom_payload_cap_and_message() -> None:
+    svc, _ = service(limits=CUSTOM)
+    svc.submit_analysis("h", "agent", {"k": "x" * 10})
+    with pytest.raises(PayloadTooLargeError, match="100"):
+        svc.submit_analysis("h", "agent", {"k": "x" * 200})

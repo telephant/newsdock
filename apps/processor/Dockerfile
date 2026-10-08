@@ -7,9 +7,11 @@ WORKDIR /app
 # Layer 1: only the manifests this app needs (explicit COPY: wildcards flatten paths)
 COPY pyproject.toml uv.lock ./
 COPY apps/processor/pyproject.toml apps/processor/pyproject.toml
+COPY packages/config/pyproject.toml packages/config/pyproject.toml
 COPY packages/core/pyproject.toml packages/core/pyproject.toml
 RUN uv sync --frozen --no-dev --no-install-workspace --package newsdock-processor
 # Layer 2: sources
+COPY packages/config/src packages/config/src
 COPY packages/core/src packages/core/src
 COPY apps/processor/src apps/processor/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-processor

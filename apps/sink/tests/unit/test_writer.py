@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from newsdock_core.contracts import CleanArticle, DlqMessage, DlqReason
 from newsdock_sink.domain.writer import (
-    DEFAULT_WINDOW,
     DbUnavailable,
     RowRejected,
     SinkItem,
@@ -17,6 +16,8 @@ from newsdock_sink.domain.writer import (
 ROOT = Path(__file__).resolve().parents[4]
 EXPECTED = ROOT / "packages" / "core" / "tests" / "fixtures" / "expected_articles.json"
 NOW = datetime(2026, 10, 5, 12, 0, 0, tzinfo=UTC)
+
+WINDOW = timedelta(hours=48)
 
 
 def fixture_articles(n: int = 5) -> list[CleanArticle]:
@@ -99,7 +100,7 @@ def test_in_batch_cache_yields_one_canonical() -> None:
     base = fixture_articles(1)[0]
     copy = copy_of(base, url="https://other-site.example/same-story", hours=1)
     writer, dlq = FakeStoryWriter(), FakeDlq()
-    result = process_batch([item(base), item(copy)], writer, dlq)
+    result = process_batch([item(base), item(copy)], writer, dlq, window=WINDOW)
     assert (result.canonicals, result.grouped, result.url_duplicates) == (1, 1, 0)
     assert len(writer.canonicals) == 1 and len(writer.sources) == 2
     assert writer.find_calls == 1  # second copy came from the cache, not the DB
@@ -117,7 +118,7 @@ def test_counts_sum_to_batch_across_all_paths() -> None:
     bad = SinkItem(key="k", value=b"{not json")
     writer, dlq = FakeStoryWriter(), FakeDlq()
     items = [item(story), item(copy), item(other), item(redelivered), bad]
-    result = process_batch(items, writer, dlq)
+    result = process_batch(items, writer, dlq, window=WINDOW)
     assert (result.canonicals, result.grouped) == (2, 1)
     assert (result.url_duplicates, result.dlq) == (1, 1)
     assert result.canonicals + result.grouped + result.url_duplicates + result.dlq == 5
@@ -127,9 +128,8 @@ def test_window_guard_splits_same_key() -> None:  # AC-5 logic at unit level
     story = fixture_articles(1)[0]
     far = copy_of(story, url="https://late.example/x", hours=72)  # > 48 h window
     writer, dlq = FakeStoryWriter(), FakeDlq()
-    result = process_batch([item(story), item(far)], writer, dlq)
+    result = process_batch([item(story), item(far)], writer, dlq, window=WINDOW)
     assert result.canonicals == 2 and result.grouped == 0
-    assert DEFAULT_WINDOW == timedelta(hours=48)
 
 
 # ---- M1 semantics preserved -------------------------------------------------
@@ -140,7 +140,7 @@ def test_poison_row_goes_to_dlq_and_the_rest_are_written() -> None:
     poison_key = articles[2].url_hash
     writer = FakeStoryWriter(poison=frozenset({poison_key}))
     dlq = FakeDlq()
-    result = process_batch([item(a) for a in articles], writer, dlq)
+    result = process_batch([item(a) for a in articles], writer, dlq, window=WINDOW)
     assert result.canonicals == 4 and result.dlq == 1
     (key, message) = dlq.sent[0]
     assert key == poison_key and message.reason == DlqReason.bad_field
@@ -150,13 +150,17 @@ def test_poison_row_goes_to_dlq_and_the_rest_are_written() -> None:
 def test_db_down_raises_so_offsets_are_not_committed() -> None:
     writer, dlq = FakeStoryWriter(down=True), FakeDlq()
     with pytest.raises(DbUnavailable):
-        process_batch([item(a) for a in fixture_articles(3)], writer, dlq)
+        process_batch(
+            [item(a) for a in fixture_articles(3)], writer, dlq, window=WINDOW
+        )
     assert dlq.sent == []
 
 
 def test_unparseable_clean_message_goes_to_dlq() -> None:
     writer, dlq = FakeStoryWriter(), FakeDlq()
     bad = SinkItem(key="k", value=b"{not json")
-    result = process_batch([bad, *(item(a) for a in fixture_articles(2))], writer, dlq)
+    result = process_batch(
+        [bad, *(item(a) for a in fixture_articles(2))], writer, dlq, window=WINDOW
+    )
     assert result.canonicals == 2 and result.dlq == 1
     assert dlq.sent[0][1].reason == DlqReason.bad_field
