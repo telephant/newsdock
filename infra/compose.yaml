@@ -1,5 +1,12 @@
 name: newsdock
 
+# Shared fragments (compose extension fields).
+x-config-file: &config-file
+  NEWSDOCK_CONFIG_FILE: /etc/newsdock/newsdock.yaml   # ADR-0013; no secrets inside
+x-config-volume: &config-volume ./config:/etc/newsdock:ro
+x-db-env: &db-env
+  DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env}:${POSTGRES_PASSWORD:?copy .env.example to .env}@postgres:5432/${POSTGRES_DB:?copy .env.example to .env}
+
 services:
   kafka:
     image: apache/kafka:4.2.2
@@ -43,16 +50,22 @@ services:
       timeout: 5s
       retries: 10
 
-  topics:
-    image: apache/kafka:4.2.2
+  topics:  # one-shot Python job (ADR-0015); same image as the processor
+    build:
+      context: ..
+      dockerfile: apps/processor/Dockerfile
+    image: newsdock-processor:dev
     depends_on:
       kafka:
         condition: service_healthy
     restart: "no"
+    environment:
+      <<: *config-file
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
     volumes:
-      - ./kafka/create-topics.sh:/create-topics.sh:ro
+      - *config-volume
     networks: [data]
-    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    command: ["python", "-m", "newsdock_processor.adapters.topics"]
 
   migrate:
     build:
@@ -63,7 +76,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env}:${POSTGRES_PASSWORD:?copy .env.example to .env}@postgres:5432/${POSTGRES_DB:?copy .env.example to .env}
+      <<: [*db-env, *config-file]
+    volumes:
+      - *config-volume
     networks: [data]
     restart: "no"
 
@@ -76,15 +91,17 @@ services:
     restart: unless-stopped
     networks: [data]
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env}:${POSTGRES_PASSWORD:?copy .env.example to .env}@postgres:5432/${POSTGRES_DB:?copy .env.example to .env}
+      <<: [*db-env, *config-file]
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - *config-volume
     depends_on:
       kafka: {condition: service_healthy}
       postgres: {condition: service_healthy}
       topics: {condition: service_completed_successfully}
       migrate: {condition: service_completed_successfully}
-    healthcheck:  # heartbeat file younger than ~1.3x the 900 s poll loop (R-4)
-      test: ["CMD-SHELL", "test -n \"$$(find /tmp/healthy -mmin -20)\""]
+    healthcheck:  # heartbeat age vs the max age the worker wrote itself (ADR-0015)
+      test: ["CMD", "python", "-m", "newsdock_ingester.adapters.healthcheck"]
       interval: 60s
       timeout: 5s
       retries: 3
@@ -98,12 +115,15 @@ services:
     restart: unless-stopped
     networks: [data]
     environment:
+      <<: *config-file
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - *config-volume
     depends_on:
       kafka: {condition: service_healthy}
       topics: {condition: service_completed_successfully}
     healthcheck:
-      test: ["CMD-SHELL", "test -n \"$$(find /tmp/healthy -mmin -2)\""]
+      test: ["CMD", "python", "-m", "newsdock_processor.adapters.healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -117,15 +137,17 @@ services:
     restart: unless-stopped
     networks: [data]
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env}:${POSTGRES_PASSWORD:?copy .env.example to .env}@postgres:5432/${POSTGRES_DB:?copy .env.example to .env}
+      <<: [*db-env, *config-file]
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    volumes:
+      - *config-volume
     depends_on:
       kafka: {condition: service_healthy}
       postgres: {condition: service_healthy}
       topics: {condition: service_completed_successfully}
       migrate: {condition: service_completed_successfully}
     healthcheck:
-      test: ["CMD-SHELL", "test -n \"$$(find /tmp/healthy -mmin -2)\""]
+      test: ["CMD", "python", "-m", "newsdock_sink.adapters.healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -139,15 +161,18 @@ services:
     restart: unless-stopped
     networks: [data, agent]  # the only bridge between the two (AC-13)
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:${API_PORT:-8000}:8000"  # container port fixed; host port from .env
     environment:
-      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env}:${POSTGRES_PASSWORD:?copy .env.example to .env}@postgres:5432/${POSTGRES_DB:?copy .env.example to .env}
+      <<: [*db-env, *config-file]
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      NEWSDOCK_PORT: 8000  # pinned: the published mapping above targets 8000
+    volumes:
+      - *config-volume
     depends_on:
       postgres: {condition: service_healthy}
       migrate: {condition: service_completed_successfully}
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/health', timeout=3).status==200 else 1)\""]
+      test: ["CMD", "python", "-m", "newsdock_api.adapters.healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -160,15 +185,17 @@ services:
     profiles: [apps]
     restart: unless-stopped
     networks: [agent]  # no route to postgres or kafka (AC-13)
-    environment:  # the agent's whole configuration surface (TC-35)
+    environment:  # the agent's env surface (TC-35) plus the config-file path
+      <<: *config-file
       MCP_URL: http://api:8000/mcp
       OLLAMA_URL: http://host.docker.internal:11434
     volumes:
       - agent_state:/data
+      - *config-volume
     depends_on:
       api: {condition: service_healthy}
     healthcheck:
-      test: ["CMD-SHELL", "test -n \"$$(find /tmp/healthy -mmin -2)\""]
+      test: ["CMD", "python", "-m", "newsdock_agent.adapters.healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -182,11 +209,15 @@ services:
     restart: unless-stopped
     networks: [agent]
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${WEB_PORT:-3000}:3000"  # container port fixed; host port from .env
+    environment:
+      <<: *config-file
+    volumes:
+      - *config-volume
     depends_on:
       api: {condition: service_healthy}
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://localhost:'+process.env.PORT).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 30s
       timeout: 5s
       retries: 3

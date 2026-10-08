@@ -1,5 +1,7 @@
 # mvp — Design (Milestone 1)
 
+> **Superseded in part (2026-10-07, [externalize-config](../externalize-config/spec.md)):** topic names are config defaults (`kafka.topics.*`), the topics job is `python -m newsdock_processor.adapters.topics` (ADR-0015; `infra/kafka/create-topics.sh` is gone), and healthchecks run `newsdock_<app>.adapters.healthcheck` instead of `find -mmin`. Text below describes the original M0/M1 design.
+
 Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not required reading): [design-detail.md](design-detail.md)
 
 **Reading order:** this file → `diagrams/index.html` (open in a browser; each diagram has a "Check" box) → ADRs in `../../adr/` → answer the checklist at the bottom.

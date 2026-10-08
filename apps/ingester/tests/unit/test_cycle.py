@@ -74,7 +74,12 @@ def make(
 ) -> tuple[Ingester, FakeSource, FakePublisher, FakeRepo]:
     source = FakeSource(index, files or {})
     publisher, repo = FakePublisher(), FakeRepo()
-    return Ingester(source, publisher, repo, base_url=BASE), source, publisher, repo
+    return (
+        Ingester(source, publisher, repo, base_url=BASE, max_attempts=4),
+        source,
+        publisher,
+        repo,
+    )
 
 
 def good_md5() -> str:
@@ -166,3 +171,17 @@ def test_run_cycle_registers_new_slot_and_processes_pending() -> None:
     ing.run_cycle()
     assert repo.states[SLOT].status == "published"
     assert repo.states["20261004080000"].attempts == 3  # retried and failed again
+
+
+# TC-11: max_attempts comes from settings, not a module constant
+def test_max_attempts_two_fails_the_slot_on_the_second_miss() -> None:
+    source = FakeSource(None, {})
+    publisher, repo = FakePublisher(), FakeRepo()
+    ing = Ingester(source, publisher, repo, base_url=BASE, max_attempts=2)
+    assert ing.process_slot(SLOT) is False
+    assert repo.states[SLOT].status == "pending"
+    assert ing.process_slot(SLOT) is False
+    assert repo.states[SLOT].status == "failed"
+    fetches = len(source.fetches)
+    ing.run_cycle()  # the failed slot is not retried
+    assert len(source.fetches) == fetches

@@ -1,22 +1,30 @@
 """One service layer under both MCP and REST (ADR-0003).
 
 Cursor (AC-10): opaque base64 of "seq:<max seq seen>"; no cursor → only
-articles ingested within FIRST_RUN_WINDOW (R-2). Limits clamped (design.md §3).
+articles ingested within `first_run_window` (R-2). Limits clamped (design.md §3).
 """
 
 import base64
 import binascii
 import json
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
 from newsdock_api.domain.records import ArticleDetail, ArticleSummary, NewArticlesPage
 
-FIRST_RUN_WINDOW = timedelta(hours=1)
-MAX_PAYLOAD_BYTES = 64 * 1024
-SEARCH_DEFAULT, SEARCH_MAX = 20, 100
-LIST_DEFAULT, LIST_MAX = 50, 200
+
+@dataclass(frozen=True)
+class ServiceLimits:
+    """Page sizes, payload cap and first-run window; values come from config."""
+
+    search_default: int
+    search_max: int
+    list_new_default: int
+    list_new_max: int
+    max_payload_bytes: int
+    first_run_window: timedelta
 
 
 class NotFoundError(Exception):
@@ -24,7 +32,7 @@ class NotFoundError(Exception):
 
 
 class PayloadTooLargeError(Exception):
-    """submit_analysis payload over 64 KB (design-detail §5)."""
+    """submit_analysis payload over the configured cap (design-detail §5)."""
 
 
 class ArticleRepo(Protocol):
@@ -80,9 +88,11 @@ class ArticleService:
         self,
         repo: ArticleRepo,
         *,
+        limits: ServiceLimits,
         now: Callable[[], datetime] = lambda: datetime.now(UTC),
     ) -> None:
         self._repo = repo
+        self._limits = limits
         self._now = now
 
     def search(
@@ -102,17 +112,19 @@ class ArticleService:
             theme=theme,
             domain=domain,
             text=text,
-            limit=_clamp(limit, SEARCH_DEFAULT, SEARCH_MAX),
+            limit=_clamp(limit, self._limits.search_default, self._limits.search_max),
             before=before,
         )
 
     def list_new(self, *, cursor: str | None, limit: int | None) -> NewArticlesPage:
         after_seq = decode_cursor(cursor) if cursor else None
-        since = None if cursor else self._now() - FIRST_RUN_WINDOW
+        since = None if cursor else self._now() - self._limits.first_run_window
         articles = self._repo.list_new(
             after_seq=after_seq,
             since=since,
-            limit=_clamp(limit, LIST_DEFAULT, LIST_MAX),
+            limit=_clamp(
+                limit, self._limits.list_new_default, self._limits.list_new_max
+            ),
         )
         if articles:
             next_cursor = encode_cursor(max(a.seq for a in articles))
@@ -123,8 +135,9 @@ class ArticleService:
     def submit_analysis(
         self, article_id: str, agent_name: str, payload: dict[str, Any]
     ) -> None:
-        if len(json.dumps(payload).encode()) > MAX_PAYLOAD_BYTES:
-            raise PayloadTooLargeError("payload over 64 KB")
+        cap = self._limits.max_payload_bytes
+        if len(json.dumps(payload).encode()) > cap:
+            raise PayloadTooLargeError(f"payload over {cap} bytes")
         if not self._repo.upsert_analysis(article_id, agent_name, payload):
             raise NotFoundError(article_id)
 

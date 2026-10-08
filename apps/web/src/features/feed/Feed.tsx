@@ -3,9 +3,8 @@
 // 60 s polling refresh. All text rendered via React (escaped, never HTML).
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { useRuntimeConfig } from "@/components/ConfigProvider";
 import { fetchFeed, type ArticleSummary, type FeedFilters } from "./api";
-
-const POLL_MS = 60_000;
 
 function ScoreBadge({ scores }: { scores: ArticleSummary["scores"] }) {
   if (!scores) return null;
@@ -21,6 +20,7 @@ function ScoreBadge({ scores }: { scores: ArticleSummary["scores"] }) {
 }
 
 export function Feed() {
+  const { apiBaseUrl, pollMs, pageSize } = useRuntimeConfig();
   const [filters, setFilters] = useState<FeedFilters>({});
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
@@ -28,27 +28,30 @@ export function Feed() {
 
   const load = useCallback(async () => {
     try {
-      const page = await fetchFeed(filters);
+      const page = await fetchFeed({ apiBaseUrl, pageSize }, filters);
       setArticles(page.articles);
       setNextBefore(page.next_before);
       setError(null);
     } catch (e) {
       setError(String(e));
     }
-  }, [filters]);
+  }, [filters, apiBaseUrl, pageSize]);
 
   useEffect(() => {
     // initial fetch + 60 s polling; load() is async, so setState happens in
     // the promise callback, not synchronously inside the effect body
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
-    const timer = setInterval(() => void load(), POLL_MS);
+    const timer = setInterval(() => void load(), pollMs);
     return () => clearInterval(timer);
-  }, [load]);
+  }, [load, pollMs]);
 
   async function loadMore() {
     if (!nextBefore) return;
-    const page = await fetchFeed({ ...filters, before: nextBefore });
+    const page = await fetchFeed(
+      { apiBaseUrl, pageSize },
+      { ...filters, before: nextBefore },
+    );
     setArticles((current) => [...current, ...page.articles]);
     setNextBefore(page.next_before);
   }

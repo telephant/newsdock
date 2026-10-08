@@ -47,7 +47,7 @@ class AgentLoop:
         *,
         agent_name: str,
         theme_prefixes: tuple[str, ...],
-        batch_limit: int = 200,
+        batch_limit: int,
     ) -> None:
         self._mcp = mcp
         self._scorer = scorer

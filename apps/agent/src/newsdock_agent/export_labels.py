@@ -12,6 +12,7 @@ import csv
 from pathlib import Path
 
 import httpx
+from newsdock_config import load_settings
 
 from newsdock_agent.config import Settings
 
@@ -32,13 +33,16 @@ def dedupe_by_title(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--limit", type=int, default=100)
+    settings = load_settings(Settings)
+    parser.add_argument("--limit", type=int, default=settings.export_limit)
     args = parser.parse_args(argv)
 
-    base = Settings().mcp_url.removesuffix("/mcp")
+    base = settings.mcp_url.removesuffix("/mcp")
     articles = dedupe_by_title(
         httpx.get(
-            f"{base}/api/articles", params={"limit": args.limit}, timeout=30
+            f"{base}/api/articles",
+            params={"limit": args.limit},
+            timeout=settings.export_timeout_seconds,
         ).json()["articles"]
     )
     with args.out.open("w", newline="") as f:

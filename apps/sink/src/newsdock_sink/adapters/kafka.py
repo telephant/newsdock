@@ -1,4 +1,4 @@
-"""Kafka loop for the sink: consume gkg.clean in batches, write, commit."""
+"""Kafka loop for the sink: consume the clean topic in batches, write, commit."""
 
 import logging
 import time
@@ -18,38 +18,36 @@ from newsdock_sink.domain.writer import (
 
 logger = logging.getLogger(__name__)
 
-CLEAN_TOPIC = "gkg.clean"
-DLQ_TOPIC = "gkg.dlq"
-
 
 class KafkaDlqSink:
-    def __init__(self, producer: Producer) -> None:
+    def __init__(self, producer: Producer, *, topic: str) -> None:
         self._producer = producer
+        self._topic = topic
 
     def send(self, key: str, message: DlqMessage) -> None:
         self._producer.produce(
-            DLQ_TOPIC, key=key.encode(), value=message.model_dump_json().encode()
+            self._topic, key=key.encode(), value=message.model_dump_json().encode()
         )
         self._producer.poll(0)
 
 
 class KafkaSinkLoop:
     def __init__(
-        self, settings: Settings, writer: StoryWriter, *, group_id: str = "sink"
+        self, settings: Settings, writer: StoryWriter, *, group_id: str | None = None
     ) -> None:
         self._settings = settings
         self._writer = writer
         self._consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
-            "group.id": group_id,
-            "auto.offset.reset": "earliest",
-            "enable.auto.commit": False,
+            "group.id": group_id or settings.kafka_group_id,
+            "auto.offset.reset": settings.kafka_auto_offset_reset,
+            "enable.auto.commit": False,  # invariant: manual commit after write,
         })  # fmt: skip
-        self._consumer.subscribe([CLEAN_TOPIC])
+        self._consumer.subscribe([settings.kafka_topics_clean])
         self._producer = Producer(
             {"bootstrap.servers": settings.kafka_bootstrap_servers}
         )
-        self._dlq = KafkaDlqSink(self._producer)
+        self._dlq = KafkaDlqSink(self._producer, topic=settings.kafka_topics_dlq)
 
     def run_once(self) -> BatchResult | None:
         """Consume up to batch_size/1 s, write, flush dlq, commit offsets."""

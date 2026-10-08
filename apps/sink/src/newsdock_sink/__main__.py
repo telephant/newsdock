@@ -3,8 +3,9 @@
 import logging
 import time
 from datetime import UTC, datetime
-from pathlib import Path
 
+from newsdock_config import load_settings, log_effective_config
+from newsdock_config.health import write_heartbeat
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
@@ -18,24 +19,26 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> int:
-    settings = Settings()
+    settings = load_settings(Settings)
     logging.basicConfig(level=settings.log_level)
+    log_effective_config(logger, settings)
     logger.info("newsdock-sink starting")
-    writer = SqlArticleWriter(make_engine(DbSettings().database_url))
+    writer = SqlArticleWriter(make_engine(DbSettings()))
     loop = KafkaSinkLoop(settings, writer)
-    heartbeat = Path(settings.heartbeat_file)
     last_retention = 0.0
     try:
         while True:
             loop.run_once()
             if time.monotonic() - last_retention > settings.retention_interval_seconds:
                 try:
-                    deleted = writer.delete_ingested_before(cutoff(datetime.now(UTC)))
+                    deleted = writer.delete_ingested_before(
+                        cutoff(datetime.now(UTC), settings.retention_days)
+                    )
                     logger.info("retention: deleted %d articles", deleted)
                     last_retention = time.monotonic()
                 except DbUnavailable as exc:
                     logger.warning("retention skipped, db unavailable: %s", exc)
-            heartbeat.touch()
+            write_heartbeat(settings.heartbeat_file, settings.heartbeat_max_age_seconds)
     finally:
         loop.close()
 

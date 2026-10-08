@@ -23,8 +23,6 @@ from newsdock_ingester.domain.ports import (
 
 logger = logging.getLogger(__name__)
 
-MAX_ATTEMPTS = 4
-
 
 def url_for(base_url: str, slot: str) -> str:
     return f"{base_url}/{slot}.gkg.csv.zip"
@@ -47,7 +45,7 @@ class Ingester:
         repo: SlotRepo,
         *,
         base_url: str,
-        max_attempts: int = MAX_ATTEMPTS,
+        max_attempts: int,
     ) -> None:
         self._source = source
         self._publisher = publisher

@@ -45,6 +45,7 @@ mypy_path = [
     "apps/api/src",
     "apps/agent/src",
     "packages/core/src",
+    "packages/config/src",
     "packages/db/src",
     "infra/scripts",
 ]
@@ -52,6 +53,7 @@ mypy_path = [
 [tool.importlinter]
 root_packages = [
     "newsdock_core",
+    "newsdock_config",
     "newsdock_db",
     "newsdock_ingester",
     "newsdock_processor",
@@ -77,6 +79,7 @@ name = "DR-7 core imports no app, db or I/O library"
 type = "forbidden"
 source_modules = ["newsdock_core"]
 forbidden_modules = [
+    "newsdock_config",
     "newsdock_db",
     "newsdock_ingester",
     "newsdock_processor",
@@ -107,6 +110,7 @@ forbidden_modules = [
     "newsdock_sink.adapters",
     "newsdock_api.adapters",
     "newsdock_agent.adapters",
+    "newsdock_config",
     "newsdock_db",
     "confluent_kafka",
     "psycopg",
@@ -114,4 +118,18 @@ forbidden_modules = [
     "alembic",
     "httpx",
     "fastapi",
+]
+
+[[tool.importlinter.contracts]]
+name = "ADR-0013 config imports no app, core or db"
+type = "forbidden"
+source_modules = ["newsdock_config"]
+forbidden_modules = [
+    "newsdock_core",
+    "newsdock_db",
+    "newsdock_ingester",
+    "newsdock_processor",
+    "newsdock_sink",
+    "newsdock_api",
+    "newsdock_agent",
 ]

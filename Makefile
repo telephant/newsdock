@@ -7,7 +7,7 @@ ENV_FILE := $(if $(wildcard .env),.env,.env.example)
 COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/compose.yaml
 
 .PHONY: doctor help setup setup-python setup-web test lint-python types-python
-.PHONY: imports-python layout-python check-python check-web check test-rules
+.PHONY: imports-python layout-python config-python check-python check-web check test-rules
 .PHONY: build up down topics migrate docs-check test-infra test-rules-python
 
 doctor: ## Check the required tools are installed (docker, uv, pnpm, ollama)
@@ -52,7 +52,10 @@ imports-python: ## import-linter contracts (rules DR-6, DR-7)
 layout-python: ## Layout rules DR-1..DR-4 (infra/scripts/check_layout.py)
 	uv run python infra/scripts/check_layout.py
 
-check-python: lint-python types-python imports-python layout-python ## All Python checks and tests
+config-python: ## Config file keys/defaults and no tunable literals in code (AC-11)
+	uv run python infra/scripts/check_config.py
+
+check-python: lint-python types-python imports-python layout-python config-python ## All Python checks and tests
 	uv run pytest
 
 check-web: ## Web lint, format check, type check and tests
