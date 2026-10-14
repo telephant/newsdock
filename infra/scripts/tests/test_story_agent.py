@@ -20,6 +20,7 @@ from alembic.config import Config
 from newsdock_agent.adapters.mcp import McpApiClient
 from newsdock_agent.domain.loop import AgentLoop
 from newsdock_agent.domain.score import Score
+from newsdock_api.config import Settings
 from newsdock_db.engine import make_engine
 from newsdock_db.models import Analysis, Article, ArticleSource
 from sqlalchemy import select, text
@@ -44,17 +45,6 @@ def _compose(*args: str) -> subprocess.CompletedProcess[str]:
 class FakeScorer:
     def score(self, title: str) -> Score | None:
         return Score(relevant=True, score=0.9, reason="fake")
-
-
-class MemCursor:
-    def __init__(self) -> None:
-        self.value: str | None = None
-
-    def load(self) -> str | None:
-        return self.value
-
-    def save(self, cursor: str) -> None:
-        self.value = cursor
 
 
 @pytest.fixture(scope="module")
@@ -103,7 +93,12 @@ def stack() -> Iterator[tuple[str, str]]:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     server = uvicorn.Server(
-        uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
+        uvicorn.Config(
+            create_app(Settings(auth_required=False)),
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+        )
     )
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -124,10 +119,8 @@ def stack() -> Iterator[tuple[str, str]]:
 def test_three_copies_yield_one_analysis(stack: tuple[str, str]) -> None:
     base_url, db_url = stack
     loop = AgentLoop(
-        McpApiClient(f"{base_url}/mcp"),
+        McpApiClient(f"{base_url}/mcp", agent_name="demo-financial"),
         FakeScorer(),
-        MemCursor(),
-        agent_name="demo-financial",
         theme_prefixes=("ECON_",),
         batch_limit=200,
     )

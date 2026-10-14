@@ -3,7 +3,7 @@
 from datetime import timedelta
 
 from newsdock_config import LayeredSettings
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import SettingsConfigDict
 
 from newsdock_api.domain.service import ServiceLimits
@@ -31,6 +31,18 @@ class Settings(LayeredSettings):
     list_new_page_default: int = 50
     list_new_page_max: int = 200
     kafka_probe_timeout_seconds: float = 1.0
+    # Agent platform (ADR-0016): keys required on /mcp; per-agent requests/minute
+    # (0 = no limit); the admin token is a secret and is read from the environment
+    # only (NEWSDOCK_ADMIN_TOKEN). Unset = admin routes answer 404.
+    auth_required: bool = True
+    rate_limit_per_minute: int = 600
+    admin_token: SecretStr | None = None
+    # Push delivery (M2 part 2): subscriptions and SSE streams
+    subscriptions_max_per_agent: int = 20
+    subscription_text_max_length: int = 200
+    sse_max_streams_per_agent: int = 5
+    sse_keepalive_seconds: int = 15
+    sse_fallback_poll_seconds: int = 30
     uvicorn_workers: int = 1
     uvicorn_log_level: str = "info"
 

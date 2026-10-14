@@ -49,7 +49,14 @@ class ArticleRepo(Protocol):
     ) -> list[ArticleSummary]: ...
 
     def list_new(
-        self, *, after_seq: int | None, since: datetime | None, limit: int
+        self,
+        *,
+        after_seq: int | None,
+        since: datetime | None,
+        limit: int,
+        theme: str | None = None,
+        domain: str | None = None,
+        text: str | None = None,
     ) -> list[ArticleSummary]: ...
 
     def upsert_analysis(
@@ -116,20 +123,41 @@ class ArticleService:
             before=before,
         )
 
-    def list_new(self, *, cursor: str | None, limit: int | None) -> NewArticlesPage:
-        after_seq = decode_cursor(cursor) if cursor else None
-        since = None if cursor else self._now() - self._limits.first_run_window
+    def list_new(
+        self,
+        *,
+        cursor: str | None,
+        limit: int | None,
+        stored_seq: int | None = None,
+        theme: str | None = None,
+        domain: str | None = None,
+        text: str | None = None,
+    ) -> NewArticlesPage:
+        """Page after `cursor`; else after the agent's stored position; else the
+        first-run window. An explicit cursor always wins (ADR-0017)."""
+        if cursor:
+            after_seq: int | None = decode_cursor(cursor)
+        else:
+            after_seq = stored_seq
+        since = (
+            None
+            if after_seq is not None
+            else self._now() - self._limits.first_run_window
+        )
         articles = self._repo.list_new(
             after_seq=after_seq,
             since=since,
             limit=_clamp(
                 limit, self._limits.list_new_default, self._limits.list_new_max
             ),
+            theme=theme,
+            domain=domain,
+            text=text,
         )
         if articles:
             next_cursor = encode_cursor(max(a.seq for a in articles))
         else:  # same cursor back: nothing new (AC-10)
-            next_cursor = cursor if cursor else encode_cursor(0)
+            next_cursor = cursor or encode_cursor(after_seq or 0)
         return NewArticlesPage(articles=articles, next_cursor=next_cursor)
 
     def submit_analysis(

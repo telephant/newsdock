@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>push-delivery — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>push-delivery — Milestone 2 part 2 diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Subscribe, stream, resume</a><a href="#e">3 Data model</a><a href="#t">4 Stream lifecycle</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  AG["agent (key)"] --> MW["C-11 auth middleware"]
+  MW --> SUBAPI["C-15 subscription routes"]
+  MW --> SSE["C-16 SSE stream"]
+  SSE --> CAP["C-17 stream cap"]
+  SUBAPI --> DB[("C-5 subscriptions")]
+  SSE --> DB
+  SSE --> ART[("articles by seq")]
+  SINK["sink (writer)"] --> ART
+  ART -->|"trigger: NOTIFY"| LST["C-18 listener"]
+  LST -->|"wake"| SSE
+  ADM["admin token"] --> ADR["C-14 admin list"]
+  ADR --> DB
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the NOTIFY only a wake-up, never the data a stream emits?</li>
+<li>Does the stream read only committed articles, written solely by the sink?</li>
+<li>Is the cap (C-17) consulted before any DB work?</li>
+<li>Is the filter applied in exactly one place (the SQL query)?</li></ul></div></section>
+
+<section id="s"><h2>2 Subscribe, stream, reconnect</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant G as Agent
+  participant A as API (C-11/C-15/C-16)
+  participant D as Postgres
+  G->>A: POST /api/subscriptions {filter}
+  A->>D: insert subscription
+  A-->>G: 201 id
+  G->>A: GET /stream (key)
+  A->>D: stored cursor? first-run window?
+  loop on each wake-up
+    D-->>A: NOTIFY articles_new (after commit)
+    A->>D: articles seq > last, filter
+    A-->>G: id=cursor, event=article, data
+  end
+  A-->>G: ": ping" (keep-alive tick, key re-check)
+  G--xA: connection drops
+  G->>A: GET /stream, Last-Event-ID
+  A-->>G: only articles after that id
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Can an article fall between the last sent id and the resume point, even if a NOTIFY is lost?</li>
+<li>Does the stream ever write agent_cursors?</li>
+<li>What does the agent see if the key is revoked right after a ping?</li></ul></div></section>
+
+<section id="e"><h2>3 Data model (new table)</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  agents ||--o{ subscriptions : owns
+  subscriptions { uuid id PK
+    uuid agent_id FK
+    jsonb filter
+    timestamptz created_at }
+  agents { uuid id PK
+    text name UK }
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is a jsonb filter enough, or do filter fields deserve columns and indexes?</li>
+<li>Should deleting an agent cascade to its subscriptions (it does)?</li></ul></div></section>
+
+<section id="t"><h2>4 Stream lifecycle</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Rejected: no key / not own / bad id / over cap
+  [*] --> Open: authorized, slot acquired
+  Open --> Open: events and keep-alive
+  Open --> Closed: client disconnects
+  Open --> Closed: key revoked or agent disabled
+  Open --> Closed: subscription deleted
+  Closed --> [*]: slot released
+  Rejected --> [*]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the slot released on every path into Closed?</li>
+<li>Is Rejected always decided before the first event byte?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

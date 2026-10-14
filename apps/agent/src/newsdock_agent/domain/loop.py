@@ -1,7 +1,8 @@
-"""Agent loop (design.md F-2): list → pre-filter → score → submit → save cursor.
+"""Agent loop (design.md F-2): list → pre-filter → score → submit → ack cursor.
 
-The cursor is saved only after the whole batch succeeded (R-2): a crash
-mid-batch re-scores the batch, which is harmless because analyses upsert.
+The position lives on the server (M2 agent-platform, ADR-0017): the loop calls
+`ack_cursor` only after the whole batch succeeded, so a crash mid-batch re-reads
+and re-scores the batch, which is harmless because analyses upsert.
 Pre-filter: themes must start with one of the prefixes (default ECON_ only,
 spike decision 2026-10-05); empty themes are skipped by design.
 """
@@ -18,24 +19,20 @@ class SubmitFailed(Exception):
     """submit_analysis failed; keep the old cursor and retry next run."""
 
 
-class McpPort(Protocol):
-    def list_new_articles(
-        self, cursor: str | None, limit: int
-    ) -> tuple[list[dict[str, object]], str]: ...
+class Unauthorized(Exception):
+    """The API rejected the agent's key (HTTP 401): wrong, revoked or missing."""
 
-    def submit_analysis(
-        self, article_id: str, agent_name: str, payload: dict[str, object]
-    ) -> None: ...
+
+class McpPort(Protocol):
+    def list_new_articles(self, limit: int) -> tuple[list[dict[str, object]], str]: ...
+
+    def ack_cursor(self, cursor: str) -> None: ...
+
+    def submit_analysis(self, article_id: str, payload: dict[str, object]) -> None: ...
 
 
 class ScorerPort(Protocol):
     def score(self, title: str) -> Score | None: ...
-
-
-class CursorStore(Protocol):
-    def load(self) -> str | None: ...
-
-    def save(self, cursor: str) -> None: ...
 
 
 class AgentLoop:
@@ -43,16 +40,12 @@ class AgentLoop:
         self,
         mcp: McpPort,
         scorer: ScorerPort,
-        cursor_store: CursorStore,
         *,
-        agent_name: str,
         theme_prefixes: tuple[str, ...],
         batch_limit: int,
     ) -> None:
         self._mcp = mcp
         self._scorer = scorer
-        self._cursor_store = cursor_store
-        self._agent_name = agent_name
         self._theme_prefixes = theme_prefixes
         self._batch_limit = batch_limit
 
@@ -61,8 +54,7 @@ class AgentLoop:
 
     def run_once(self) -> int:
         """One batch; returns the number of analyses submitted."""
-        cursor = self._cursor_store.load()
-        articles, next_cursor = self._mcp.list_new_articles(cursor, self._batch_limit)
+        articles, next_cursor = self._mcp.list_new_articles(self._batch_limit)
         submitted = 0
         for article in articles:
             themes = article.get("themes") or []
@@ -75,12 +67,10 @@ class AgentLoop:
             if score is None:  # malformed model output: log and skip (TC-29)
                 logger.warning("unscorable article %s", article.get("article_id"))
                 continue
-            self._mcp.submit_analysis(
-                str(article["article_id"]), self._agent_name, score.model_dump()
-            )
+            self._mcp.submit_analysis(str(article["article_id"]), score.model_dump())
             submitted += 1
-        # only now is the batch complete: advance the cursor (TC-32)
-        self._cursor_store.save(next_cursor)
+        # only now is the batch complete: acknowledge it (TC-15)
+        self._mcp.ack_cursor(next_cursor)
         logger.info(
             "batch done: %d of %d scored and submitted", submitted, len(articles)
         )

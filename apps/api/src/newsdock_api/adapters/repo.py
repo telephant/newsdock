@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any
 
 from newsdock_db.models import Analysis, Article, ArticleSource, IngestSlot
-from sqlalchemy import Engine, Select, func, select, text
+from sqlalchemy import Engine, Select, func, literal, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -15,6 +15,7 @@ from newsdock_api.domain.records import (
     SourceRecord,
 )
 from newsdock_api.domain.service import escape_like
+from newsdock_api.domain.subscriptions import split_theme
 
 
 def _summary(
@@ -49,7 +50,18 @@ def _apply_filters(
     if time_to is not None:
         statement = statement.where(Article.published_at <= time_to)
     if theme is not None:
-        statement = statement.where(Article.themes.contains([theme]))
+        value, is_prefix = split_theme(theme)
+        if is_prefix:  # `ECON_*`: any of the article's themes starts with the prefix
+            each = func.unnest(Article.themes).table_valued("theme").render_derived()
+            has_prefix = (
+                select(literal(1))
+                .select_from(each)
+                .where(each.c.theme.like(escape_like(value) + "%", escape="\\"))
+                .exists()
+            )
+            statement = statement.where(has_prefix)
+        else:
+            statement = statement.where(Article.themes.contains([value]))
     if domain is not None:
         statement = statement.where(Article.domain == domain)
     if text_filter is not None:
@@ -106,9 +118,24 @@ class SqlArticleRepo:
             ]
 
     def list_new(
-        self, *, after_seq: int | None, since: datetime | None, limit: int
+        self,
+        *,
+        after_seq: int | None,
+        since: datetime | None,
+        limit: int,
+        theme: str | None = None,
+        domain: str | None = None,
+        text: str | None = None,
     ) -> list[ArticleSummary]:
-        statement = select(Article).order_by(Article.seq).limit(limit)
+        statement = _apply_filters(
+            select(Article),
+            time_from=None,
+            time_to=None,
+            theme=theme,
+            domain=domain,
+            text_filter=text,
+        )
+        statement = statement.order_by(Article.seq).limit(limit)
         if after_seq is not None:
             statement = statement.where(Article.seq > after_seq)
         if since is not None:

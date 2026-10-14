@@ -55,10 +55,36 @@ make down            # stop everything (data volumes are kept)
 | `make up` / `make down` | Start (and wait for) Kafka and Postgres, create topics, migrate / stop |
 | `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
+| `make agent-create NAME=<name>` | Register an agent and print its API key once (needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up) |
 | `make config-python` | Check `infra/config/newsdock.yaml` and that no tunable literal crept back into code |
 | `make test-rules` | Prove each enforced rule fails when violated |
 | `make test-infra [SCENE=<name>]` | Docker tests; scenes scope the run to what you're working on: `db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images` (no scene = everything, ~4 min warm). Needs Docker and ports 5433/29092 free |
 | `make docs-check` | README sections and relative links |
+
+## Agents and API keys (M2)
+
+MCP (`/mcp`) needs an agent API key; `api.auth_required` in the config file (default `true`) turns that off for local experiments. Agents are registered by an admin, there is no self-service.
+
+1. Put a long random `NEWSDOCK_ADMIN_TOKEN` in `.env` and start the stack (the admin routes return 404 while the token is empty).
+2. `make agent-create NAME=demo-financial` prints the agent's key **once**; only a hash is stored. More routes: `GET /api/admin/agents`, `POST /api/admin/agents/{id}/keys`, `DELETE /api/admin/agents/{id}/keys/{key_id}`, `POST /api/admin/agents/{id}/disable|enable` (all with `Authorization: Bearer <admin token>`).
+3. Put the key in `.env` as `NEWSDOCK_AGENT_API_KEY` and restart the agent. Any MCP client sends `Authorization: Bearer <key>`.
+
+The server keeps each agent's position: `list_new_articles` without a cursor resumes after the last `ack_cursor` the agent sent (call it after finishing a batch), and each agent is limited to `api.rate_limit_per_minute` requests (HTTP 429 with `Retry-After`). **Reading is still open:** the web UI's `GET /api/*` routes need no key until the UI-login spec lands (spec D-7).
+
+## Subscriptions and push streams (M2)
+
+An authenticated agent can save filters and have matching new articles pushed to it over Server-Sent Events, instead of polling `list_new_articles`.
+
+```bash
+KEY=ndk_...   # from `make agent-create NAME=<name>`
+# the body is the filter: theme (exact, or a prefix like ECON_*), domain, title text; all optional
+curl -sS -X POST http://127.0.0.1:8000/api/subscriptions -H "Authorization: Bearer $KEY" \
+  -H 'Content-Type: application/json' -d '{"theme":"ECON_*","domain":"example.com"}'
+curl -N -H "Authorization: Bearer $KEY" http://127.0.0.1:8000/api/subscriptions/<id>/stream
+curl -N -H "Authorization: Bearer $KEY" -H "Last-Event-ID: <last id>" .../stream   # resume
+```
+
+Each event is `id: <cursor>`, `event: article`, `data: <article summary JSON>`; idle streams get `: ping` comment lines every `api.sse_keepalive_seconds`. Delivery is at-least-once: a reconnect with `Last-Event-ID` resumes strictly after that article (duplicates are possible, dedupe by `article_id`). Without `Last-Event-ID` a stream starts after the agent's acknowledged cursor, or from the last hour for a new agent; streaming never moves that cursor, only `ack_cursor` does. Other routes: `GET /api/subscriptions` (own), `DELETE /api/subscriptions/{id}`; limits `api.subscriptions_max_per_agent` (409), `api.sse_max_streams_per_agent` (429); `GET /api/admin/subscriptions` lists everyone's (admin token). A revoked key or disabled agent ends its open streams within one keep-alive interval. New articles reach streams through a Postgres `NOTIFY` raised by a trigger on `articles` ([ADR-0018](docs/adr/0018-sse-streams-wake-on-listen-notify.md)).
 
 ## Configuration
 
@@ -102,5 +128,7 @@ The directory and layering rules (`domain/` pure, `adapters/` for I/O, apps neve
 - **Raw `docker compose` complains about missing variables:** pass the env file, e.g. `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - **Port already in use:** Postgres defaults to host port 5433 (a local Postgres often owns 5432); change `POSTGRES_PORT` in `.env`. Kafka uses 29092.
 - **`ollama list` shows no model:** run `ollama pull llama3.2:3b` (the demo agent's model, chosen in the M1 spike).
-- **Agent logs `batch failed`:** usually Ollama is not running on the host (`ollama list` must answer); the agent retries with its cursor unchanged.
+- **Agent logs `batch failed`:** usually Ollama is not running on the host (`ollama list` must answer); the agent retries and, because it only acks after a finished batch, re-reads the same batch.
+- **A stream stays silent:** check the subscription's filter (`GET /api/subscriptions`) and that new articles are arriving (GDELT slots land every ~15 min); `: ping` lines mean the connection is healthy. A `429` on connect means the agent already has `api.sse_max_streams_per_agent` open streams.
+- **Agent logs `the API rejected this agent's key (HTTP 401)`:** `NEWSDOCK_AGENT_API_KEY` is empty, wrong or revoked; issue a new key with `make agent-create` (or set `api.auth_required: false` for local experiments).
 - Only macOS on Apple silicon is documented and tested.

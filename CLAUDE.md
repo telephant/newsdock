@@ -3,7 +3,7 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` done (verified 2026-10-09, pass with follow-ups). In progress: M2b `externalize-config` (one YAML config file + env overrides, spec `docs/specs/externalize-config/`). Next milestone after: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
+- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` done (verified 2026-10-09, pass with follow-ups). M2b `externalize-config` done (spec `docs/specs/externalize-config/`). M2 part 1 `agent-platform` done (agent registry, API keys, per-agent cursors, rate limit; spec `docs/specs/agent-platform/`, verified 2026-10-14, pass with follow-ups). M2 part 2 `push-delivery` done (saved filters + SSE streams over Postgres NOTIFY; spec `docs/specs/push-delivery/`, verified 2026-10-14, pass with follow-ups). Next: `ui-login` (M2 is split in three specs, roadmap) via `/spec-init`.
 - Roadmap: `docs/roadmap.md` (current milestone: M2b).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
@@ -39,7 +39,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Flink was deliberately dropped (ADR-0001). Do not reintroduce stateful stream engines in the MVP.
 
 ## Fixed names (do not rename without updating all docs)
-- MCP tools: `search_articles`, `get_article`, `list_new_articles`, `submit_analysis`.
+- MCP tools: `search_articles`, `get_article`, `list_new_articles`, `submit_analysis`, `ack_cursor` (M2 agent-platform, ADR-0017).
 - Public article id is `url_hash` (sha256 of the normalized URL). `seq` (bigserial) drives the cursor, never expose it raw: the cursor is opaque base64.
 - Tables: `articles` (canonicals; `story_key` NULL = pre-M2a row), `analyses`, `ingest_slot`, `article_sources` (copies; PK `url_hash`, FK → canonical, CASCADE). Slot format: `YYYYMMDDHHMMSS`.
 - Dead-letter reasons: `missing_url`, `missing_title`, `bad_column_count`, `bad_field`.
@@ -58,6 +58,8 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - All consumers are at-least-once with manual offset commits; all writes must be idempotent (`ON CONFLICT (url_hash) DO NOTHING`).
 - SQL is always parameterized. Render agent payloads in the UI as escaped text, never HTML.
 - Secrets live in `.env` (git-ignored). Never commit credentials or put them in docs.
+- Auth (M2 `agent-platform`, ADR-0016/0017): `/mcp` needs `Authorization: Bearer ndk_<prefix>_<secret>` unless `api.auth_required: false`; keys are admin-issued (`make agent-create`, `NEWSDOCK_ADMIN_TOKEN` in `.env`), stored as prefix + sha256, shown once. Authenticated agents own a server-side cursor (`agent_cursors`, advanced only by `ack_cursor`) and a per-minute rate limit. Public `GET /api/*` stays open until the `ui-login` spec.
+- Push (M2 `push-delivery`, ADR-0018/0019): agents manage their own subscriptions (`/api/subscriptions`, body = filter) and read `GET /api/subscriptions/{id}/stream` (SSE; event id = the opaque cursor; resume with `Last-Event-ID`; a keep-alive tick re-checks the key). New rows wake streams through Postgres `NOTIFY articles_new` (trigger in migration 0005); the notification is only a wake-up, the data always comes from the `seq` cursor query.
 - The demo agent must have no database credentials and no route to Postgres or Kafka; it reaches data only through the MCP server (AC-13).
 
 ## Configuration (ADR-0013, spec `externalize-config`)

@@ -44,6 +44,7 @@ Status: **approved** · 2026-10-04 · Spec: [spec.md](spec.md) · Detail (not re
 | `search_articles` | `time_from?, time_to?, theme?, domain?, text?, limit (default 20, max 100)` | `articles[]` (summary form) |
 | `get_article` | `article_id` (= `url_hash`) | article + `analyses[]` |
 | `list_new_articles` | `cursor?, limit (default 50, max 200)` | `articles[], next_cursor` |
+| `ack_cursor` (M2) | `cursor` | `{cursor}`: M2 `agent-platform` adds a server-side per-agent cursor; with auth on, `list_new_articles` without a cursor resumes from the last ack ([ADR-0017](../../adr/0017-server-side-agent-cursor-and-ack.md)). The F-2 cursor-file description above is the M1 behaviour. |
 
 Summary form (`articles[]` items): `article_id, title, url, domain, published_at, themes[]`.
 | `submit_analysis` | `article_id, agent_name, payload (JSON object)` | `{ok}` |

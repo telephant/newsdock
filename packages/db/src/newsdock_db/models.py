@@ -16,6 +16,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Text,
+    Uuid,
     text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, JSONB, REAL
@@ -131,3 +132,85 @@ class IngestSlot(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+class Agent(Base):
+    """A registered API client (M2 agent-platform); `name` is unique and immutable."""
+
+    __tablename__ = "agents"
+
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    name: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=text("'active'")
+    )  # active | disabled
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class ApiKey(Base):
+    """Only the public prefix and sha256(secret) are stored (ADR-0016)."""
+
+    __tablename__ = "api_keys"
+
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    agent_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    prefix: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    key_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (Index("ix_api_keys_agent_id", "agent_id"),)
+
+
+class AgentCursor(Base):
+    """Per-agent read position: the highest acknowledged `articles.seq` (ADR-0017)."""
+
+    __tablename__ = "agent_cursors"
+
+    agent_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+
+class Subscription(Base):
+    """An agent's saved filter (M2 push-delivery); `filter` holds only given fields."""
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False), primary_key=True, server_default=text("gen_random_uuid()")
+    )
+    agent_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("agents.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    filter: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (Index("ix_subscriptions_agent_id", "agent_id"),)

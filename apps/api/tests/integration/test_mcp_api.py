@@ -18,6 +18,7 @@ from alembic import command
 from alembic.config import Config
 from mcp import Client
 from mcp.shared.exceptions import MCPError
+from newsdock_api.config import Settings
 from newsdock_db.engine import make_engine
 from newsdock_db.models import Article
 from sqlalchemy import text
@@ -90,7 +91,12 @@ def base_url() -> Iterator[str]:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     server = uvicorn.Server(
-        uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
+        uvicorn.Config(
+            create_app(Settings(auth_required=False)),
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+        )
     )
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
@@ -112,7 +118,7 @@ def _run(coro: Any) -> Any:
     return asyncio.new_event_loop().run_until_complete(coro)
 
 
-# TC-15: the client sees exactly the four designed tools
+# TC-15: the client sees exactly the designed tools (+ack_cursor, M2 ADR-0017)
 def test_tool_list(base_url: str) -> None:
     async def go() -> list[str]:
         async with Client(f"{base_url}/mcp") as client:
@@ -120,7 +126,8 @@ def test_tool_list(base_url: str) -> None:
             return sorted(t.name for t in tools.tools)
 
     assert _run(go()) == [
-        "get_article", "list_new_articles", "search_articles", "submit_analysis",
+        "ack_cursor", "get_article", "list_new_articles",
+        "search_articles", "submit_analysis",
     ]  # fmt: skip
 
 

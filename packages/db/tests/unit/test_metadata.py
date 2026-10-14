@@ -9,12 +9,16 @@ from newsdock_db.metadata import NAMING_CONVENTION, metadata
 
 
 def test_metadata_holds_exactly_the_known_tables() -> None:
-    # M1 tables + article_sources (M2a dedup-syndication, 2026-10-05)
+    # M1 + article_sources (M2a) + agent-platform and subscriptions (M2, 2026-10-14)
     assert set(metadata.tables) == {
         "articles",
         "analyses",
         "ingest_slot",
         "article_sources",
+        "agents",
+        "api_keys",
+        "agent_cursors",
+        "subscriptions",
     }
 
 

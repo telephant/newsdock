@@ -1,7 +1,6 @@
 {
   "agent": {
     "agent_name": "demo-financial",
-    "cursor_file": "/data/cursor.json",
     "heartbeat_file": "/tmp/healthy",
     "log_level": "INFO",
     "loop_interval_seconds": 60,

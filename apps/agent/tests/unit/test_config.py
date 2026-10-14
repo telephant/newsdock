@@ -132,3 +132,17 @@ def test_tc19_kafka_or_database_key_in_agent_section_fails(
     write(tmp_path, monkeypatch, f"agent:\n  {key}: x\n")
     with pytest.raises(ConfigError, match=key):
         Settings()
+
+
+# M2 agent-platform: the key is an env-only secret; no local cursor file
+def test_api_key_default_and_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("NEWSDOCK_AGENT_API_KEY", raising=False)
+    assert Settings().api_key is None
+    monkeypatch.setenv("NEWSDOCK_AGENT_API_KEY", "ndk_abc_def")
+    key = Settings().api_key
+    assert key is not None and key.get_secret_value() == "ndk_abc_def"
+    assert "ndk_abc_def" not in repr(Settings())
+
+
+def test_cursor_file_setting_is_gone() -> None:
+    assert not hasattr(Settings(), "cursor_file")
