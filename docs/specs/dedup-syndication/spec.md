@@ -26,6 +26,7 @@ flowchart LR
 | D-3 | Agent behavior | Decided: one score per story; follows automatically since the agent only ever sees canonicals (2026-10-05) |
 | D-4 | Existing rows | Decided: no backfill/regrouping of pre-existing articles; the 7-day retention makes the store converge on its own (2026-10-05) |
 | D-5 | False-merge guard | Decided: same story key only groups within a published_at window (default 48 h, configurable); exact value may be tuned in design **[assumption]** (2026-10-05) |
+| D-6 | Same-site look-alike guard | Decided: a copy never joins a story that already holds a *different page* of the same domain (page = last path segment + query); other domains always join (user chose "fix now" at /spec-verify after live data showed generic titles merging different pages, 2026-10-09) |
 
 No open decisions.
 
@@ -64,7 +65,7 @@ The GDELT feed lists every republication of a wire story as its own record. Afte
 `gkg.clean → sink: story key → canonical article + article_sources → API (canonical + sources) → UI badge + sources list → agent scores canonicals only`
 
 **In**
-- `story_key` normalization in `newsdock_core` (D-2) with the window guard (D-5).
+- `story_key` normalization in `newsdock_core` (D-2) with the window guard (D-5) and the same-site look-alike guard (D-6).
 - Sink: first copy of a story becomes the canonical `articles` row; every copy (incl. the first) becomes an `article_sources` row; same-URL re-ingest stays idempotent.
 - Alembic migration adding `article_sources` and the story key column; no backfill (D-4).
 - API: canonicals only in search/list/feed; `source_count` in summaries; `sources[]` in the detail; cursor semantics unchanged for late copies.
@@ -160,9 +161,18 @@ AC-12 Live dedup ratio is observable
   When  the sink finishes it
   Then  the log reports copies grouped vs canonicals created for the batch
   Verify: auto
+
+AC-13 Look-alike pages of one site do not group  (added 2026-10-09, D-6)
+  Given two copies with the same normalized title on the same domain whose URLs
+        point at different pages (e.g. two staff pages both titled "The Miami Student")
+  When  the sink processes both, and later a copy of the title from another domain
+  Then  the store holds two separate canonical articles for the first two, the other-domain
+        copy joins the older one, while same-page host variants (iHeart station
+        subdomains, http/https) still group
+  Verify: auto
 ```
 
-**Provisional targets — measure first (not ACs):** stored-article reduction ≈ 14 % on live slots; agent LLM calls drop by the same share; false-merge rate ≈ 0 on a hand-checked sample of grouped stories.
+**Provisional targets — measure first (not ACs):** stored-article reduction ≈ 14 % on live slots; agent LLM calls drop by the same share; false-merge rate ≈ 0 on a hand-checked sample of grouped stories (live check 2026-10-08: 6 of 261 groups merged generic-title pages before D-6; 0 after).
 
 ## 7. Non-functional (this milestone)
 
@@ -185,4 +195,6 @@ AC-12 Live dedup ratio is observable
 - **Story key**: normalized title (+ window guard) used to group copies.
 - **Syndication**: wire-service distribution of one story to many outlets.
 - **False merge**: two different stories wrongly sharing a story key.
+- **Look-alike pages**: different pages of one site that share a generic title (site name, paywall banner, boilerplate); never grouped (D-6).
+- **Page signature**: last URL path segment (lowercased) plus the sorted query string; ignores scheme, host, port, fragment and path prefix.
 - **Window guard**: maximum published_at spread for copies to group (D-5).

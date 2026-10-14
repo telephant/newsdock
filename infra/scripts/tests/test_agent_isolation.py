@@ -79,11 +79,17 @@ def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
     check = f"python -m newsdock_{service}.adapters.healthcheck"
     fresh = _exec(service, "sh", "-c", check)
     assert fresh.returncode == 0, f"{service}: heartbeat missing or stale"
+    # The worker rewrites /tmp/healthy every loop, so back-dating that file races
+    # with it. Point the check at a separate file nobody touches instead.
+    prefix = "NEWSDOCK_AGENT_" if service == "agent" else "NEWSDOCK_"
     stale = _exec(
-        service, "sh", "-c", f"touch -d '2 hours ago' /tmp/healthy && {check}"
+        service,
+        "sh",
+        "-c",
+        "echo 120 > /tmp/stale-heartbeat && touch -d '2 hours ago' "
+        f"/tmp/stale-heartbeat && {prefix}HEARTBEAT_FILE=/tmp/stale-heartbeat {check}",
     )
     assert stale.returncode != 0, f"{service}: stale heartbeat passed the check"
-    _exec(service, "sh", "-c", "touch /tmp/healthy")  # restore
 
 
 def test_all_eight_services_report_healthy(stack: None) -> None:

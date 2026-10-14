@@ -3,7 +3,7 @@
 News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it with a Python Kafka processor, keeps 7 days in Postgres, and serves it to agents through an MCP server and REST. Local docker-compose only. Milestone 1 (MVP) is a walking skeleton.
 
 ## Status
-- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` committed (verification pending). In progress: M2b `externalize-config` (one YAML config file + env overrides, spec `docs/specs/externalize-config/`). Next milestone after: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
+- Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` done (verified 2026-10-09, pass with follow-ups). In progress: M2b `externalize-config` (one YAML config file + env overrides, spec `docs/specs/externalize-config/`). Next milestone after: M2 (push subscriptions, agent registry/auth) via `/spec-init`.
 - Roadmap: `docs/roadmap.md` (current milestone: M2b).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
@@ -44,7 +44,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Tables: `articles` (canonicals; `story_key` NULL = pre-M2a row), `analyses`, `ingest_slot`, `article_sources` (copies; PK `url_hash`, FK → canonical, CASCADE). Slot format: `YYYYMMDDHHMMSS`.
 - Dead-letter reasons: `missing_url`, `missing_title`, `bad_column_count`, `bad_field`.
 - Agent score payload: `{relevant, score (0–1), reason}`; `submit_analysis` accepts any JSON object.
-- Story grouping (M2a): key = `newsdock_core.stories.story_key` (normalized title, fixpoint suffix-strip) within ± `NEWSDOCK_STORY_WINDOW_HOURS` (48); API fields `source_count` and `sources[]`.
+- Story grouping (M2a): key = `newsdock_core.stories.story_key` (normalized title, fixpoint suffix-strip) within ± `NEWSDOCK_STORY_WINDOW_HOURS` (48), and never into a story that already has a different page of the same domain (`can_join`, ADR-0012 amendment); API fields `source_count` and `sources[]`.
 
 ## GDELT rules (verified in `docs/research.md`)
 - Follow redirects; `http://` URLs in the index redirect to `https://`.

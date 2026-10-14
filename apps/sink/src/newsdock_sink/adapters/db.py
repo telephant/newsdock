@@ -10,7 +10,7 @@ from sqlalchemy.exc import DataError, IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import Executable
 
-from newsdock_sink.domain.writer import DbUnavailable, RowRejected
+from newsdock_sink.domain.writer import Candidate, DbUnavailable, RowRejected
 
 
 def _article_values(article: CleanArticle, story_key: str) -> dict[str, object]:
@@ -52,23 +52,34 @@ class SqlArticleWriter:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
-    def find_canonical(
+    def find_candidates(
         self, story_key: str, published_at: datetime, window: timedelta
-    ) -> tuple[str, datetime] | None:
-        statement = (
+    ) -> list[Candidate]:
+        stories = (
             select(Article.url_hash, Article.published_at)
             .where(Article.story_key == story_key)
             .where(Article.published_at >= published_at - window)
             .where(Article.published_at <= published_at + window)
             .order_by(Article.published_at)
-            .limit(1)
         )
         try:
             with Session(self._engine) as session:
-                row = session.execute(statement).first()
-                return (row[0], row[1]) if row is not None else None
+                rows = session.execute(stories).all()
+                if not rows:
+                    return []
+                members = session.execute(
+                    select(
+                        ArticleSource.article_id,
+                        ArticleSource.domain,
+                        ArticleSource.url,
+                    ).where(ArticleSource.article_id.in_([r[0] for r in rows]))
+                ).all()
         except OperationalError as exc:
             raise DbUnavailable(str(exc)) from exc
+        by_story: dict[str, list[tuple[str | None, str]]] = {}
+        for article_id, domain, url in members:
+            by_story.setdefault(article_id, []).append((domain, url))
+        return [Candidate(r[0], r[1], by_story.get(r[0], [])) for r in rows]
 
     def insert_canonical(self, article: CleanArticle, story_key: str) -> bool:
         statement = (

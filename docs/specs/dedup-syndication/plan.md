@@ -24,6 +24,8 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Tests: [tests.md](
 
 ## Tasks
 
+_Added at /spec-verify 2026-10-09 (user: "fix now"):_ **T-06 same-site look-alike guard** — AC-13, TC-15/16, ADR-0012 amendment; `page_signature`/`can_join` in core, `find_candidates` + `Candidate` in the sink. Done 2026-10-09; false merges on the replayed live slots 17 → 0.
+
 | Phase | Task | Title | ACs | Effort |
 |---|---|---|---|---|
 | P0 | T-01 | Story keyer in core + live-slot calibration | 1 | 0.5 d |

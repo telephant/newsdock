@@ -38,11 +38,14 @@ All copies of a story converge: `key("T | SiteA") → key("T")` because strippin
 ```
 for each CleanArticle in batch (in offset order):
     key = story_key(title)
-    canonical = in-batch cache hit
-             or SELECT url_hash, published_at FROM articles
+    candidates = in-batch cache (in window) or
+             SELECT url_hash, published_at FROM articles
                 WHERE story_key = :key
                   AND published_at BETWEEN :p - WINDOW AND :p + WINDOW
-                ORDER BY published_at LIMIT 1
+                ORDER BY published_at           -- plus each candidate's (domain, url) sources
+    canonical = first candidate where can_join(article.domain, article.url, candidate.sources)
+                (D-6: false when the story already has a copy from the same domain whose
+                 page signature differs; other domains always join)
     if canonical is None:
         INSERT INTO articles (..., story_key) ON CONFLICT (url_hash) DO NOTHING
         canonical = this article (if conflict: the existing row with this url_hash)

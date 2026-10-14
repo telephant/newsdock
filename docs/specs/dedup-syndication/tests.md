@@ -27,8 +27,10 @@ Spec: [spec.md](spec.md) §6 · Design: [design.md](design.md) · Derived 2026-1
 | TC-12 | AC-11 | integration | Canonical aged 8 d with sources; retention (injected clock) → canonical and all its sources gone |
 | TC-13 | AC-12 | unit | `process_batch` over fakes returns/logs `canonicals created / copies grouped / url duplicates` counts that sum to the batch |
 | TC-14 | AC-2 | unit | Both copies arrive in the SAME batch: the in-batch cache yields one canonical, no second DB insert attempt (fake story repo records calls) |
+| TC-15 | AC-13 | unit | `story_key`-equal copies on one domain with different pages (real URLs from the 2026-10-08 live slots: Miami Student staff pages, Townsville Bulletin banner, Bellevision query ids, Investegate announcements) → separate canonicals; same page on other hosts (iHeart stations, http/https) → grouped; other-domain copy joins the oldest compatible story; a cold-cache redelivery stays idempotent (`core` `can_join`/`page_signature` tests + `test_writer.py`) |
+| TC-16 | AC-13 | integration | Same scenario on real Postgres: 2 canonicals, the other-domain copy attached to the older, redelivery adds nothing |
 
-Coverage: every AC-1…AC-12 has ≥ 1 TC; no TC without an AC (validated in plan.md).
+Coverage: every AC-1…AC-13 has ≥ 1 TC; no TC without an AC (validated in plan.md).
 
 ## Manual checklist
 

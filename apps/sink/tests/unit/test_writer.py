@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from newsdock_core.contracts import CleanArticle, DlqMessage, DlqReason
 from newsdock_sink.domain.writer import (
+    Candidate,
     DbUnavailable,
     RowRejected,
     SinkItem,
@@ -33,10 +34,13 @@ def copy_of(
     article: CleanArticle, *, url: str, title: str | None = None, hours: float = 0.0
 ) -> CleanArticle:
     import hashlib
+    from urllib.parse import urlsplit
 
+    host = urlsplit(url).hostname or ""
     return article.model_copy(
         update={
             "url": url,
+            "domain": ".".join(host.split(".")[-2:]),
             "url_hash": hashlib.sha256(url.encode()).hexdigest(),
             "title": title if title is not None else article.title,
             "published_at": article.published_at + timedelta(hours=hours),
@@ -51,6 +55,9 @@ class FakeStoryWriter:
         self.poison, self.down = poison, down
         self.canonicals: dict[str, tuple[str, datetime]] = {}  # url_hash -> (key, pub)
         self.sources: dict[str, str] = {}  # source url_hash -> canonical id
+        self.source_info: dict[
+            str, tuple[str | None, str]
+        ] = {}  # hash -> (domain, url)
         self.find_calls = 0
 
     def _guard(self, url_hash: str) -> None:
@@ -59,16 +66,20 @@ class FakeStoryWriter:
         if url_hash in self.poison:
             raise RowRejected("invalid byte sequence")
 
-    def find_canonical(
+    def find_candidates(
         self, story_key: str, published_at: datetime, window: timedelta
-    ) -> tuple[str, datetime] | None:
+    ) -> list[Candidate]:
         if self.down:
             raise DbUnavailable("connection refused")
         self.find_calls += 1
-        for cid, (key, pub) in self.canonicals.items():
+        found: list[Candidate] = []
+        for cid, (key, pub) in sorted(self.canonicals.items(), key=lambda i: i[1][1]):
             if key == story_key and abs(published_at - pub) <= window:
-                return cid, pub
-        return None
+                members = [
+                    self.source_info[h] for h, c in self.sources.items() if c == cid
+                ]
+                found.append(Candidate(cid, pub, members))
+        return found
 
     def insert_canonical(self, article: CleanArticle, story_key: str) -> bool:
         self._guard(article.url_hash)
@@ -82,6 +93,7 @@ class FakeStoryWriter:
         if article.url_hash in self.sources:
             return False
         self.sources[article.url_hash] = canonical_id
+        self.source_info[article.url_hash] = (article.domain, article.url)
         return True
 
 
@@ -164,3 +176,57 @@ def test_unparseable_clean_message_goes_to_dlq() -> None:
     )
     assert result.canonicals == 2 and result.dlq == 1
     assert dlq.sent[0][1].reason == DlqReason.bad_field
+
+
+# ---- AC-13 / TC-15: same-domain look-alike pages must not group ---------------
+
+
+def story_pair(
+    url_a: str, url_b: str, hours: float = 1
+) -> tuple[CleanArticle, CleanArticle]:
+    base = copy_of(fixture_articles(1)[0], url=url_a, title="The Miami Student")
+    return base, copy_of(base, url=url_b, hours=hours)
+
+
+def test_tc15_same_domain_different_pages_stay_separate_stories() -> None:
+    a, b = story_pair(
+        "https://www.miamistudent.net/staff/ada-lillie-worthington",
+        "https://www.miamistudent.net/staff/alyssa-vasquez",
+    )
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+    result = process_batch([item(a), item(b)], writer, dlq, window=WINDOW)
+    assert (result.canonicals, result.grouped) == (2, 0)
+    assert len(writer.canonicals) == 2
+
+
+def test_tc15_same_domain_same_page_other_host_still_groups() -> None:
+    a, b = story_pair(
+        "https://wtak.iheart.com/content/2026-10-08-aerosmith",
+        "https://937theriver.iheart.com/content/2026-10-08-aerosmith",
+    )
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+    result = process_batch([item(a), item(b)], writer, dlq, window=WINDOW)
+    assert (result.canonicals, result.grouped) == (1, 1)
+
+
+def test_tc15_other_domain_copy_joins_the_first_compatible_story() -> None:
+    a, b = story_pair(
+        "https://www.miamistudent.net/staff/ada",
+        "https://www.miamistudent.net/staff/alyssa",
+    )
+    c = copy_of(a, url="https://elsewhere.org/miami-student", hours=2)
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+    process_batch([item(a), item(b), item(c)], writer, dlq, window=WINDOW)
+    assert writer.sources[c.url_hash] == a.url_hash  # oldest compatible story
+
+
+def test_tc15_redelivery_of_the_second_story_stays_idempotent() -> None:
+    a, b = story_pair(
+        "https://www.miamistudent.net/staff/ada",
+        "https://www.miamistudent.net/staff/alyssa",
+    )
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+    process_batch([item(a), item(b)], writer, dlq, window=WINDOW)
+    again = process_batch([item(b)], writer, dlq, window=WINDOW)  # cold cache
+    assert (again.canonicals, again.grouped, again.url_duplicates) == (0, 0, 1)
+    assert len(writer.canonicals) == 2 and len(writer.sources) == 2

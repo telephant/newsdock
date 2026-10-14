@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from alembic import command
@@ -91,8 +92,10 @@ def _fixture_article() -> CleanArticle:
 
 def _copy(base: CleanArticle, *, url: str, slot: str | None = None,
           hours: float = 0.0, title: str | None = None) -> CleanArticle:  # fmt: skip
+    host = urlsplit(url).hostname or ""
     return base.model_copy(update={
         "url": url,
+        "domain": ".".join(host.split(".")[-2:]),
         "url_hash": hashlib.sha256(url.encode()).hexdigest(),
         "slot": slot or base.slot,
         "title": title if title is not None else base.title,
@@ -175,6 +178,28 @@ def test_window_guard_creates_second_canonical(clean_db: str) -> None:
     assert _count(clean_db) == 2
     sources = _source_rows(clean_db)
     assert {cid for _, cid in sources} == {base.url_hash, far.url_hash}
+
+
+# externalize/M2a follow-up AC-13 (TC-16): look-alike pages of one site stay separate
+def test_same_domain_different_pages_do_not_group(clean_db: str) -> None:
+    base = _fixture_article().model_copy(update={"title": "The Miami Student"})
+    ada = _copy(base, url="https://www.miamistudent.net/staff/ada-lillie-worthington")
+    alyssa = _copy(
+        base, url="https://www.miamistudent.net/staff/alyssa-vasquez", hours=1
+    )
+    other_site = _copy(base, url="https://elsewhere.example/the-miami-student", hours=2)
+    writer = SqlArticleWriter(make_engine(clean_db))
+    result = process_batch(
+        _items(ada, alyssa, other_site), writer, NullDlq(), window=WINDOW
+    )
+    assert (result.canonicals, result.grouped) == (2, 1)
+    assert _count(clean_db) == 2
+    by_source = dict(_source_rows(clean_db))
+    assert by_source[alyssa.url_hash] == alyssa.url_hash  # its own story
+    assert by_source[other_site.url_hash] == ada.url_hash  # oldest compatible story
+    # a cold-cache redelivery of the second story stays idempotent
+    again = process_batch(_items(alyssa), writer, NullDlq(), window=WINDOW)
+    assert again.url_duplicates == 1 and _count(clean_db) == 2
 
 
 # M1 TC-13 + M2a TC-12: retention deletes the canonical AND cascades its sources

@@ -45,6 +45,7 @@ The canonical's own URL also gets a source row, so `source_count` = number of co
 ## 4. Tricky parts
 
 - **Consistent keys across variants:** suffix stripping runs to a **fixpoint**, so `"T"`, `"T | SiteA"`, `"T - SiteB"` all converge to the same key even when `T` itself contains a dash segment (ADR-0012 thresholds: strip only if the remainder ≥ 25 chars and the segment ≤ 45 chars).
+- **Look-alike guard (AC-13, D-6, ADR-0012 amendment):** generic titles (site name, paywall banner, "Company Announcement") collide on one site. A copy joins a story only if the story has no same-domain copy with a different *page signature* (last path segment + query). Iheart stations (same slug, other host) still group; a miss costs a duplicate (M1 behaviour), a false merge hides an article, so the guard errs toward splitting.
 - **Window guard (AC-5):** canonical lookup is `story_key = :k AND published_at BETWEEN :p - window AND :p + window`; same key outside the window starts a new story. Index `(story_key, published_at)`.
 - **No races:** C-4 stays the single writer (ADR-0002), so lookup-then-insert needs no locking; within a batch, grouping happens in memory first.
 - **Idempotency (AC-4):** both inserts are `ON CONFLICT DO NOTHING` on `url_hash` — a redelivered copy touches nothing; URL-level dedup (M1 AC-6) is preserved verbatim.
@@ -82,6 +83,7 @@ No new dependencies: Python stdlib `unicodedata` for NFKC **[memory: stdlib, sta
 | AC-10 | C-8 | feed badge + detail source list |
 | AC-11 | C-4, C-5 | FK ON DELETE CASCADE from retention delete |
 | AC-12 | C-4 | per-batch dedup-ratio log line |
+| AC-13 | C-4, C-10 | `can_join` / `page_signature` in `newsdock_core.stories`, applied by the sink |
 
 ## 8. Questions to answer before approving this design
 
