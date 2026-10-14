@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       python: ${{ steps.filter.outputs.python }}
       web: ${{ steps.filter.outputs.web }}
@@ -35,6 +35,8 @@ jobs:
               - '.python-version'
               - 'infra/scripts/**'
               - 'infra/migrations/**'
+              - 'infra/config/**'
+              - 'infra/compose.yaml'
             tooling:
               - 'Makefile'
               - '.github/workflows/**'
@@ -99,7 +101,7 @@ jobs:
   check-python:
     needs: changes
     if: needs.changes.outputs.python == 'true' || needs.changes.outputs.tooling == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
@@ -110,7 +112,7 @@ jobs:
   check-web:
     needs: changes
     if: needs.changes.outputs.web == 'true' || needs.changes.outputs.tooling == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
@@ -120,7 +122,7 @@ jobs:
       - run: make check-web
 
   docs:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
@@ -129,7 +131,7 @@ jobs:
   build:
     needs: changes
     if: needs.changes.outputs.has_apps == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -142,7 +144,7 @@ jobs:
   ci-ok:
     if: always()
     needs: [changes, check-python, check-web, docs, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Fail when any needed job failed or was cancelled
         env:
