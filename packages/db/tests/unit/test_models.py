@@ -33,3 +33,22 @@ def test_ingest_slot_contract() -> None:
     assert [c.name for c in slot.primary_key.columns] == ["slot"]
     assert not slot.c.status.nullable
     assert models.IngestSlot.__tablename__ == "ingest_slot"
+
+
+def test_agent_platform_tables_contract() -> None:
+    agents = metadata.tables["agents"]
+    assert agents.c.name.unique
+    keys = metadata.tables["api_keys"]
+    assert keys.c.prefix.unique
+    assert "key_hash" in keys.c and "secret" not in keys.c  # never the plaintext
+    (fk,) = keys.c.agent_id.foreign_keys
+    assert fk.ondelete == "CASCADE" and fk.column.table.name == "agents"
+    cursors = metadata.tables["agent_cursors"]
+    assert [c.name for c in cursors.primary_key.columns] == ["agent_id"]
+
+
+def test_subscriptions_table_contract() -> None:
+    subs = metadata.tables["subscriptions"]
+    (fk,) = subs.c.agent_id.foreign_keys
+    assert fk.ondelete == "CASCADE" and fk.column.table.name == "agents"
+    assert str(subs.c.filter.type) == "JSONB"

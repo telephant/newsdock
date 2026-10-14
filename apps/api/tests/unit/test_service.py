@@ -36,6 +36,7 @@ class FakeRepo:
     def __init__(self) -> None:
         self.search_limits: list[int] = []
         self.list_calls: list[tuple[int | None, datetime | None, int]] = []
+        self.filters: list[tuple[str | None, str | None, str | None]] = []
         self.upserts: list[tuple[str, str]] = []
         self.articles_exist = True
         self.new: list[ArticleSummary] = []
@@ -45,9 +46,17 @@ class FakeRepo:
         return []
 
     def list_new(
-        self, *, after_seq: int | None, since: datetime | None, limit: int
+        self,
+        *,
+        after_seq: int | None,
+        since: datetime | None,
+        limit: int,
+        theme: str | None = None,
+        domain: str | None = None,
+        text: str | None = None,
     ) -> list[ArticleSummary]:
         self.list_calls.append((after_seq, since, limit))
+        self.filters.append((theme, domain, text))
         return self.new
 
     def upsert_analysis(
@@ -166,3 +175,27 @@ def test_tc16_custom_payload_cap_and_message() -> None:
     svc.submit_analysis("h", "agent", {"k": "x" * 10})
     with pytest.raises(PayloadTooLargeError, match="100"):
         svc.submit_analysis("h", "agent", {"k": "x" * 200})
+
+
+# T-06 (AC-8): a stored server position replaces the first-run window
+def test_list_new_starts_from_the_stored_position() -> None:
+    svc, repo = service()
+    page = svc.list_new(cursor=None, limit=10, stored_seq=7)
+    after_seq, since, _ = repo.list_calls[-1]
+    assert (after_seq, since) == (7, None)
+    assert decode_cursor(page.next_cursor) == 7  # nothing new: position stays
+
+
+def test_explicit_cursor_beats_the_stored_position() -> None:
+    svc, repo = service()
+    svc.list_new(cursor=encode_cursor(3), limit=10, stored_seq=7)
+    assert repo.list_calls[-1][0] == 3
+
+
+# T-04 (AC-6, AC-7): the filter reaches the repository unchanged
+def test_list_new_passes_the_filter_through() -> None:
+    svc, repo = service()
+    svc.list_new(cursor=None, limit=10, theme="ECON_*", domain="a.org", text="fed")
+    assert repo.filters == [("ECON_*", "a.org", "fed")]
+    svc.list_new(cursor=None, limit=10)
+    assert repo.filters[-1] == (None, None, None)

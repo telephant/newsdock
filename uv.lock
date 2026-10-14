@@ -1019,6 +1019,7 @@ version = "0.0.0"
 source = { editable = "apps/agent" }
 dependencies = [
     { name = "httpx" },
+    { name = "httpx2" },
     { name = "mcp" },
     { name = "newsdock-config" },
     { name = "newsdock-core" },
@@ -1028,6 +1029,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "httpx", specifier = ">=0.28" },
+    { name = "httpx2", specifier = ">=2.13" },
     { name = "mcp", specifier = ">=2.3" },
     { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
@@ -1044,6 +1046,7 @@ dependencies = [
     { name = "newsdock-config" },
     { name = "newsdock-core" },
     { name = "newsdock-db" },
+    { name = "psycopg" },
     { name = "pydantic-settings" },
     { name = "uvicorn" },
 ]
@@ -1055,6 +1058,7 @@ requires-dist = [
     { name = "newsdock-config", editable = "packages/config" },
     { name = "newsdock-core", editable = "packages/core" },
     { name = "newsdock-db", editable = "packages/db" },
+    { name = "psycopg", specifier = ">=3.2" },
     { name = "pydantic-settings", specifier = ">=2.15" },
     { name = "uvicorn", specifier = ">=0.30" },
 ]

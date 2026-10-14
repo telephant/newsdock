@@ -1,4 +1,4 @@
-"""TC-29, TC-32: scoring parse/clamp/skip and cursor-after-batch semantics."""
+"""TC-29, TC-15 (M2): scoring parse/clamp/skip and ack-after-batch semantics."""
 
 import pytest
 from newsdock_agent.domain.loop import AgentLoop, SubmitFailed
@@ -41,16 +41,16 @@ class FakeMcp:
         self.fail_on = fail_on
         self.submitted: list[str] = []
         self.limits: list[int] = []
+        self.acked: list[str] = []
 
-    def list_new_articles(
-        self, cursor: str | None, limit: int
-    ) -> tuple[list[dict[str, object]], str]:
+    def list_new_articles(self, limit: int) -> tuple[list[dict[str, object]], str]:
         self.limits.append(limit)
         return list(ARTICLES), "cursor-2"
 
-    def submit_analysis(
-        self, article_id: str, agent_name: str, payload: dict[str, object]
-    ) -> None:
+    def ack_cursor(self, cursor: str) -> None:
+        self.acked.append(cursor)
+
+    def submit_analysis(self, article_id: str, payload: dict[str, object]) -> None:
         if article_id == self.fail_on:
             raise SubmitFailed(article_id)
         self.submitted.append(article_id)
@@ -68,35 +68,20 @@ class FakeScorer:
         return Score(relevant=True, score=0.9, reason="r")
 
 
-class MemCursor:
-    def __init__(self) -> None:
-        self.value: str | None = None
-
-    def load(self) -> str | None:
-        return self.value
-
-    def save(self, cursor: str) -> None:
-        self.value = cursor
-
-
 def loop(
     mcp: FakeMcp | None = None, scorer: FakeScorer | None = None
-) -> tuple[AgentLoop, FakeMcp, FakeScorer, MemCursor]:
+) -> tuple[AgentLoop, FakeMcp, FakeScorer]:
     mcp = mcp or FakeMcp()
     scorer = scorer or FakeScorer()
-    cursor = MemCursor()
     return (
         AgentLoop(
             mcp,
             scorer,
-            cursor,
-            agent_name="demo",
             theme_prefixes=("ECON_",),
             batch_limit=200,
         ),
         mcp,
         scorer,
-        cursor,
     )
 
 
@@ -104,34 +89,51 @@ def loop(
 
 
 def test_prefilter_scores_only_econ_articles() -> None:
-    agent, mcp, scorer, _ = loop()
+    agent, mcp, scorer = loop()
     agent.run_once()
     assert scorer.scored == ["t0", "t3"]
     assert mcp.submitted == ["h0", "h3"]
 
 
 def test_malformed_score_skips_article_without_crash() -> None:  # TC-29
-    agent, mcp, scorer, cursor = loop(scorer=FakeScorer(malformed_on="t0"))
+    agent, mcp, scorer = loop(scorer=FakeScorer(malformed_on="t0"))
     agent.run_once()
     assert mcp.submitted == ["h3"]  # t0 skipped, loop continued
-    assert cursor.value == "cursor-2"  # batch still completed
+    assert mcp.acked == ["cursor-2"]  # batch still completed
 
 
-# ---- TC-32: cursor saved only after the whole batch succeeded ---------------
+# ---- TC-15: ack only after the whole batch succeeded ------------------------
 
 
-def test_cursor_saved_after_successful_batch() -> None:
-    agent, _, _, cursor = loop()
+def test_ack_sent_after_successful_batch() -> None:
+    agent, mcp, _ = loop()
     agent.run_once()
-    assert cursor.value == "cursor-2"
+    assert mcp.acked == ["cursor-2"]
 
 
-def test_cursor_unchanged_when_a_submit_fails_mid_batch() -> None:
-    agent, mcp, _, cursor = loop(mcp=FakeMcp(fail_on="h3"))
+def test_no_ack_when_a_submit_fails_mid_batch() -> None:
+    agent, mcp, _ = loop(mcp=FakeMcp(fail_on="h3"))
     with pytest.raises(SubmitFailed):
         agent.run_once()
-    assert cursor.value is None  # old cursor kept; batch re-scored next run
+    assert mcp.acked == []  # batch is re-read next run
     assert mcp.submitted == ["h0"]  # crash mid-batch is harmless (upsert)
+
+
+def test_no_ack_when_the_scorer_crashes() -> None:
+    class Boom(FakeScorer):
+        def score(self, title: str) -> Score | None:
+            raise RuntimeError("ollama down")
+
+    agent, mcp, _ = loop(scorer=Boom())
+    with pytest.raises(RuntimeError):
+        agent.run_once()
+    assert mcp.acked == []
+
+
+def test_loop_keeps_no_cursor_state_of_its_own() -> None:
+    import importlib.util
+
+    assert importlib.util.find_spec("newsdock_agent.adapters.cursor") is None
 
 
 # ---- TC-17 (agent half): batch_limit comes from the constructor --------------
@@ -142,8 +144,6 @@ def test_tc17_batch_limit_is_passed_to_the_mcp_call() -> None:
     agent = AgentLoop(
         mcp,
         FakeScorer(),
-        MemCursor(),
-        agent_name="demo",
         theme_prefixes=("ECON_",),
         batch_limit=17,
     )

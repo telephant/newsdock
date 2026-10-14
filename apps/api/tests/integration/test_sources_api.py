@@ -16,6 +16,7 @@ import uvicorn
 from alembic import command
 from alembic.config import Config
 from mcp import Client
+from newsdock_api.config import Settings
 from newsdock_db.engine import make_engine
 from newsdock_db.models import Article, ArticleSource
 from sqlalchemy import text
@@ -99,7 +100,12 @@ def stack_urls() -> Iterator[tuple[str, str]]:
         sock.bind(("127.0.0.1", 0))
         port = sock.getsockname()[1]
     server = uvicorn.Server(
-        uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
+        uvicorn.Config(
+            create_app(Settings(auth_required=False)),
+            host="127.0.0.1",
+            port=port,
+            log_level="warning",
+        )
     )
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()

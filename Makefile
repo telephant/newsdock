@@ -117,5 +117,14 @@ topics: ## Create the Kafka topics (idempotent; starts Kafka if needed)
 migrate: ## Apply database migrations (alembic upgrade head); Postgres must be up
 	$(COMPOSE) run --rm --no-deps migrate
 
+agent-create: ## Register an agent and print its API key once: make agent-create NAME=<name> (needs NEWSDOCK_ADMIN_TOKEN in .env and the api up)
+	@test -n "$(NAME)" || { echo "usage: make agent-create NAME=<name> (a-z, 0-9, _ and -)" >&2; exit 2; }
+	@test -f .env || { echo "missing .env: cp .env.example .env" >&2; exit 1; }
+	@set -a; . ./.env; set +a; \
+	  test -n "$$NEWSDOCK_ADMIN_TOKEN" || { echo "set NEWSDOCK_ADMIN_TOKEN in .env first" >&2; exit 1; }; \
+	  curl -fsS -X POST "http://127.0.0.1:$${API_PORT:-8000}/api/admin/agents" \
+	    -H "Authorization: Bearer $$NEWSDOCK_ADMIN_TOKEN" -H "Content-Type: application/json" \
+	    -d '{"name":"$(NAME)"}' && echo
+
 docs-check: ## README sections and relative links (infra/scripts/check_docs.py)
 	uv run python infra/scripts/check_docs.py

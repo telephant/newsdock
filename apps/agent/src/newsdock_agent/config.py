@@ -7,7 +7,7 @@ its own `agent` section; Kafka and database values in the shared file never reac
 """
 
 from newsdock_config import LayeredSettings
-from pydantic import AliasChoices, Field, model_validator
+from pydantic import AliasChoices, Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
 
@@ -27,7 +27,9 @@ class Settings(LayeredSettings):
     model: str = "llama3.2:3b"  # chosen in the T-01 spike (spike.md §2)
     agent_name: str = "demo-financial"
     theme_prefixes: str = "ECON_"  # comma-separated; spike decision 2026-10-05
-    cursor_file: str = "/data/cursor.json"
+    # Registered-agent API key (ADR-0016); a secret, env-only: NEWSDOCK_AGENT_API_KEY.
+    # The API owns the cursor (ADR-0017), so there is no local cursor file any more.
+    api_key: SecretStr | None = None
     heartbeat_file: str = "/tmp/healthy"
     heartbeat_max_age_seconds: int = 0  # 0 = derive: 2 x loop interval
     loop_interval_seconds: int = 60

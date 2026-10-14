@@ -85,3 +85,27 @@ def test_cors_method_and_header_lists() -> None:
     s = Settings(cors_allow_methods="GET,POST", cors_allow_headers="x-a,x-b")
     assert s.cors_methods_list == ["GET", "POST"]
     assert s.cors_headers_list == ["x-a", "x-b"]
+
+
+# TC-11 (config part): auth defaults and the committed file
+def test_auth_settings_defaults() -> None:
+    s = Settings()
+    assert s.auth_required is True
+    assert s.rate_limit_per_minute == 600
+    assert s.admin_token is None
+
+
+def test_admin_token_comes_from_env_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEWSDOCK_ADMIN_TOKEN", "s3cret")
+    token = Settings().admin_token
+    assert token is not None and token.get_secret_value() == "s3cret"
+    assert "s3cret" not in repr(Settings())
+
+
+def test_committed_yaml_lists_auth_defaults_and_no_secret() -> None:
+    import yaml
+
+    raw = yaml.safe_load((ROOT / "infra/config/newsdock.yaml").read_text())
+    assert raw["api"]["auth_required"] is True
+    assert raw["api"]["rate_limit_per_minute"] == 600
+    assert "admin_token" not in raw["api"]

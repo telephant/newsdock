@@ -26,7 +26,14 @@ ingester:
 
 processor: {}
 sink: {}
-api: {}
+api:
+  auth_required: true           # MCP needs an agent API key (ADR-0016); false = anonymous
+  rate_limit_per_minute: 600     # per agent; anonymous traffic shares one bucket; 0 = off
+  subscriptions_max_per_agent: 20     # saved filters one agent may hold (409 above)
+  subscription_text_max_length: 200   # max characters of a filter value
+  sse_max_streams_per_agent: 5        # concurrent SSE streams per agent (429 above)
+  sse_keepalive_seconds: 15           # ': ping' interval; also the revoked-key re-check
+  sse_fallback_poll_seconds: 30       # re-query even without a NOTIFY (listener outage)
 agent: {}
 web:                              # read at web server start (ADR-0014); env NEWSDOCK_WEB_* wins
   api_base_url: http://127.0.0.1:8000   # what the BROWSER calls (the host-published API)

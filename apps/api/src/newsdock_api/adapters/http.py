@@ -4,6 +4,7 @@ Spike-verified pattern (spike.md §1): mount `mcp.streamable_http_app()` and run
 `mcp.session_manager.run()` inside the host app's lifespan.
 """
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -12,14 +13,29 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
+from newsdock_api.adapters.admin import build_admin_router
+from newsdock_api.adapters.agents_repo import SqlAgentsRepo
+from newsdock_api.adapters.auth import AuthMiddleware
 from newsdock_api.adapters.kafka_health import kafka_reachable
+from newsdock_api.adapters.listener import NotifyListener, listen_dsn
 from newsdock_api.adapters.repo import SqlArticleRepo
+from newsdock_api.adapters.sse import build_stream_router
+from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
+from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
 from newsdock_api.config import Settings
+from newsdock_api.domain.agents import (
+    ANONYMOUS,
+    Agent,
+    AgentRegistry,
+    KeyLookup,
+)
+from newsdock_api.domain.ratelimit import FixedWindowLimiter
 from newsdock_api.domain.records import (
     ArticleDetail,
     FeedPage,
@@ -30,13 +46,40 @@ from newsdock_api.domain.service import (
     ArticleService,
     NotFoundError,
     PayloadTooLargeError,
+    decode_cursor,
+    encode_cursor,
     get_article,
 )
+from newsdock_api.domain.streams import StreamLimiter, WakeHub
+from newsdock_api.domain.subscriptions import SubscriptionStore
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    agents_repo: AgentRegistry | None = None,
+    subscriptions_repo: SubscriptionStore | None = None,
+    key_lookup: KeyLookup | None = None,
+) -> FastAPI:
     settings = settings or Settings()
-    repo = SqlArticleRepo(make_engine(DbSettings()))
+    engine = make_engine(DbSettings())
+    repo = SqlArticleRepo(engine)
+    sql_agents = SqlAgentsRepo(engine)
+    registry: AgentRegistry = agents_repo or sql_agents
+    keys: KeyLookup = key_lookup or sql_agents
+    subscriptions: SubscriptionStore = subscriptions_repo or SqlSubscriptionsRepo(
+        engine
+    )
+
+    def current_agent(ctx: Context) -> Agent:
+        """The caller verified by AuthMiddleware (state set per request)."""
+        request = ctx.request_context.request
+        agent = getattr(getattr(request, "state", None), "agent", None)
+        if isinstance(agent, Agent):
+            return agent
+        if settings.auth_required:  # defence in depth: never fall back to anonymous
+            raise ToolError("unauthorized: no verified agent on the request")
+        return ANONYMOUS
+
     service = ArticleService(repo, limits=settings.limits())
 
     mcp = MCPServer("newsdock")
@@ -67,36 +110,108 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @mcp.tool()
     def list_new_articles(
-        cursor: str | None = None, limit: int | None = None
+        ctx: Context, cursor: str | None = None, limit: int | None = None
     ) -> dict[str, Any]:
-        """List articles newer than the cursor; no cursor = the last hour."""
-        page: NewArticlesPage = service.list_new(cursor=cursor, limit=limit)
+        """List articles newer than the cursor.
+
+        Without a cursor an authenticated agent resumes from the position it last
+        acknowledged with ack_cursor; a new agent gets the last hour.
+        """
+        agent = current_agent(ctx)
+        stored = None
+        if cursor is None and agent.id is not None:
+            stored = sql_agents.get_cursor(agent.id)
+        try:
+            page: NewArticlesPage = service.list_new(
+                cursor=cursor, limit=limit, stored_seq=stored
+            )
+        except ValueError as exc:
+            raise ToolError(f"invalid_cursor: {exc}") from exc
         return page.model_dump(mode="json")
 
     @mcp.tool()
-    def submit_analysis(
-        article_id: str, agent_name: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
-        """Store an agent's analysis for an article (payload: any JSON object)."""
+    def ack_cursor(cursor: str, ctx: Context) -> dict[str, Any]:
+        """Acknowledge that every article up to `cursor` is processed.
+
+        Call it with the next_cursor of a batch after you finished that batch; the
+        next list_new_articles without a cursor then starts there. Moves forward
+        only; safe to repeat.
+        """
+        agent = current_agent(ctx)
+        if agent.id is None:
+            raise ToolError("anonymous_agent: register an agent to keep a cursor")
         try:
-            service.submit_analysis(article_id, agent_name, payload)
+            seq = decode_cursor(cursor)
+        except ValueError as exc:
+            raise ToolError(f"invalid_cursor: {exc}") from exc
+        return {"cursor": encode_cursor(sql_agents.advance_cursor(agent.id, seq))}
+
+    @mcp.tool()
+    def submit_analysis(
+        article_id: str, agent_name: str, payload: dict[str, Any], ctx: Context
+    ) -> dict[str, Any]:
+        """Store an analysis for an article (payload: any JSON object).
+
+        Authenticated agents are recorded under their registered name;
+        `agent_name` is only honoured for anonymous callers (auth off).
+        """
+        agent = current_agent(ctx)
+        name = agent_name if agent.is_anonymous else agent.name
+        try:
+            service.submit_analysis(article_id, name, payload)
         except NotFoundError as exc:
             raise ToolError(f"not_found: {exc}") from exc
         except PayloadTooLargeError as exc:
             raise ToolError(f"payload_too_large: {exc}") from exc
         return {"ok": True}
 
+    hub = WakeHub()  # shared with the SSE streams (ADR-0018)
+    listener = NotifyListener(listen_dsn(DbSettings().database_url), hub)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        async with mcp.session_manager.run():
-            yield
+        listener_task = asyncio.create_task(listener.run())
+        try:
+            async with mcp.session_manager.run():
+                yield
+        finally:
+            listener_task.cancel()
+            await asyncio.gather(listener_task, return_exceptions=True)
 
     app = FastAPI(title="newsdock API", lifespan=lifespan)
+    app.state.wake_hub = hub
     app.add_middleware(  # the web UI calls /api/* from the browser (TC-25)
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
         allow_methods=settings.cors_methods_list,
         allow_headers=settings.cors_headers_list,
+    )
+
+    admin_token = settings.admin_token
+    app.include_router(
+        build_admin_router(
+            registry,
+            admin_token.get_secret_value() if admin_token else None,
+            subscriptions,
+        )
+    )
+    app.include_router(
+        build_stream_router(
+            subscriptions=subscriptions,
+            service=service,
+            agents=sql_agents,
+            hub=hub,
+            limiter=StreamLimiter(settings.sse_max_streams_per_agent),
+            keepalive_seconds=settings.sse_keepalive_seconds,
+            fallback_poll_seconds=settings.sse_fallback_poll_seconds,
+        )
+    )
+    app.include_router(
+        build_subscriptions_router(
+            subscriptions,
+            max_per_agent=settings.subscriptions_max_per_agent,
+            max_text_length=settings.subscription_text_max_length,
+        )
     )
 
     @app.get("/api/articles")
@@ -155,5 +270,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 allowed_hosts=settings.allowed_hosts_list
             )
         ),
+    )
+    app.add_middleware(
+        AuthMiddleware,
+        keys=keys,
+        limiter=FixedWindowLimiter(settings.rate_limit_per_minute),
+        auth_required=settings.auth_required,
     )
     return app
