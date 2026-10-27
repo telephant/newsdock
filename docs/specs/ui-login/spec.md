@@ -24,8 +24,8 @@ flowchart LR
 | ID | Decision | Status |
 |---|---|---|
 | D-1 | Cut line, accounts model | Decided: multi-user accounts + roles (agent-platform D-4, 2026-10-14) |
-| D-2 | Read access | Decided: login required for UI reads; `GET /api/articles*` accepts a session or an agent key, anonymous gets 401 when `auth.required` is true. Closes agent-platform D-7 / R-1 (2026-10-27) |
-| D-3 | Account creation | Decided: open self-sign-up (user choice, 2026-10-27; the recommended option was bootstrap owner + invites). Guard rails below are **[assumption]**: new accounts are `viewer`; the very first account becomes `owner`; `auth.signup_open` flag (default `true`) turns sign-up off |
+| D-2 | Read access | Decided: login required for UI reads; `GET /api/articles*` accepts a session or an agent key, anonymous gets 401 when `auth_required` is true. Closes agent-platform D-7 / R-1 (2026-10-27) |
+| D-3 | Account creation | Decided: open self-sign-up (user choice, 2026-10-27; the recommended option was bootstrap owner + invites). Guard rails below are **[assumption]**: new accounts are `viewer`; the very first account becomes `owner`; `auth_signup_open` flag (default `true`) turns sign-up off |
 | D-4 | Roles | Decided: `owner` (users + everything), `admin` (agents, keys, subscriptions), `viewer` (read articles, live feed) (2026-10-27) |
 | D-5 | UI scope | Decided: login/logout, user management, agent registry with create/revoke key, subscriptions screen and live feed page (user chose options 1 + 2, 2026-10-27; the backlog had the live feed at P3) |
 | D-6 | Sessions and passwords | Decided **[assumption]**: random opaque session id in an `httpOnly`, `SameSite=Lax` cookie, stored hashed in Postgres with idle and absolute expiry; passwords hashed with argon2id (ADR-0016 already says so). Conventional default, not asked |
@@ -37,7 +37,7 @@ flowchart LR
 No open decisions.
 
 ### Open risks
-1. **Open sign-up on a service that holds article data and agent keys (D-3).** Anyone who can reach the web port can register a `viewer` account and read articles. Mitigations: viewer is read-only, `auth.signup_open: false` closes it, README states it. No email verification in this milestone.
+1. **Open sign-up on a service that holds article data and agent keys (D-3).** Anyone who can reach the web port can register a `viewer` account and read articles. Mitigations: viewer is read-only, `auth_signup_open: false` closes it, README states it. No email verification in this milestone.
 2. **Cookie vs. cross-origin (decided D-10, ADR-0021).** Credentialed CORS needs page and API on one hostname and an Origin allowlist as the CSRF guard; the web server redirects to the API's host.
 3. **Brute force on login.** Mitigated by a per-account/IP failure limit (AC-13); no CAPTCHA, no MFA.
 4. **First-account race.** Two simultaneous first sign-ups must not both become owner (needs a DB-level guard).
@@ -75,10 +75,10 @@ Learning goals: password storage and session design, cookie security, role-based
 **In**
 - `users` and `sessions` tables, sign-up, login, logout, "who am I", with argon2id hashing.
 - Roles `owner` / `admin` / `viewer`, enforced server-side on every route.
-- Article read routes require a session or an agent key when `auth.required` is true.
+- Article read routes require a session or an agent key when `auth_required` is true.
 - Next.js: `/login`, `/signup`, auth gate for all other pages, navigation by role.
 - Screens: users (owner), agents and keys (admin+), subscriptions (admin+, view and delete), live feed (all roles).
-- Login failure rate limit; `auth.signup_open` and session lifetime settings in `newsdock.yaml`.
+- Login failure rate limit; `auth_signup_open` and session lifetime settings in `newsdock.yaml`.
 - Admin routes accept admin/owner session or the admin token (D-7).
 - Owner recovery: `make user-reset-password` through a token-only admin route (D-9).
 
@@ -115,7 +115,7 @@ AC-2  First account becomes owner
 
 AC-3  Bad sign-up is rejected
   Given an account with email a@x.io exists
-  When  a visitor signs up again with a@x.io, or with a password shorter than the configured minimum, or with auth.signup_open false
+  When  a visitor signs up again with a@x.io, or with a password shorter than the configured minimum, or with auth_signup_open false
   Then  the response is 409, 422 or 403 respectively and no row is created
   Verify: auto
 
@@ -138,7 +138,7 @@ AC-6  Logout and expiry end the session
   Verify: auto
 
 AC-7  Article reads need a session or a key
-  Given auth.required is true
+  Given auth_required is true
   When  GET /api/articles is called anonymously, with a valid session, and with a valid agent key
   Then  the responses are 401, 200 and 200, and GET /api/health stays 200 anonymously
   Verify: auto
@@ -198,7 +198,7 @@ AC-16  Owner recovery by CLI
   Verify: auto
 ```
 
-Provisional targets (measure first, not requirements): argon2 time per hash under about 200 ms on the dev machine; idle session 12 h and absolute 7 d; login limit 5 failures per 15 min; minimum password length 10.
+Provisional targets (measure first, not requirements): argon2 time per hash under about 200 ms on the dev machine; idle session 12 h and absolute 7 d; login limit 5 failures per 15 min; minimum password length 10; maximum password length 128 and email length 254 (input bounds); session `last_seen_at` refreshed at most once a minute; at most 3 concurrent live-feed streams per user.
 
 ## 7. Non-functional requirements
 
@@ -223,4 +223,10 @@ Provisional targets (measure first, not requirements): argon2 time per hash unde
 - **Agent key**: `ndk_<prefix>_<secret>` bearer token for agents (agent-platform).
 - **Admin token**: shared secret in `.env` for the CLI; break-glass after this spec.
 - **Live feed**: browser SSE stream of newly stored articles for a logged-in user.
+- **CORS (credentialed)**: browser rule that lets a page on one origin call the API on another and send cookies; the API names the allowed origins and sets `Access-Control-Allow-Credentials`.
+- **CSRF**: a forged request made from another site or app using the victim's cookie; blocked here by `SameSite=Lax`, JSON-only bodies and an Origin allowlist.
+- **Origin check**: the API rejects a state-changing request whose `Origin` header is not in `cors_origins`.
+- **Principal**: the resolved caller of a request: user (with role), agent, admin token or anonymous.
+- **Hostname alignment**: page and API use the same hostname (`localhost` or `127.0.0.1`) so the cookie is sent; the web server redirects to the API's host when they differ.
+- **Advisory lock**: a Postgres application-level lock used so only one sign-up or role change decides "first owner" or "last owner" at a time.
 - **Break-glass**: an emergency access path kept outside the normal login.

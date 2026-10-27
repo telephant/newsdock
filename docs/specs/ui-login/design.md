@@ -48,6 +48,8 @@ Routes (all JSON, errors `{"error": code}` or FastAPI `detail`):
 | `GET /api/users`, `PATCH /api/users/{id}` (role), `DELETE /api/users/{id}` | owner | 200/204; 409 last owner; 404 |
 | `GET /api/articles*` | session or agent key | 200; 401 anonymous when `auth_required` |
 | `/api/admin/*` (unchanged paths) | admin/owner session or admin token | as today; viewer 403 |
+| `DELETE /api/admin/subscriptions/{id}` (new) | admin/owner session or admin token | 204; 404; the agent's open stream ends within one keep-alive |
+| `POST /api/admin/users/reset-password` (C-17) | admin token only | 204; 404 unknown email; 422 policy; session 403 |
 | `GET /api/live` | session (any role) | SSE; 401; 429 over per-user cap |
 | `GET /api/health` | public | unchanged |
 

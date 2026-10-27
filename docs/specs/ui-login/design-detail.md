@@ -54,6 +54,9 @@ Role order is `owner > admin > viewer`; the permission table is a dict `PERMISSI
 
 Rate limiting: agents keep the per-key fixed window. Humans are not rate-limited per request in this milestone, only on login failures and on opening live streams.
 
+### Admin subscription delete (AC-12)
+`DELETE /api/admin/subscriptions/{id}`: new `SubscriptionStore.delete_any(sub_id) -> bool` (SQL `DELETE … WHERE id = :id`), 204 or 404. Open agent streams already re-check `subscriptions.exists` on each keep-alive tick (push-delivery), so they end within `sse_keepalive_seconds`; a new stream request is 404 at once.
+
 ### Recovery route (C-17)
 `POST /api/admin/users/reset-password` body `{email, password}`: **admin-token principal only** (an admin or owner *session* gets 403, so an admin cannot take over the owner account). Applies the password policy, replaces the hash, deletes every session of that user, returns 204; unknown email 404. `make user-reset-password EMAIL=<email>` reads the new password with `read -s` (not an argument, not in shell history), then posts it with curl exactly like `make agent-create` (needs `NEWSDOCK_ADMIN_TOKEN` in `.env`). If no admin token is configured the route does not exist (404), as the other admin routes.
 
