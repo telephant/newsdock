@@ -2,7 +2,7 @@
 
 **Vision:** a shared "news dock" that ingests GDELT news once (clean, dedup, 7-day store) so any custom AI agent, such as a financial-relevance agent, can plug in. Also the owner's path from frontend engineer to AI production / full-stack engineer.
 
-**Current milestone:** M1 `mvp` is **done** (verified pass-with-follow-ups 2026-10-05, [verify](specs/mvp/verify.md): all 15 ACs pass, F1 0.83, live end-to-end). Current: **M2b `externalize-config`** (spec'd 2026-10-06, verified 2026-10-07 pass with follow-ups: one YAML config file with env overrides) after **M2a `dedup-syndication`** (committed 2026-10-07, verified 2026-10-09 pass with follow-ups); then M2 (push subscriptions + agent registry/auth, backlog P1). M0 `foundation` done (2026-10-05).
+**Current milestone:** M2 (platform), in progress: `agent-platform` and `push-delivery` are done (both verified 2026-10-14, pass with follow-ups); next spec is `ui-login` (multi-user accounts + roles). Done before: M0 `foundation` (2026-10-05), M1 `mvp` (verified 2026-10-05, all 15 ACs, F1 0.83, live end-to-end), M2a `dedup-syndication` (verified 2026-10-09) and M2b `externalize-config` (verified 2026-10-07), all pass with follow-ups.
 Specs: [foundation](specs/foundation/spec.md) · [mvp](specs/mvp/spec.md) · Items: [mvp backlog](specs/mvp/backlog.md), [foundation backlog](specs/foundation/backlog.md) · Decisions: [ADRs](adr/) · Evidence: [research](research.md)
 
 | M | Goal | Skills it teaches / proves | Exit condition | Depends on | Status |

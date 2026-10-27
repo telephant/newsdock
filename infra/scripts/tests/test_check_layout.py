@@ -83,6 +83,11 @@ def test_allowed_python_locations_and_ignored_dirs_pass(tree: Path) -> None:  # 
     assert messages(tree) == []
 
 
+def test_claude_code_local_state_is_ignored(tree: Path) -> None:
+    write(tree / ".claude" / "scheduled_tasks.lock")
+    assert messages(tree) == []
+
+
 def test_pending_table_skips_only_listed_items(tree: Path) -> None:
     (tree / "apps" / "api" / "Dockerfile").unlink()
     assert any("apps/api/Dockerfile" in m for m in messages(tree))
