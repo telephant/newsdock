@@ -4,6 +4,15 @@ Reference only; not required reading for approval. Overview: [design.md](design.
 
 ## 1. Packages (apps/web)
 
+**Spike result (T-01, 2026-10-27) [verified]:** Tailwind 4.3.3, `@tailwindcss/postcss`, shadcn CLI 4.22.1 (`pnpm dlx shadcn@latest init --defaults`) work on Next 16.3.8 / React 19.2.8 / pnpm 12.9.1. `pnpm run build` and `make build APP=web` succeed with no `allowBuilds` change; the container serves `/login` with a stylesheet (`/_next/static/chunks/*.css`, HTTP 200, contains `--primary`, 7.9 kB gzipped on the unstyled base). Deviations from the text below, all applied:
+- The CLI default style is `base-nova`, built on **Base UI** (`@base-ui/react`), not Radix `new-york`. Kept: it is the current CLI default and ADR-0022's decision (shadcn primitives) is unchanged. Wherever this file says Radix, read Base UI. AlertDialog comes from `@base-ui/react`.
+- The CLI wrote `import { cn } from "cn"` (a third-party npm package `cn`) and `next/font/google` Geist into `layout.tsx`. Both removed: `src/lib/utils.ts` defines `cn` with `clsx` + `tailwind-merge`, and fonts stay the system stack (D-5).
+- `shadcn` is a devDependency (its `shadcn/tailwind.css` is imported by `globals.css` at build time). Runtime deps added: `@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `tw-animate-css`, `next-themes`, `sonner`.
+- Built CSS lands in `.next/static/chunks/`, not `.next/static/css/` (Next 16, Turbopack): the AC-14 test follows the `<link>` href instead of a fixed path.
+- Re-run `shadcn add` with `--overwrite` and re-apply the `cn` import fix, or the stray `cn` import returns.
+
+Original plan (superseded where noted above):
+
 Runtime: `tailwindcss`, `@tailwindcss/postcss`, `postcss`, `tw-animate-css`, `class-variance-authority`, `clsx`, `tailwind-merge`, `lucide-react`, `next-themes`, `sonner`, Radix packages pulled by the added components (`@radix-ui/react-alert-dialog`, `@radix-ui/react-slot`, `@radix-ui/react-label`, `@radix-ui/react-separator`) or the unified `radix-ui` package, whichever the CLI 4.x writes **[assumption]**. Install through `pnpm --dir apps/web add`, never by hand-editing the lockfile. `pnpm-workspace.yaml` `allowBuilds` stays as is unless the install reports a blocked build script; if it does, allow only that package and note it here.
 
 Files added: `postcss.config.mjs`, `components.json` (style `new-york`, `rsc: true`, `tsx: true`, css `src/app/globals.css`, aliases `@/components`, `@/components/ui`, `@/lib/utils`), `src/lib/utils.ts` (`cn`). `lib/api/` untouched.

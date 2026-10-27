@@ -56,7 +56,7 @@ Status: design written 2026-10-27 · detail in [design-detail.md](design-detail.
 
 ## Technology
 
-shadcn/ui (CLI 4.23.0), Tailwind CSS 4.3.x + `@tailwindcss/postcss`, `tw-animate-css`, `lucide-react`, `next-themes`, `clsx` + `tailwind-merge` + `class-variance-authority` (installed by shadcn init) **[verified versions on npm 2026-10-27; compatibility with Next 16.3 verified at implement task 1]**. Radix UI comes in through the shadcn components that need it (AlertDialog).
+shadcn/ui (CLI 4.23.0), Tailwind CSS 4.3.x + `@tailwindcss/postcss`, `tw-animate-css`, `lucide-react`, `next-themes`, `clsx` + `tailwind-merge` + `class-variance-authority` (installed by shadcn init) **[verified versions on npm 2026-10-27; compatibility with Next 16.3 verified at implement task 1]**. Base UI (`@base-ui/react`, the CLI's current default instead of Radix, see design-detail §1) comes in through the shadcn components that need it (AlertDialog). Compatibility with Next 16.3 **[verified 2026-10-27, T-01]**.
 
 ## AC coverage
 

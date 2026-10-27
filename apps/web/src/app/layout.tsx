@@ -7,6 +7,7 @@ import { Nav } from "@/features/auth/Nav";
 import { SessionProvider } from "@/features/auth/SessionProvider";
 import { getRuntimeConfig } from "@/lib/config/runtime";
 import { MISMATCH_HEADER } from "@/lib/hosts";
+import "./globals.css";
 
 export const metadata: Metadata = {
   title: "newsdock",
