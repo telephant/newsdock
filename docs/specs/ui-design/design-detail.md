@@ -57,7 +57,7 @@ Relative time keeps `new Date(...).toLocaleString()` in the `title` so existing 
   2. Contrast: parse `globals.css` `:root` and `.dark` hex values, compute WCAG ratios for pairs (`foreground/background`, `muted-foreground/background`, `card-foreground/card`, `primary-foreground/primary`, `primary-text/background`, `destructive-foreground/destructive` if present), fail under 4.5.
 - Focus ring: `ring` token plus `focus-visible:ring-[3px]` from shadcn; the script also asserts `--ring` differs from `--background` by at least 3:1 (WCAG non-text contrast).
 - Manual: screenshots of the 8 routes at 375 and 1280 px, light and dark, saved under `docs/specs/ui-design/screens/` at verify (AC-9, AC-10).
-- AC-14: extend the existing image/stack test in `infra/tests` (scene `images` or `stack`) to fetch `/login`, find the `<link rel="stylesheet">`, fetch it, assert 200 and the token variable name `--primary` in the body.
+- AC-14: extend the existing image/stack test in `infra/scripts/tests` (scene `images` or `stack`) to fetch `/login`, find the `<link rel="stylesheet">`, fetch it, assert 200 and the token variable name `--primary` in the body.
 
 ## 6. Dockerfile
 
