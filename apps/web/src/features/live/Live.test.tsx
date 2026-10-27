@@ -81,6 +81,67 @@ const current = () => sources[sources.length - 1];
 const titles = () =>
   screen.queryAllByRole("link").map((link) => link.textContent);
 
+// TC-12, TC-13, TC-19 (AC-8, AC-13): status dot, reduced-motion-safe entrance, empty state.
+const dot = () => document.querySelector('[data-slot="status-dot"]');
+
+test("a status dot follows connecting, live, reconnecting and closed", () => {
+  render(
+    <Live
+      createSource={createSource}
+      deps={{
+        fetch: async () =>
+          new Response(
+            JSON.stringify({ id: "u", email: "a@x.io", role: "viewer" }),
+            {
+              status: 200,
+            },
+          ),
+      }}
+    />,
+  );
+  expect(dot()?.getAttribute("data-state")).toBe("connecting");
+  act(() => current().open());
+  expect(dot()?.getAttribute("data-state")).toBe("live");
+  act(() => current().failWhileReconnecting());
+  expect(dot()?.getAttribute("data-state")).toBe("reconnecting");
+  act(() => current().failForGood());
+  expect(dot()?.getAttribute("data-state")).toBe("closed");
+  expect(screen.getByRole("button", { name: "Reconnect" })).toBeTruthy();
+});
+
+test("the dot is decoration: the status text alone carries the meaning", () => {
+  render(<Live createSource={createSource} />);
+  expect(dot()?.getAttribute("aria-hidden")).toBe("true");
+  expect(screen.getAllByRole("status")).toHaveLength(1);
+});
+
+test("new articles animate in only when motion is allowed", () => {
+  render(<Live createSource={createSource} />);
+  act(() => current().open());
+  act(() => current().emit({ article_id: "a1" }));
+  const item = screen.getByRole("link", { name: "Title a1" }).closest("li");
+  const classes = (item?.className ?? "").split(/\s+/);
+  expect(classes.some((c) => c.startsWith("motion-safe:animate-in"))).toBe(
+    true,
+  );
+  // nothing animates unconditionally
+  expect(
+    classes.filter((c) => /^(animate-|fade-|slide-|zoom-)/.test(c)),
+  ).toEqual([]);
+});
+
+test("with no articles yet a friendly empty state waits for the first one", () => {
+  render(<Live createSource={createSource} />);
+  act(() => current().open());
+  expect(
+    screen
+      .getByText(/waiting for new articles/i)
+      .closest('[data-slot="empty-state"]'),
+  ).not.toBeNull();
+  act(() => current().emit({ article_id: "a1" }));
+  expect(screen.queryByText(/waiting for new articles/i)).toBeNull();
+});
+
 test("opens one credentialed stream on the configured API", () => {
   render(<Live createSource={createSource} />);
   expect(sources).toHaveLength(1);

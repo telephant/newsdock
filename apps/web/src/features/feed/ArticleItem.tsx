@@ -19,9 +19,15 @@ function ScoreBadges({ scores }: { scores: ArticleSummary["scores"] }) {
   );
 }
 
-export function ArticleItem({ article }: { article: ArticleSummary }) {
+export function ArticleItem({
+  article,
+  className,
+}: {
+  article: ArticleSummary;
+  className?: string; // e.g. the live page's entrance animation
+}) {
   return (
-    <li>
+    <li className={className}>
       <Card className="min-w-0 py-4 transition-colors hover:bg-muted/40">
         <CardContent className="flex min-w-0 flex-col gap-2 px-4">
           <Link

@@ -7,6 +7,9 @@
 // All text is rendered by React (escaped, never HTML).
 import { useEffect, useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
+import { EmptyState } from "@/components/EmptyState";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { apiRequest, type ClientDeps } from "@/lib/client/api";
 import type { ArticleSummary } from "@/features/feed/api";
 import { ArticleItem } from "@/features/feed/ArticleItem";
@@ -40,6 +43,14 @@ const STATUS_TEXT: Record<Status, string> = {
   live: "Live: new articles appear here as they arrive.",
   reconnecting: "Connection lost, reconnecting…",
   closed: "Disconnected.",
+};
+
+// Dot colours come from tokens only; reconnecting pulses unless motion is reduced.
+const DOT_CLASS: Record<Status, string> = {
+  connecting: "bg-muted-foreground",
+  live: "bg-primary",
+  reconnecting: "bg-muted-foreground motion-safe:animate-pulse",
+  closed: "bg-destructive",
 };
 
 function parseArticle(data: string): ArticleSummary | null {
@@ -104,19 +115,36 @@ export function Live({
   }
 
   return (
-    <section>
-      <p role="status">{STATUS_TEXT[status]}</p>
-      {status === "closed" ? (
-        <button type="button" onClick={reconnect}>
-          Reconnect
-        </button>
-      ) : null}
+    <section className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <p role="status" className="flex items-center gap-2 text-sm">
+          <span
+            data-slot="status-dot"
+            data-state={status}
+            aria-hidden="true"
+            className={cn("size-2.5 shrink-0 rounded-full", DOT_CLASS[status])}
+          />
+          {STATUS_TEXT[status]}
+        </p>
+        {status === "closed" ? (
+          <Button type="button" size="sm" onClick={reconnect}>
+            Reconnect
+          </Button>
+        ) : null}
+      </div>
       {articles.length === 0 && status !== "closed" ? (
-        <p>Waiting for new articles…</p>
+        <EmptyState
+          title="Waiting for new articles…"
+          description="Stories show up here the moment they are processed."
+        />
       ) : null}
-      <ol>
+      <ol className="flex flex-col gap-3">
         {articles.map((article) => (
-          <ArticleItem key={article.article_id} article={article} />
+          <ArticleItem
+            key={article.article_id}
+            article={article}
+            className="motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2"
+          />
         ))}
       </ol>
     </section>

@@ -12,10 +12,10 @@ acs:
   AC-5: {status: passing}  # TC-8 green (T-05, 2026-10-27)
   AC-6: {status: passing}  # TC-9 green (T-06, 2026-10-27)
   AC-7: {status: passing}  # TC-10, TC-11 green (T-07, 2026-10-27)
-  AC-8: {status: todo}
+  AC-8: {status: passing}  # TC-12, TC-13 green (T-08, 2026-10-27); built CSS has motion-safe:animate-in
   AC-9: {status: in-progress}  # toggle + stored choice green in jsdom (T-03); flash-free first paint is manual M-1 (T-09)
   AC-10: {status: todo}
   AC-11: {status: passing}  # TC-16, TC-17 green (T-02, 2026-10-27); every text pair >= 5.2:1 in both themes, ring >= 5.2:1
   AC-12: {status: todo}
-  AC-13: {status: in-progress}  # TC-19 green for feed, detail (T-04, T-05) and management (T-07); live in T-08
+  AC-13: {status: passing}  # TC-19 green for feed (T-04), detail (T-05), management (T-07) and live (T-08), 2026-10-27
   AC-14: {status: in-progress}  # image builds and serves CSS by hand (T-01); automated TC-20 in T-09
