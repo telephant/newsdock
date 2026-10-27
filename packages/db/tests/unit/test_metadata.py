@@ -10,6 +10,7 @@ from newsdock_db.metadata import NAMING_CONVENTION, metadata
 
 def test_metadata_holds_exactly_the_known_tables() -> None:
     # M1 + article_sources (M2a) + agent-platform and subscriptions (M2, 2026-10-14)
+    # + users and sessions (ui-login, 2026-10-27)
     assert set(metadata.tables) == {
         "articles",
         "analyses",
@@ -19,6 +20,8 @@ def test_metadata_holds_exactly_the_known_tables() -> None:
         "api_keys",
         "agent_cursors",
         "subscriptions",
+        "users",
+        "sessions",
     }
 
 

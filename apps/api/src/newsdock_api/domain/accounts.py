@@ -74,6 +74,37 @@ def ensure_signup_open(signup_open: bool) -> None:
         raise SignupClosed("signup_closed")
 
 
+class DuplicateEmail(Exception):
+    pass
+
+
+class LastOwner(Exception):
+    """A change that would leave the system without an owner (AC-10)."""
+
+
+class UserSummary(BaseModel):
+    """A user as listed to an owner: never carries the hash."""
+
+    model_config = ConfigDict(frozen=True)
+
+    id: str
+    email: str
+    role: Role
+    created_at: datetime
+
+
+class SessionInfo(BaseModel):
+    """A live session joined with its user; the role is the current one."""
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: str
+    email: str
+    role: Role
+    last_seen_at: datetime
+    expires_at: datetime
+
+
 class StoredUser(BaseModel):
     model_config = ConfigDict(frozen=True)
 
