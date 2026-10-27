@@ -21,6 +21,7 @@ from newsdock_db.engine import make_engine
 
 from newsdock_api.adapters.accounts_api import (
     build_accounts_router,
+    build_recovery_router,
     build_users_router,
 )
 from newsdock_api.adapters.admin import build_admin_router
@@ -203,6 +204,7 @@ def create_app(
         auth_required=settings.auth_required,
         cookie_name=settings.auth_cookie_name,
         allowed_origins=settings.cors_origins_list,
+        admin_token_configured=admin_token is not None,
     )
     app = FastAPI(
         title="newsdock API",
@@ -219,7 +221,19 @@ def create_app(
     )
 
     app.include_router(build_admin_router(registry, subscriptions, guards.admin))
+    limiter_for_logins = login_limiter or LoginLimiter(
+        settings.auth_login_max_failures, settings.login_window_seconds
+    )
     app.include_router(build_users_router(accounts, guards.manage_users))
+    app.include_router(
+        build_recovery_router(
+            accounts,
+            password_hasher,
+            limiter_for_logins,
+            require_token=guards.admin_token_only,
+            min_password_length=settings.auth_min_pw_length,
+        )
+    )
     app.include_router(
         build_stream_router(
             subscriptions=subscriptions,
@@ -235,10 +249,7 @@ def create_app(
         build_accounts_router(
             accounts,
             password_hasher,
-            login_limiter
-            or LoginLimiter(
-                settings.auth_login_max_failures, settings.login_window_seconds
-            ),
+            limiter_for_logins,
             require_user=guards.user,
             dummy_hash=make_dummy_hash(password_hasher),
             signup_open=settings.auth_signup_open,

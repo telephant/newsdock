@@ -56,6 +56,7 @@ make down            # stop everything (data volumes are kept)
 | `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
 | `make agent-create NAME=<name>` | Register an agent and print its API key once (needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up) |
+| `make user-reset-password EMAIL=<email>` | Owner recovery: set a user's password (asks twice, never echoed; ends that user's sessions and lifts a login lockout; needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up). Only the admin token can do this; an admin or owner session cannot |
 | `make config-python` | Check `infra/config/newsdock.yaml` and that no tunable literal crept back into code |
 | `make test-rules` | Prove each enforced rule fails when violated |
 | `make test-infra [SCENE=<name>]` | Docker tests; scenes scope the run to what you're working on: `db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images` (no scene = everything, ~4 min warm). Needs Docker and ports 5433/29092 free |

@@ -9,6 +9,7 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/compose.yaml
 .PHONY: doctor help setup setup-python setup-web test lint-python types-python
 .PHONY: imports-python layout-python config-python check-python check-web check test-rules
 .PHONY: build up down topics migrate docs-check test-infra test-rules-python
+.PHONY: user-reset-password
 
 doctor: ## Check the required tools are installed (docker, uv, pnpm, ollama)
 	@bash infra/scripts/doctor.sh
@@ -125,6 +126,9 @@ agent-create: ## Register an agent and print its API key once: make agent-create
 	  curl -fsS -X POST "http://127.0.0.1:$${API_PORT:-8000}/api/admin/agents" \
 	    -H "Authorization: Bearer $$NEWSDOCK_ADMIN_TOKEN" -H "Content-Type: application/json" \
 	    -d '{"name":"$(NAME)"}' && echo
+
+user-reset-password: ## Owner recovery, set a user's password (prompts, never echoed): make user-reset-password EMAIL=<email> (needs NEWSDOCK_ADMIN_TOKEN in .env and the api up)
+	@bash infra/scripts/user_reset_password.sh "$(EMAIL)"
 
 docs-check: ## README sections and relative links (infra/scripts/check_docs.py)
 	uv run python infra/scripts/check_docs.py

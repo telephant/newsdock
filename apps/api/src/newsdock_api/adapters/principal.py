@@ -104,6 +104,7 @@ class Guards(NamedTuple):
     write: Callable[[Request], None]  # app-wide: Origin allowlist + JSON bodies
     admin: Callable[[Request], Principal]  # admin token, or admin/owner session
     manage_users: Callable[[Request], UserPrincipal]  # owner session only
+    admin_token_only: Callable[[Request], None]  # the CLI token, nothing else
 
 
 def build_guards(
@@ -112,6 +113,7 @@ def build_guards(
     auth_required: bool,
     cookie_name: str,
     allowed_origins: list[str],
+    admin_token_configured: bool,
 ) -> Guards:
     def principal(request: Request) -> Principal:
         state = request.state
@@ -174,6 +176,16 @@ def build_guards(
             return who
         raise forbidden_or_unauthorized(who)
 
+    def admin_token_only(request: Request) -> None:
+        # no token configured: the route does not exist; sessions never qualify, so
+        # an admin cannot take over the owner account
+        if not admin_token_configured:
+            raise HTTPException(status_code=404)
+        who = principal(request)
+        if isinstance(who, AdminTokenPrincipal):
+            return
+        raise forbidden_or_unauthorized(who)
+
     return Guards(
         principal=principal,
         read=read,
@@ -181,4 +193,5 @@ def build_guards(
         write=write,
         admin=admin,
         manage_users=manage_users,
+        admin_token_only=admin_token_only,
     )

@@ -211,3 +211,44 @@ def build_users_router(
         return Response(status_code=204)
 
     return router
+
+
+class PasswordReset(BaseModel):
+    email: str = Field(max_length=BODY_LIMIT)
+    password: str = Field(max_length=BODY_LIMIT)
+
+
+def build_recovery_router(
+    store: AccountStore,
+    hasher: PasswordHasher,
+    limiter: LoginLimiter,
+    *,
+    require_token: Callable[[Request], None],
+    min_password_length: int,
+) -> APIRouter:
+    """Owner recovery (C-17, AC-16): token-only, so no session can take an account."""
+    router = APIRouter(prefix="/api/admin/users", dependencies=[Depends(require_token)])
+
+    @router.post("/reset-password", status_code=204)
+    def reset_password(body: PasswordReset) -> Response:
+        try:
+            email = normalize_email(body.email)
+            check_password(body.password, min_length=min_password_length)
+        except InvalidEmail as exc:
+            raise HTTPException(status_code=422, detail="invalid_email") from exc
+        except WeakPassword as exc:
+            raise HTTPException(status_code=422, detail="invalid_password") from exc
+        try:
+            user = store.find_by_email(email)
+            if user is None:
+                raise HTTPException(status_code=404, detail="not_found")
+            store.set_password_hash(user.id, hasher.hash(body.password))
+            ended = store.delete_user_sessions(user.id)
+        except SQLAlchemyError as exc:
+            logger.exception("password reset failed")
+            raise HTTPException(status_code=503, detail="unavailable") from exc
+        limiter.clear(email)  # a locked-out owner is the case this exists for
+        logger.info("password reset user=%s sessions_ended=%d", user.id, ended)
+        return Response(status_code=204)
+
+    return router

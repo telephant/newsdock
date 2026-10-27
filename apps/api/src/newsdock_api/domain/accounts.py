@@ -192,6 +192,8 @@ class AccountStore(UserLookup, SessionStore, Protocol):
 
     def delete_expired(self, now: datetime, idle: timedelta) -> int: ...
 
+    def delete_user_sessions(self, user_id: str) -> int: ...
+
 
 class UsersStore(AccountStore, UserAdminStore, Protocol):
     """Everything the user-facing API needs; `SqlUsersRepo` implements it all."""
