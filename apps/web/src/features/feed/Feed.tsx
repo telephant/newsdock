@@ -1,23 +1,10 @@
 "use client";
 // Feed (AC-12): newest first, filters, agent score badge, keyset "load more",
 // 60 s polling refresh. All text rendered via React (escaped, never HTML).
-import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
 import { fetchFeed, type ArticleSummary, type FeedFilters } from "./api";
-
-function ScoreBadge({ scores }: { scores: ArticleSummary["scores"] }) {
-  if (!scores) return null;
-  return (
-    <span>
-      {Object.entries(scores).map(([agent, score]) => (
-        <em key={agent} title={agent}>
-          {score.toFixed(2)}
-        </em>
-      ))}
-    </span>
-  );
-}
+import { ArticleItem } from "./ArticleItem";
 
 export function Feed() {
   const { apiBaseUrl, pollMs, pageSize } = useRuntimeConfig();
@@ -77,19 +64,7 @@ export function Feed() {
       {error ? <p role="alert">{error}</p> : null}
       <ol>
         {articles.map((article) => (
-          <li key={article.article_id}>
-            <Link href={`/articles/${article.article_id}`}>
-              {article.title}
-            </Link>{" "}
-            <small>
-              {article.domain ?? "unknown"} ·{" "}
-              {new Date(article.published_at).toLocaleString()}
-            </small>{" "}
-            {article.source_count > 1 ? (
-              <small>· {article.source_count} sites</small>
-            ) : null}{" "}
-            <ScoreBadge scores={article.scores ?? null} />
-          </li>
+          <ArticleItem key={article.article_id} article={article} />
         ))}
       </ol>
       {nextBefore ? (
