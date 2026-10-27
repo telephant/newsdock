@@ -2,8 +2,13 @@
 // Main navigation (AC-9). Links follow the role; hiding one is cosmetic, the API
 // enforces every permission. Everything shown is a React text node (escaped).
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/client/api";
 import { asRole, canManageAgents, canManageUsers } from "./roles";
 import { useSession, useSessionDeps } from "./SessionProvider";
@@ -31,39 +36,70 @@ export function Nav() {
   }
 
   return (
-    <nav aria-label="main">
-      <Link href="/">Feed</Link> <Link href="/live">Live</Link>
-      {canManageAgents(role) ? (
-        <>
-          {" "}
-          <Link href="/admin/agents">Agents</Link>{" "}
-          <Link href="/admin/subscriptions">Subscriptions</Link>
-        </>
-      ) : null}
-      {canManageUsers(role) ? (
-        <>
-          {" "}
-          <Link href="/admin/users">Users</Link>
-        </>
-      ) : null}
+    <nav aria-label="main" className="flex min-w-0 items-center gap-2">
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+        <NavLink href="/">Feed</NavLink>
+        <NavLink href="/live">Live</NavLink>
+        {canManageAgents(role) ? (
+          <>
+            <NavLink href="/admin/agents">Agents</NavLink>
+            <NavLink href="/admin/subscriptions">Subscriptions</NavLink>
+          </>
+        ) : null}
+        {canManageUsers(role) ? (
+          <NavLink href="/admin/users">Users</NavLink>
+        ) : null}
+      </div>
       {session.status === "user" ? (
-        <span>
-          {" "}
-          <span>{session.user.email}</span> <small>{session.user.role}</small>{" "}
-          <button type="button" onClick={logout} disabled={leaving}>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="hidden text-sm text-muted-foreground sm:inline">
+            {session.user.email}
+          </span>
+          <Badge variant="secondary">{session.user.role}</Badge>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={logout}
+            disabled={leaving}
+          >
             Log out
-          </button>
-        </span>
+          </Button>
+        </div>
       ) : null}
       {session.status === "anonymous" && loginRequired ? (
-        <span>
-          {" "}
-          <Link href="/login">Log in</Link> <Link href="/signup">Sign up</Link>
-        </span>
+        <div className="ml-auto flex items-center gap-1">
+          <NavLink href="/login">Log in</NavLink>
+          <NavLink href="/signup">Sign up</NavLink>
+        </div>
       ) : null}
       {session.status === "unreachable" ? (
-        <p role="status">Cannot reach the server. Reload to try again.</p>
+        <Alert role="status" className="ml-auto w-auto py-1">
+          Cannot reach the server. Reload to try again.
+        </Alert>
       ) : null}
     </nav>
+  );
+}
+
+// A link styled as a ghost button; the current page is marked for assistive tech.
+function NavLink({ href, children }: { href: string; children: string }) {
+  const pathname = usePathname();
+  const current =
+    pathname !== null &&
+    (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  return (
+    <Link
+      href={href}
+      aria-current={current ? "page" : undefined}
+      className={cn(
+        buttonVariants({
+          variant: current ? "secondary" : "ghost",
+          size: "sm",
+        }),
+      )}
+    >
+      {children}
+    </Link>
   );
 }

@@ -7,13 +7,13 @@ gates: {init: approved, design: approved, plan: approved, implement: pending, ve
 acs:
   AC-1: {status: passing}  # TC-1 green, build + make build APP=web ok (T-01, 2026-10-27)
   AC-2: {status: passing}  # TC-2, TC-3 green (T-02, 2026-10-27)
-  AC-3: {status: todo}
+  AC-3: {status: passing}  # TC-4, TC-5 green (T-03, 2026-10-27)
   AC-4: {status: todo}
   AC-5: {status: todo}
   AC-6: {status: todo}
   AC-7: {status: todo}
   AC-8: {status: todo}
-  AC-9: {status: todo}
+  AC-9: {status: in-progress}  # toggle + stored choice green in jsdom (T-03); flash-free first paint is manual M-1 (T-09)
   AC-10: {status: todo}
   AC-11: {status: passing}  # TC-16, TC-17 green (T-02, 2026-10-27); every text pair >= 5.2:1 in both themes, ring >= 5.2:1
   AC-12: {status: todo}

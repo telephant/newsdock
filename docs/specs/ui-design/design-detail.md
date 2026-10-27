@@ -44,6 +44,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 - Header content: wordmark `newsdock` (green dot + text, a `<span>`), nav links (`aria-current="page"` from `usePathname`), spacer, user area (email hidden below `sm`, role `Badge`, `Log out` ghost button), `ThemeToggle` (icon button, `aria-label="Toggle theme"`). Below `sm` the nav scrolls horizontally inside its own row (`overflow-x-auto`), never the page.
 - Host-mismatch alert and the "Cannot reach the server" status render as `Alert` (`role="alert"` / `role="status"` kept).
 
+**As built (T-03, 2026-10-27):** `AppShell` takes the nav as a `nav` prop that `layout.tsx` fills with `features/auth/Nav`, so `components/` imports no feature code. `ThemeToggle` renders both icons and lets CSS pick one (no mounted flag). `<main>` is `max-w-5xl`; the feed, article and form screens narrow themselves to `max-w-3xl` / `max-w-sm` in their own tasks. The host-mismatch notice is an `Alert` passed as `notice`. Tests for `next-themes` must stub `matchMedia` including `addListener`/`removeListener`. Verified in a production build: the server HTML carries the skip link, the toggle and next-themes' inline script (`localStorage`, `prefers-color-scheme`), run before paint.
+
 ## 4. Screens
 
 | Route | Component | Look |

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { connection } from "next/server";
+import { AppShell } from "@/components/AppShell";
 import { ConfigProvider } from "@/components/ConfigProvider";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { Nav } from "@/features/auth/Nav";
 import { SessionProvider } from "@/features/auth/SessionProvider";
 import { getRuntimeConfig } from "@/lib/config/runtime";
@@ -25,15 +27,17 @@ export default async function RootLayout({
   // hostnames that cannot share the login cookie, so say so instead of failing quietly
   const hostProblem = (await headers()).get(MISMATCH_HEADER);
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>
-        {hostProblem ? <p role="alert">{hostProblem}</p> : null}
-        <ConfigProvider value={config}>
-          <SessionProvider>
-            <Nav />
-            {children}
-          </SessionProvider>
-        </ConfigProvider>
+        <ThemeProvider>
+          <ConfigProvider value={config}>
+            <SessionProvider>
+              <AppShell nav={<Nav />} notice={hostProblem}>
+                {children}
+              </AppShell>
+            </SessionProvider>
+          </ConfigProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
