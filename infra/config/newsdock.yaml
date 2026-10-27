@@ -34,6 +34,14 @@ api:
   sse_max_streams_per_agent: 5        # concurrent SSE streams per agent (429 above)
   sse_keepalive_seconds: 15           # ': ping' interval; also the revoked-key re-check
   sse_fallback_poll_seconds: 30       # re-query even without a NOTIFY (listener outage)
+  auth_signup_open: true              # false closes self-sign-up (ADR-0020, spec D-3)
+  auth_min_pw_length: 10
+  auth_session_idle_hours: 12         # a session unused this long ends
+  auth_session_absolute_days: 7       # and no session outlives this
+  auth_login_max_failures: 5          # wrong passwords per account inside the window (429 above); 0 = off
+  auth_login_window_minutes: 15
+  auth_cookie_secure: false           # set true when served over HTTPS
+  auth_cookie_name: newsdock_session
 agent: {}
 web:                              # read at web server start (ADR-0014); env NEWSDOCK_WEB_* wins
   api_base_url: http://127.0.0.1:8000   # what the BROWSER calls (the host-published API)

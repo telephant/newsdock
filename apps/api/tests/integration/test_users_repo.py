@@ -275,3 +275,13 @@ def test_delete_expired_removes_absolute_and_idle_expired_rows(
     assert repo.find_session("fresh") is not None
     assert repo.find_session("absolute-gone") is None
     assert repo.find_session("idle-gone") is None
+
+
+def test_set_password_hash_replaces_only_the_hash(repo: SqlUsersRepo) -> None:
+    user = repo.create_user("p@x.io", "old-hash")
+    assert repo.set_password_hash(user.id, "new-hash")
+    after = repo.get_by_id(user.id)
+    assert after is not None and after.password_hash == "new-hash"
+    assert (after.email, after.role) == (user.email, user.role)
+    assert not repo.set_password_hash(NO_SUCH_UUID, "x")
+    assert not repo.set_password_hash("not-a-uuid", "x")

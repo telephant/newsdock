@@ -4,7 +4,9 @@ Pure, no I/O. Hashing is a port (`PasswordHasher`): the argon2 adapter lives in
 `adapters/passwords.py`. Nothing here logs or returns a password or a hash.
 """
 
+import hashlib
 import re
+import secrets
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import NamedTuple, Protocol
@@ -128,6 +130,20 @@ class UserLookup(Protocol):
     def find_by_email(self, email: str) -> StoredUser | None: ...
 
 
+class AccountStore(UserLookup, Protocol):
+    """What the sign-up and login routes need from persistence."""
+
+    def create_user(self, email: str, password_hash: str) -> StoredUser: ...
+
+    def set_password_hash(self, user_id: str, password_hash: str) -> bool: ...
+
+    def create_session(
+        self, user_id: str, token_hash: str, now: datetime, expires_at: datetime
+    ) -> None: ...
+
+    def delete_expired(self, now: datetime, idle: timedelta) -> int: ...
+
+
 class LoginResult(NamedTuple):
     user: StoredUser
     rehash: bool  # the stored hash uses weaker parameters than today's
@@ -153,6 +169,19 @@ def verify_login(
     if user is None or not matched:
         raise InvalidCredentials
     return LoginResult(user, hasher.needs_rehash(user.password_hash))
+
+
+SESSION_TOKEN_BYTES = 32
+
+
+def new_session_token() -> str:
+    """The cookie value: 256 random bits, base64url. Never stored, only hashed."""
+    return secrets.token_urlsafe(SESSION_TOKEN_BYTES)
+
+
+def hash_token(token: str) -> str:
+    """What the database stores for a session (sha256 is right for random input)."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 
 def session_expiry(created_at: datetime, absolute: timedelta) -> datetime:

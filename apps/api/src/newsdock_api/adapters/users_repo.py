@@ -96,6 +96,16 @@ class SqlUsersRepo:
                 for r in rows
             ]
 
+    def set_password_hash(self, user_id: str, password_hash: str) -> bool:
+        key = as_uuid(user_id)
+        if key is None:
+            return False
+        with Session(self._engine) as session, session.begin():
+            result = session.execute(
+                update(User).where(User.id == key).values(password_hash=password_hash)
+            )
+            return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
+
     def set_role(self, user_id: str, role: Role) -> bool:
         """False if the user is absent; LastOwner if it would drop the last owner."""
         key = as_uuid(user_id)
