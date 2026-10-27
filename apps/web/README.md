@@ -8,6 +8,10 @@ Browse the news feed, filter it and see agent scores (M1). Since M2 `ui-login`: 
 
 Login plumbing: `src/proxy.ts` (Next 16's proxy) redirects `localhost` to the API's hostname and sends visitors without the session cookie to `/login` (an optimistic gate; the API decides every permission); `src/lib/client/api.ts` is the credentialed fetch wrapper (a 401 goes to `/login`); `src/features/auth/` holds the session provider, the forms and the navigation. Settings in the `web:` section: `api_base_url`, `poll_ms`, `page_size`, `session_cookie` (must equal `api.auth_cookie_name`), `login_required`. Open the app at `http://127.0.0.1:3000`.
 
+## Styling (M2c `ui-design`, ADR-0022)
+
+shadcn/ui components (Base UI primitives, copied into `src/components/ui` by the shadcn CLI) on Tailwind CSS v4, with `lucide-react` icons and `next-themes` for light/dark (class strategy, follows the system, toggle in the header). All colours are tokens in `src/app/globals.css`; feature code uses semantic classes (`bg-card`, `text-muted-foreground`, `bg-primary`), never hex values or palette classes. `make style-web` (part of `check-web`) enforces that, bans `dangerouslySetInnerHTML` and checks token contrast (WCAG AA). System fonts only, no web-font download. Add a primitive with `pnpm dlx shadcn@latest add <name>`, then replace the generated `import { cn } from "cn"` with `"@/lib/utils"` (the CLI's `cn` package is not used here). Shared pieces without data fetching live in `src/components/` (`AppShell`, `PageHeader`, `EmptyState`, `ErrorAlert`, `ListSkeleton`, `ConfirmDialog`).
+
 ## Entrypoint
 
 `src/app/page.tsx` (App Router). `pnpm --dir apps/web run dev` starts the dev server. The production image serves `.next/standalone/server.js`.
@@ -16,13 +20,14 @@ Folders (rule DR-12): `src/app/` thin routes, `src/features/<name>/` feature cod
 
 ## Dependencies
 
-Next.js 16.3.8, React 19.2.8, TypeScript ^5, ESLint ^9, Prettier, Vitest with Testing Library. Node 24 LTS is provisioned by pnpm from `devEngines.runtime` in `package.json`; no Node on PATH is required. Versions and reasons: `docs/adr/0009-web-toolchain-and-node-pin.md`.
+Next.js 16.3.8, React 19.2.8, TypeScript ^5, Tailwind CSS 4 with `@tailwindcss/postcss`, shadcn/ui (`@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`), `lucide-react`, `next-themes`, `sonner`, ESLint ^9, Prettier, Vitest with Testing Library. Node 24 LTS is provisioned by pnpm from `devEngines.runtime` in `package.json`; no Node on PATH is required. Versions and reasons: `docs/adr/0009-web-toolchain-and-node-pin.md`.
 
 ## Run/Test
 
 ```bash
 make setup-web          # pnpm install --frozen-lockfile
 make test APP=web       # vitest
-make check-web          # lint, format check, type check, tests
+make check-web          # style rules, lint, format check, type check, tests
+make style-web          # only the colour-token and contrast rules
 make build APP=web      # build the image newsdock-web:dev
 ```
