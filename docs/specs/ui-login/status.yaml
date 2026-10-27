@@ -13,9 +13,9 @@ acs:
   AC-7: {status: passing}  # TC-16, TC-17 green (T-05, 2026-10-27)
   AC-8: {status: in-progress}  # TC-18..TC-21 green (T-10, T-11, 2026-10-27); manual TC-22 pending (T-14)
   AC-9: {status: passing}  # TC-23, TC-24, TC-25 green (T-02, T-06, T-11, 2026-10-27)
-  AC-10: {status: in-progress}  # API half green (T-03, T-06); users screen TC-27 pending
-  AC-11: {status: todo}
-  AC-12: {status: in-progress}  # API half green (T-06); subscriptions screen TC-31 pending
+  AC-10: {status: passing}  # TC-26, TC-27 green (T-03, T-06, T-12, 2026-10-27)
+  AC-11: {status: in-progress}  # TC-28 green (T-12, 2026-10-27); manual TC-29 pending (T-14)
+  AC-12: {status: passing}  # TC-30, TC-31 green (T-06, T-12, 2026-10-27)
   AC-13: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
   AC-14: {status: passing}  # TC-35 green (T-05, T-06, 2026-10-27)
   AC-15: {status: in-progress}  # API half green: TC-36, TC-37 (T-09, 2026-10-27); live page TC-38 and manual TC-39 pending
