@@ -37,6 +37,7 @@ IGNORED = {
     ".import_linter_cache",
     ".next",
     ".DS_Store",
+    ".claude",  # Claude Code local state (worktrees, scheduled-task lock)
 }
 PYTHON_APPS = ("ingester", "processor", "sink", "api", "agent")
 APP_NAMES = {*PYTHON_APPS, "web"}

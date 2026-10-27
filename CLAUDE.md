@@ -4,7 +4,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 
 ## Status
 - Stage: M0 `foundation` and M1 `mvp` both done and verified (M1: pass with follow-ups, 2026-10-05 — all 15 ACs, agent F1 0.83, live end-to-end run; see `docs/specs/mvp/verify.md`). M2a `dedup-syndication` done (verified 2026-10-09, pass with follow-ups). M2b `externalize-config` done (spec `docs/specs/externalize-config/`). M2 part 1 `agent-platform` done (agent registry, API keys, per-agent cursors, rate limit; spec `docs/specs/agent-platform/`, verified 2026-10-14, pass with follow-ups). M2 part 2 `push-delivery` done (saved filters + SSE streams over Postgres NOTIFY; spec `docs/specs/push-delivery/`, verified 2026-10-14, pass with follow-ups). Next: `ui-login` (M2 is split in three specs, roadmap) via `/spec-init`.
-- Roadmap: `docs/roadmap.md` (current milestone: M2b).
+- Roadmap: `docs/roadmap.md` (current milestone: M2, next spec `ui-login`).
 - Source of truth, in this order: `docs/specs/mvp/spec.md` (ACs) → `docs/specs/mvp/design.md` → `docs/adr/` → `docs/specs/mvp/design-detail.md`.
 - Real GDELT evidence and a sample row: `docs/research.md`. Check it before assuming anything about the data.
 - Open items: `docs/specs/mvp/backlog.md` ("Design TODOs").
