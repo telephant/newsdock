@@ -1,6 +1,6 @@
 # ui-login — Spec (Milestone 2, part 3 of 3: human accounts, roles, sessions, management screens)
 
-Status: init approved · 2026-10-27 · design approved · 2026-10-27 (added D-9, D-10, AC-16)
+Status: init approved · 2026-10-27 · design approved · 2026-10-27 (added D-9, D-10, AC-16) · implemented 2026-10-27, verification pending
 
 ## 0. Review guide
 

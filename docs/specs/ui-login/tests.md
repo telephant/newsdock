@@ -68,13 +68,25 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 3. Log out in another tab: the live page's stream ends within about 15 s and the page shows the signed-out state.
 4. `curl -N http://127.0.0.1:8000/api/live` returns 401.
 
+## Manual run results (2026-10-27, T-14)
+
+Run in a real Chrome (headless, DevTools protocol) against the real containers `postgres`, `migrate`, `api` and `web` built from this branch (compose project `newsdock-t14`, own volume; no Kafka, ingester or demo agent, no real GDELT data; the developer's own project and volume were not touched). 31 of 31 checks passed; screenshots were looked at for the key panel and the live page.
+
+| Checklist | Result |
+|---|---|
+| **M-1** (TC-22, AC-8) | pass. `http://localhost:3000/` ended on `http://127.0.0.1:3000/login?next=%2F`; wrong password shows one generic message; the first sign-up is the owner (nav: Feed, Live, Agents, Subscriptions, Users, role shown); a second account is a viewer (Feed, Live only); logging out and clearing cookies gates the pages again; with the API container stopped the page stays put with "Cannot reach the server" (no redirect to login), and after the API is back the session still works |
+| **M-2** (TC-29, AC-11) | pass. The owner promoted the viewer to admin in `/admin/users`; demoting the only owner was refused with a clear message; the admin saw Agents and Subscriptions but not Users, and `/admin/users` showed a permission message (API 403); creating `demo-x` showed `ndk_<prefix>_<secret>` once with a warning and a Copy button; after a reload the key was gone; `/mcp initialize` with it answered 200, and 401 after the confirmed revoke; disable and enable worked; a second key replaced the panel; with it the agent created a subscription, the subscriptions screen listed it, the confirmed delete removed it and the agent's stream for it answered 404 |
+| **M-3** (TC-39, AC-15) | pass. `/live` said Live; a row inserted with SQL appeared in 113 ms with no reload (a page marker survived); anonymous `GET /api/live` was 401; logging out in a second tab made the first tab leave `/live` for `/login` after 18 s (the keep-alive is 15 s) |
+
+Not covered: Safari and Firefox; the full 8-service `make up` (Kafka pipeline, real GDELT ingestion, demo agent); step M-3.2 used an SQL insert instead of waiting for an ingest slot (the checklist allows it).
+
 ## Measurements (provisional targets, not pass/fail)
 
 | Id | What | How |
 |---|---|---|
 | M-a | argon2 time per hash and per failed login | `time` 20 hashes with the default `PasswordHasher` parameters in T-01; record median and p95; tune parameters only with the user's approval |
 | M-b | Unknown-email vs wrong-password response time gap | 200 requests each against the real app; record the median difference (target: no systematic gap beyond noise) |
-| M-c | Insert → live event latency | TC-36 timestamps from commit to frame, 20 samples with the real listener; record median and max (expect well under `sse_keepalive_seconds`) |
+| M-c | Insert → live event latency | TC-36 timestamps from commit to frame, 20 samples with the real listener; record median and max (expect well under `sse_keepalive_seconds`). **Measured 2026-10-27 (T-09): median 13 ms, max 19 ms.** In the real-browser run one insert reached the page in 113 ms |
 | M-d | Default lifetimes and limit (12 h idle, 7 d absolute, 5 per 15 min, min password 10) | not measurable; confirmed by the user at /spec-design, kept as settings |
 
 ## Coverage

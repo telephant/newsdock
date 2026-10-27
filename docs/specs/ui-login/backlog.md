@@ -12,4 +12,10 @@ Priority: P1 next, P2 soon, P3 later.
 - **MFA / OAuth / SSO (P3).**
 - **Editing subscriptions in the UI (P3):** agents own them today.
 - **Richer filters (P3).**
+- **Rate-limit sign-up (P2):** open sign-up has no limiter, so a flood creates viewer rows (spec risk 1); `auth_signup_open: false` is the only brake today.
+- **Other browsers (P3):** the cross-port cookie and `EventSource` behaviour was verified in Chrome only; repeat M-1 and M-3 in Safari and Firefox.
+- **Stream keeps the session alive (P3):** an open live page refreshes `last_seen_at` through the keep-alive check, so an open tab never idles out (it still ends at the 7-day absolute limit); decide whether the stream should leave `last_seen_at` alone.
+- **Login throttle is per process (P3):** failure counters live in memory (one API worker); move them to Postgres before running more than one worker.
+- **Unstyled UI (P3):** all new screens are plain HTML; a design pass belongs with the UI work in a later milestone.
+- **Full `make test-infra` and a real `make up` run (verify):** only the DB-backed scenes and an isolated api+web stack were run during implementation; `/spec-verify` runs every scene and the full stack.
 - **Cloud deployment with TLS (M5):** `Secure` cookies on by default.

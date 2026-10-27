@@ -2,7 +2,7 @@ feature: ui-login
 stage: implement
 updated: 2026-10-27
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided, D-10: decided}
-gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: pending}
 acs:
   AC-1: {status: passing}  # TC-1, TC-2, TC-3, TC-4 green (T-03..T-08, 2026-10-27)
   AC-2: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
@@ -11,12 +11,12 @@ acs:
   AC-5: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
   AC-6: {status: passing}  # TC-13, TC-14, TC-15 green (T-02, T-05, 2026-10-27)
   AC-7: {status: passing}  # TC-16, TC-17 green (T-05, 2026-10-27)
-  AC-8: {status: in-progress}  # TC-18..TC-21 green (T-10, T-11, 2026-10-27); manual TC-22 pending (T-14)
+  AC-8: {status: manual-ok}  # TC-18..TC-21 green (T-10, T-11); TC-22 manual run 2026-10-27 (T-14)
   AC-9: {status: passing}  # TC-23, TC-24, TC-25 green (T-02, T-06, T-11, 2026-10-27)
   AC-10: {status: passing}  # TC-26, TC-27 green (T-03, T-06, T-12, 2026-10-27)
-  AC-11: {status: in-progress}  # TC-28 green (T-12, 2026-10-27); manual TC-29 pending (T-14)
+  AC-11: {status: manual-ok}  # TC-28 green (T-12); TC-29 manual run 2026-10-27 (T-14)
   AC-12: {status: passing}  # TC-30, TC-31 green (T-06, T-12, 2026-10-27)
   AC-13: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
   AC-14: {status: passing}  # TC-35 green (T-05, T-06, 2026-10-27)
-  AC-15: {status: in-progress}  # TC-36, TC-37, TC-38 green (T-09, T-13, 2026-10-27); manual TC-39 pending (T-14)
+  AC-15: {status: manual-ok}  # TC-36..TC-38 green (T-09, T-13); TC-39 manual run 2026-10-27 (T-14)
   AC-16: {status: passing}  # TC-40, TC-41 green (T-08, 2026-10-27)
