@@ -12,8 +12,9 @@ BEFORE = json.loads(
     (ROOT / "infra/scripts/tests/fixtures/config_defaults_before.json").read_text()
 )["api"]
 NEW_DEFAULTS = {
-    "cors_allow_methods": "GET",
-    "cors_allow_headers": "*",
+    "cors_allow_methods": "GET,POST,PATCH,DELETE",  # ui-login: writes (ADR-0021)
+    "cors_allow_headers": "Content-Type,Last-Event-ID",
+    "cors_allow_cookies": True,
     "first_run_window_minutes": 60,
     "max_payload_bytes": 65536,
     "search_page_default": 20,

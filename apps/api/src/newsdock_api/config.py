@@ -21,8 +21,11 @@ class Settings(LayeredSettings):
     mcp_allowed_hosts: str = "localhost:*,127.0.0.1:*,api:*"
     # Browser origins allowed on /api/* (the web UI); local-only MVP
     cors_origins: str = "http://127.0.0.1:3000,http://localhost:3000"
-    cors_allow_methods: str = "GET"
-    cors_allow_headers: str = "*"
+    # ui-login (ADR-0021): the browser sends the session cookie, so credentials are
+    # allowed and the lists are explicit (a wildcard is not honoured with cookies)
+    cors_allow_cookies: bool = True
+    cors_allow_methods: str = "GET,POST,PATCH,DELETE"
+    cors_allow_headers: str = "Content-Type,Last-Event-ID"
     # Service limits (spec AC-11): first-run window, payload cap, page sizes
     first_run_window_minutes: int = 60
     max_payload_bytes: int = 64 * 1024

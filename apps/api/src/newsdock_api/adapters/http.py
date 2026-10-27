@@ -213,6 +213,7 @@ def create_app(
     app.add_middleware(  # the web UI calls /api/* from the browser (TC-25)
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
+        allow_credentials=settings.cors_allow_cookies,
         allow_methods=settings.cors_methods_list,
         allow_headers=settings.cors_headers_list,
     )
