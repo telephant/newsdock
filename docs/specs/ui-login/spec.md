@@ -1,6 +1,6 @@
 # ui-login — Spec (Milestone 2, part 3 of 3: human accounts, roles, sessions, management screens)
 
-Status: init approved · 2026-10-27
+Status: init approved · 2026-10-27 · design approved · 2026-10-27 (added D-9, D-10, AC-16)
 
 ## 0. Review guide
 
@@ -31,12 +31,14 @@ flowchart LR
 | D-6 | Sessions and passwords | Decided **[assumption]**: random opaque session id in an `httpOnly`, `SameSite=Lax` cookie, stored hashed in Postgres with idle and absolute expiry; passwords hashed with argon2id (ADR-0016 already says so). Conventional default, not asked |
 | D-7 | Admin token | Decided **[assumption]**: `NEWSDOCK_ADMIN_TOKEN` stays only as a break-glass path for the CLI (`make agent-create`); the UI path uses roles. Admin routes accept the token or an admin/owner session |
 | D-8 | Live feed source | Decided **[assumption]**: the live feed is a session-authenticated SSE stream of new articles with an optional ad-hoc filter. It is not a saved subscription and not bound to an agent |
+| D-9 | Owner recovery | Decided: `make user-reset-password EMAIL=<email>` sets a new password through a token-only admin route (user choice, 2026-10-27, at /spec-design) |
+| D-10 | Browser to API | Decided: credentialed CORS, no proxy (ADR-0021, 2026-10-27, at /spec-design) |
 
 No open decisions.
 
 ### Open risks
 1. **Open sign-up on a service that holds article data and agent keys (D-3).** Anyone who can reach the web port can register a `viewer` account and read articles. Mitigations: viewer is read-only, `auth.signup_open: false` closes it, README states it. No email verification in this milestone.
-2. **Cookie vs. cross-origin.** The UI (port 3000) and API (port 8000) are different origins and CORS currently allows only `GET` without credentials. The design must choose between a Next.js same-origin proxy and credentialed CORS.
+2. **Cookie vs. cross-origin (decided D-10, ADR-0021).** Credentialed CORS needs page and API on one hostname and an Origin allowlist as the CSRF guard; the web server redirects to the API's host.
 3. **Brute force on login.** Mitigated by a per-account/IP failure limit (AC-13); no CAPTCHA, no MFA.
 4. **First-account race.** Two simultaneous first sign-ups must not both become owner (needs a DB-level guard).
 5. **SSE through the Next.js layer** (buffering, timeouts) is untested in this repo **[assumption]**.
@@ -55,7 +57,7 @@ Anyone who reaches the API can read every article, and managing agents needs a s
 | Reads are no longer anonymous | AC-7, AC-8 |
 | Agents and keys are managed in the UI | AC-11, AC-14 |
 | Subscriptions are visible and a live feed works | AC-12, AC-15 |
-| Credentials are handled safely | AC-4…AC-6, AC-13; NFR-1 |
+| Credentials are handled safely | AC-4…AC-6, AC-13, AC-16; NFR-1 |
 
 Learning goals: password storage and session design, cookie security, role-based authorization, authenticated SSE in a browser, Next.js auth middleware.
 
@@ -78,6 +80,7 @@ Learning goals: password storage and session design, cookie security, role-based
 - Screens: users (owner), agents and keys (admin+), subscriptions (admin+, view and delete), live feed (all roles).
 - Login failure rate limit; `auth.signup_open` and session lifetime settings in `newsdock.yaml`.
 - Admin routes accept admin/owner session or the admin token (D-7).
+- Owner recovery: `make user-reset-password` through a token-only admin route (D-9).
 
 **Out** (backlog)
 - Email verification, password reset by email, invites, OAuth/SSO, MFA, CAPTCHA.
@@ -93,7 +96,7 @@ Learning goals: password storage and session design, cookie security, role-based
 - **Admin** creates an agent, copies the key once, revokes keys, disables agents, views and deletes subscriptions.
 - **Owner** also lists users and changes roles or removes users.
 - **Agent** is unchanged: `Authorization: Bearer ndk_…` on `/mcp`, `/api/subscriptions*` and article reads.
-- **Operator** can still run `make agent-create` with the admin token.
+- **Operator** can still run `make agent-create` with the admin token, and `make user-reset-password` when an owner is locked out.
 
 ## 6. Acceptance criteria
 
@@ -187,6 +190,12 @@ AC-15  Live feed
   When  a new article row is committed to the database
   Then  it appears on the page without a reload within the keep-alive/notify delay, and an anonymous request to the stream returns 401
   Verify: manual
+
+AC-16  Owner recovery by CLI
+  Given an account a@x.io with an active session and NEWSDOCK_ADMIN_TOKEN set
+  When  the reset-password route is called with the admin token, and then with an admin session
+  Then  the token call returns 204, the old password and the old session get 401, the new password logs in, and the session call returns 403
+  Verify: auto
 ```
 
 Provisional targets (measure first, not requirements): argon2 time per hash under about 200 ms on the dev machine; idle session 12 h and absolute 7 d; login limit 5 failures per 15 min; minimum password length 10.
@@ -202,7 +211,7 @@ Provisional targets (measure first, not requirements): argon2 time per hash unde
 
 - Local docker-compose, plain HTTP; `Secure` cookie flag is configurable and off locally **[assumption]**.
 - One browser origin set (`WEB_PORT`) is enough; no custom domains.
-- `auth.required=false` (dev mode) skips login gating entirely, matching agent-platform D-5 **[assumption]**.
+- `auth_required=false` (dev mode) opens article reads and the live feed and removes the UI gate, matching agent-platform D-5; user and agent management stay behind a principal (refined at /spec-design, 2026-10-27) **[assumption]**.
 
 ## Glossary
 
