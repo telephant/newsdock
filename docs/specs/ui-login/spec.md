@@ -1,6 +1,6 @@
 # ui-login — Spec (Milestone 2, part 3 of 3: human accounts, roles, sessions, management screens)
 
-Status: init approved · 2026-10-27 · design approved · 2026-10-27 (added D-9, D-10, AC-16) · implemented 2026-10-27, verification pending
+Status: init approved · 2026-10-27 · design approved · 2026-10-27 (added D-9, D-10, AC-16) · implemented 2026-10-27 · verified 2026-10-27 (pass with follow-ups, see verify.md)
 
 ## 0. Review guide
 
@@ -64,7 +64,7 @@ Learning goals: password storage and session design, cookie security, role-based
 ## 3. Data and reality findings
 
 - **[verified 2026-10-27]** API routes today: `GET /api/articles`, `GET /api/articles/{id}`, `GET /api/health` (open); `/api/subscriptions` (agent key, `POST/GET/DELETE`, `GET /{id}/stream` SSE); `/api/admin/agents`, `/keys`, `/disable`, `/enable`, `/api/admin/subscriptions` (admin token).
-- **[verified 2026-10-27]** `apps/api/.../config.py` sets `cors_allow_methods = "GET"` and local origins only, so state-changing browser calls need a config or proxy change.
+- **[verified 2026-10-27]** `apps/api/.../config.py` sets `cors_allow_methods = "GET"` and local origins only, so state-changing browser calls need a config or proxy change (state before this spec; ADR-0021 chose credentialed CORS and T-07 changed the defaults).
 - **[verified 2026-10-27]** Latest migration is `0005_subscriptions`; this spec adds users and sessions as `0006`.
 - **[verified 2026-10-27]** `apps/web/src` has `app/`, `components/`, `features/{article,feed}`, `lib/{api,config}`; the UI reads only public REST.
 - **[verified 2026-10-27, T-01 spike, headless Chrome]** A page on `http://localhost:3000` that logs in against `http://localhost:8000` gets an `httpOnly; SameSite=Lax` cookie and sends it on credentialed `fetch` and on `EventSource` with `withCredentials`; the browser's automatic `Last-Event-ID` on reconnect passes CORS. Against `http://127.0.0.1:8000` from the `localhost` page the cookie is not sent (401), so hostname alignment is required. Only Chrome was tested; Safari and Firefox are **[memory]**. Browsers' `EventSource` cannot set custom headers, so a cookie session suits SSE (this is why the agent stream needs a key header and the human one does not).

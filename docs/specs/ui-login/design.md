@@ -55,7 +55,7 @@ Routes (all JSON, errors `{"error": code}` or FastAPI `detail`):
 
 Tables (detail in design-detail §1): `users(id, email unique lower, password_hash, role, created_at)`, `sessions(token_hash pk, user_id fk cascade, created_at, last_seen_at, expires_at)`. Role is a text column with a CHECK in (`owner`,`admin`,`viewer`).
 
-Settings (flat keys in `api:`, defaults in code): `auth_signup_open` true, `auth_min_pw_length` 10, `auth_session_idle_hours` 12, `auth_session_absolute_days` 7, `auth_login_max_failures` 5, `auth_login_window_minutes` 15, `auth_cookie_secure` false, `live_max_streams_per_user` 3. Web: no setting changes. CORS: `cors_allow_cookies` true, `cors_allow_methods` `GET,POST,PATCH,DELETE`, `cors_allow_headers` `Content-Type,Last-Event-ID` (explicit, no `*`), `cors_origins` unchanged.
+Settings (flat keys in `api:`, defaults in code): `auth_signup_open` true, `auth_min_pw_length` 10, `auth_session_idle_hours` 12, `auth_session_absolute_days` 7, `auth_login_max_failures` 5, `auth_login_window_minutes` 15, `auth_cookie_secure` false, `auth_cookie_name` `newsdock_session`, `live_max_streams_per_user` 3. Web (two keys added at T-10): `session_cookie` (default `newsdock_session`, must equal `auth_cookie_name`) and `login_required` (default true; false only in the open dev mode). CORS: `cors_allow_cookies` true, `cors_allow_methods` `GET,POST,PATCH,DELETE`, `cors_allow_headers` `Content-Type,Last-Event-ID` (explicit, no `*`), `cors_origins` unchanged.
 
 ## Tricky parts
 

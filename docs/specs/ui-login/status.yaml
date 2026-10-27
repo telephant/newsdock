@@ -1,8 +1,8 @@
 feature: ui-login
-stage: implement
+stage: done
 updated: 2026-10-27
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided, D-10: decided}
-gates: {init: approved, design: approved, plan: approved, implement: approved, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}
 acs:
   AC-1: {status: passing}  # TC-1, TC-2, TC-3, TC-4 green (T-03..T-08, 2026-10-27)
   AC-2: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)

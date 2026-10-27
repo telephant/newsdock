@@ -11,7 +11,7 @@ users
   password_hash text not null            -- argon2id PHC string
   role          text not null check (role in ('owner','admin','viewer'))
   created_at    timestamptz not null default now()
-  unique index users_email_key on (email)
+  unique constraint uq_users_email on (email)  -- plus check constraint ck_users_role
 
 sessions
   token_hash    text pk                  -- sha256 hex of the cookie value
@@ -19,8 +19,8 @@ sessions
   created_at    timestamptz not null default now()
   last_seen_at  timestamptz not null default now()
   expires_at    timestamptz not null     -- created_at + absolute lifetime
-  index sessions_user_idx on (user_id)
-  index sessions_expires_idx on (expires_at)
+  index ix_sessions_user_id on (user_id)
+  index ix_sessions_expires_at on (expires_at)
 ```
 
 The sink's 7-day retention does not touch these tables. `agents` and `api_keys` are unchanged; agents are not owned by users in this milestone (an admin sees all agents) **[assumption]**.
@@ -60,7 +60,7 @@ Rate limiting: agents keep the per-key fixed window. Humans are not rate-limited
 `DELETE /api/admin/subscriptions/{id}`: new `SubscriptionStore.delete_any(sub_id) -> bool` (SQL `DELETE … WHERE id = :id`), 204 or 404. Open agent streams already re-check `subscriptions.exists` on each keep-alive tick (push-delivery), so they end within `sse_keepalive_seconds`; a new stream request is 404 at once.
 
 ### Recovery route (C-17)
-`POST /api/admin/users/reset-password` body `{email, password}`: **admin-token principal only** (an admin or owner *session* gets 403, so an admin cannot take over the owner account). Applies the password policy, replaces the hash, deletes every session of that user, returns 204; unknown email 404. `make user-reset-password EMAIL=<email>` reads the new password with `read -s` (not an argument, not in shell history), then posts it with curl exactly like `make agent-create` (needs `NEWSDOCK_ADMIN_TOKEN` in `.env`). If no admin token is configured the route does not exist (404), as the other admin routes.
+`POST /api/admin/users/reset-password` body `{email, password}`: **admin-token principal only** (an admin or owner *session* gets 403, so an admin cannot take over the owner account). Applies the password policy, replaces the hash, deletes every session of that user, returns 204; unknown email 404. `make user-reset-password EMAIL=<email>` reads the new password with `read -s` (not an argument, not in shell history), then posts it with curl (needs `NEWSDOCK_ADMIN_TOKEN` in `.env`). Unlike `make agent-create`, the body goes through stdin and the token through a mode-600 header file (`curl -H @file`), so neither shows up in `ps`; the logic is `infra/scripts/user_reset_password.sh`. If no admin token is configured this route does not exist (404). The other admin routes no longer hide behind the token: admins and owners reach them with a session (ADR-0016 amendment). A reset also clears the login-failure counter of that email.
 
 ## 3. Auth routes (C-13)
 
@@ -80,7 +80,7 @@ Cookie attributes: `HttpOnly; SameSite=Lax; Path=/; Max-Age=<absolute>`; `Secure
 1. Normalize email. If the failure counter for it is at the limit → 429 `Retry-After: <seconds left in window>` before any hashing (AC-13).
 2. Load user. Verify the password against the user's hash, or against a module-level dummy hash when absent (equal work, AC-5).
 3. On failure: increment counter, 401 `{"error":"invalid_credentials"}` (same body for unknown email).
-4. On success: clear counter, optionally rehash if `check_needs_rehash`, create session (`secrets.token_urlsafe(32)`, store sha256), delete this user's expired sessions, set cookie.
+4. On success: clear counter, optionally rehash if `check_needs_rehash`, create session (`secrets.token_urlsafe(32)`, store sha256), delete expired sessions (`delete_expired`, absolute and idle expiry, for all users: one cheap statement), set cookie.
 
 argon2-cffi `PasswordHasher()` defaults are used as is: argon2id v19, t=3, m=64 MiB, p=4, 16-byte salt, 32-byte hash. **[verified 2026-10-27, T-01, dev machine]** median 22.5 ms, p95 23.7 ms per hash; a wrong-password verify takes 23.6 ms median, so the 200 ms target holds with a wide margin and no tuning is proposed. Hashing runs in `run_in_threadpool`.
 
