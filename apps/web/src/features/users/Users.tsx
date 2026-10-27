@@ -79,11 +79,11 @@ export function Users({ confirm: answer }: { confirm?: ConfirmFn }) {
         <EmptyState title="No users yet" />
       ) : (
         <div className="rounded-xl border border-border bg-card">
-          <Table>
+          <Table className="sm:min-w-[34rem]">
             <TableHeader>
               <TableRow>
                 <TableHead>Email</TableHead>
-                <TableHead>Created</TableHead>
+                <TableHead className="max-sm:hidden">Created</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead />
               </TableRow>
@@ -91,10 +91,10 @@ export function Users({ confirm: answer }: { confirm?: ConfirmFn }) {
             <TableBody>
               {remote.data.map((user) => (
                 <TableRow key={user.id}>
-                  <TableCell className="font-medium break-all whitespace-normal">
+                  <TableCell className="max-w-[18rem] font-medium break-all whitespace-normal">
                     {user.email}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground max-sm:hidden">
                     {formatTime(user.created_at)}
                   </TableCell>
                   <TableCell>

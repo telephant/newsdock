@@ -37,7 +37,8 @@ export function Nav() {
 
   return (
     <nav aria-label="main" className="flex min-w-0 items-center gap-2">
-      <div className="flex min-w-0 items-center gap-1 overflow-x-auto">
+      {/* on a phone the links scroll sideways; the fade at the right edge says so */}
+      <div className="flex min-w-0 items-center gap-1 overflow-x-auto max-sm:[mask-image:linear-gradient(to_right,black_calc(100%-1.5rem),transparent)]">
         <NavLink href="/">Feed</NavLink>
         <NavLink href="/live">Live</NavLink>
         {canManageAgents(role) ? (
@@ -55,7 +56,9 @@ export function Nav() {
           <span className="hidden text-sm text-muted-foreground sm:inline">
             {session.user.email}
           </span>
-          <Badge variant="secondary">{session.user.role}</Badge>
+          <Badge variant="secondary" className="max-sm:hidden">
+            {session.user.role}
+          </Badge>
           <Button
             type="button"
             variant="ghost"

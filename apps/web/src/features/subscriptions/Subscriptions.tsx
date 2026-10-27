@@ -73,12 +73,12 @@ export function Subscriptions({ confirm: answer }: { confirm?: ConfirmFn }) {
     <section className="flex flex-col gap-4">
       {notice ? <ErrorAlert message={notice} /> : null}
       <div className="rounded-xl border border-border bg-card">
-        <Table>
+        <Table className="sm:min-w-[34rem]">
           <TableHeader>
             <TableRow>
               <TableHead>Agent</TableHead>
               <TableHead>Filter</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead className="max-sm:hidden">Created</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -107,7 +107,7 @@ export function Subscriptions({ confirm: answer }: { confirm?: ConfirmFn }) {
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground max-sm:hidden">
                     {formatTime(sub.created_at)}
                   </TableCell>
                   <TableCell className="text-right">

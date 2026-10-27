@@ -56,6 +56,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 
 **As built (T-08, 2026-10-27):** `Live` keeps its stream and session logic untouched; only the render changed. One `role="status"` line holds a decorative dot (`data-slot="status-dot"`, `data-state` = connecting/live/reconnecting/closed, `aria-hidden`) and the unchanged status text; `closed` shows a `Reconnect` button. Dot colours are tokens (muted, primary, destructive; reconnecting pulses under `motion-safe:`). New items get `motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-top-2` through a new optional `className` on `ArticleItem`; the built CSS contains these utilities, wrapped in the reduced-motion media query. The empty state reads "Waiting for new articles…". The live page drops its own `<main>`. This removes the last nested `<main>` in the app.
 
+**As built (T-09, 2026-10-27):** the screenshot review (method and results in tests.md) found three layout defects that no automated check flagged, all fixed: the mobile header nav (role badge hidden below `sm`, fade mask on the scrolling link row), crushed tables on phones (`sm:min-w-*` on the tables, Created and Last used columns hidden below `sm`) and a clipped placeholder. TC-20 is `test_web_image_ships_the_stylesheet` in `infra/scripts/tests/test_images.py` (marker `docker`, runs under `make test-infra SCENE=images`).
+
 ## 4. Screens
 
 | Route | Component | Look |

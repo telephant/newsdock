@@ -73,7 +73,7 @@ export function Feed() {
             <Input
               name="theme"
               aria-label="Theme"
-              placeholder="theme (e.g. ECON_INFLATION)"
+              placeholder="e.g. ECON_INFLATION"
             />
             <Input name="domain" aria-label="Domain" placeholder="domain" />
             <Input

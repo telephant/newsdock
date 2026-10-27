@@ -41,12 +41,29 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md). Test first: write th
 
 **M-3 Taste review (not an AC):** the owner skims the screenshots and notes anything not "modern, readable, clean"; findings go to `verify.md`.
 
+## Results (T-09, 2026-10-27)
+
+Method: the production build served by `next start` (`NEWSDOCK_WEB_LOGIN_REQUIRED=false`, `NEWSDOCK_WEB_API_BASE_URL` pointing at a throwaway mock API with mixed-language, very long and multi-source sample data), driven by headless Chrome through `puppeteer-core` (viewports, `prefers-color-scheme` emulation, console capture). Neither the mock nor the script is in the repo; the run is described here so it can be repeated. Screenshots: `screens/<route>-<width>-<light|dark>.jpg` (8 routes x 375 and 1280 px x 2 themes = 32) and `screens/report.json`.
+
+| Check | Result |
+|---|---|
+| TC-20 (image serves the stylesheet) | pass: `make test-infra`-style run `pytest -m docker infra/scripts/tests/test_images.py -k stylesheet` against a freshly built `newsdock-web:dev` |
+| TC-14 / M-1 dark mode | pass: with a dark system theme the `dark` class is on `<html>` by DOMContentLoaded on all 16 dark page loads (the inline script runs before first paint, so no light flash is possible from the class); toggle flips it, `localStorage.theme` = `dark`, a reload keeps it, the second click returns to light. Cleared-storage fallback to the system theme is covered by the jsdom tests. A frame-by-frame flash recording was not made. |
+| TC-15 / M-2 responsive | pass after fixes: 32 of 32 loads have no horizontal page scroll, one `<main>`, and no console warnings or errors. |
+| M-3 taste review | done by the author of this change only, owner review still pending: desktop and mobile read clean in both themes. |
+
+Defects found in the first screenshot pass and fixed in T-09 (all by looking at the images; the automated checks had passed):
+
+1. Mobile header: "Subscriptions" was cut to "Sub" and ran into the role badge. Fix: the role badge is hidden below 640 px (like the email), and the link row shows a fade at its right edge as a scroll cue.
+2. Users, subscriptions and agent-key tables were crushed to a few characters per column at 375 px, with Delete and Revoke pushed out of view. Fix: the table keeps a minimum width from 640 px up; below that the Created and Last used columns are hidden so the status and action columns fit. Tables still scroll inside their own wrapper if needed.
+3. The feed's theme placeholder was clipped on desktop. Fix: shorter placeholder.
+
 ## Measurements (provisional targets, not pass/fail)
 
 | What | How |
 |---|---|
-| First-load CSS size gzipped (target about 50 kB) | `gzip -c .next/static/css/*.css | wc -c` after build |
-| Lighthouse accessibility on `/` and `/login` (target 95+) | Chrome Lighthouse on the running stack |
+| First-load CSS size gzipped (target about 50 kB) | `gzip -c .next/static/chunks/*.css | wc -c` after build. **Measured 2026-10-27: 47,644 bytes raw, 9,090 gzipped.** |
+| Lighthouse accessibility on `/` and `/login` (target 95+) | Chrome Lighthouse on the running stack. **Not measured**: no Lighthouse tool is installed here; left for `/spec-verify` or the owner. |
 
 ## AC coverage
 

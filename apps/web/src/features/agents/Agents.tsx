@@ -235,12 +235,14 @@ export function Agents({
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Table>
+                  <Table className="sm:min-w-[32rem]">
                     <TableHeader>
                       <TableRow>
                         <TableHead>Key</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead>Last used</TableHead>
+                        <TableHead className="max-sm:hidden">Created</TableHead>
+                        <TableHead className="max-sm:hidden">
+                          Last used
+                        </TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead />
                       </TableRow>
@@ -253,10 +255,10 @@ export function Agents({
                               {key.prefix}
                             </code>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground max-sm:hidden">
                             {formatTime(key.created_at)}
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
+                          <TableCell className="text-muted-foreground max-sm:hidden">
                             {key.last_used_at
                               ? formatTime(key.last_used_at)
                               : "never used"}

@@ -13,9 +13,9 @@ acs:
   AC-6: {status: passing}  # TC-9 green (T-06, 2026-10-27)
   AC-7: {status: passing}  # TC-10, TC-11 green (T-07, 2026-10-27)
   AC-8: {status: passing}  # TC-12, TC-13 green (T-08, 2026-10-27); built CSS has motion-safe:animate-in
-  AC-9: {status: in-progress}  # toggle + stored choice green in jsdom (T-03); flash-free first paint is manual M-1 (T-09)
-  AC-10: {status: todo}
+  AC-9: {status: manual-ok}  # M-1 run 2026-10-27 (T-09): dark class set before DOMContentLoaded on every dark load, toggle persists across reload; no frame-by-frame flash recording
+  AC-10: {status: manual-ok}  # M-2 run 2026-10-27 (T-09): 32 loads, no horizontal page scroll; screenshots in screens/
   AC-11: {status: passing}  # TC-16, TC-17 green (T-02, 2026-10-27); every text pair >= 5.2:1 in both themes, ring >= 5.2:1
   AC-12: {status: todo}
   AC-13: {status: passing}  # TC-19 green for feed (T-04), detail (T-05), management (T-07) and live (T-08), 2026-10-27
-  AC-14: {status: in-progress}  # image builds and serves CSS by hand (T-01); automated TC-20 in T-09
+  AC-14: {status: passing}  # TC-20 green against a freshly built image (T-09, 2026-10-27)

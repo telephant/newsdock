@@ -29,7 +29,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Tests: [tests.md](
 | T-06 | Login and sign-up | AC-6 | C. **Done 2026-10-27** |
 | T-07 | Management screens | AC-7, AC-13 | C. **Done 2026-10-27** |
 | T-08 | Live page | AC-8, AC-13 | C. **Done 2026-10-27** |
-| T-09 | Image test, screenshots, dark and responsive review | AC-14, AC-9, AC-10 | D proof |
+| T-09 | Image test, screenshots, dark and responsive review | AC-14, AC-9, AC-10 | D proof. **Done 2026-10-27** (3 defects found by eye and fixed; results in tests.md) |
 | T-10 | Final checks and docs | AC-12 | D |
 
 Milestones: after T-04 the skeleton (tokens + shell + feed) is demonstrable; after T-08 every screen is done; after T-10 the spec is ready for `/spec-verify`.

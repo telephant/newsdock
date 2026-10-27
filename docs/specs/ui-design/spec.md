@@ -104,7 +104,7 @@ AC-2  Tokens are the only source of colour
 AC-3  App shell
   Given a logged-in admin
   When  any page renders
-  Then  a header shows the wordmark, nav links for the role (viewer: Feed, Live; admin adds Agents, Subscriptions; owner adds Users) with the current page marked `aria-current="page"`, a user area (email, role badge, Log out button), and the theme toggle (changed at /spec-design 2026-10-27: inline user area instead of a dropdown, to keep Log out a plain control)
+  Then  a header shows the wordmark, nav links for the role (viewer: Feed, Live; admin adds Agents, Subscriptions; owner adds Users) with the current page marked `aria-current="page"`, a user area (email, role badge, Log out button), and the theme toggle (changed at /spec-design 2026-10-27: inline user area instead of a dropdown, to keep Log out a plain control; below 640 px the email and role badge are hidden to fit the header, changed at T-09 2026-10-27)
   Verify: auto
 
 AC-4  Feed cards

@@ -1,6 +1,10 @@
 """TC-16…TC-18: every app image builds, builds alone, and is safe (AC-8)."""
 
+import re
+import socket
 import subprocess
+import time
+import urllib.request
 from pathlib import Path
 
 import pytest
@@ -69,3 +73,45 @@ def test_python_image_entrypoint_imports(app: str) -> None:  # TC-18
         f"newsdock-{app}:dev", "-c", f"import newsdock_{app}.__main__",
     )  # fmt: skip
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def free_port() -> int:
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def fetch(url: str) -> tuple[int, str]:
+    with urllib.request.urlopen(url, timeout=5) as response:  # noqa: S310 (local)
+        return int(response.status), response.read().decode("utf-8", "replace")
+
+
+def test_web_image_ships_the_stylesheet() -> None:  # TC-20 (ui-design AC-14)
+    """The served login page links a CSS file that exists in the image and holds
+    the design tokens (Tailwind output), so the container is styled, not bare."""
+    assert image_exists("web"), "run `make build APP=web` first"
+    port = free_port()
+    name = f"newsdock-web-style-{port}"
+    started = run(
+        "docker", "run", "-d", "--rm", "--name", name,
+        "-p", f"127.0.0.1:{port}:3000", "newsdock-web:dev",
+    )  # fmt: skip
+    assert started.returncode == 0, started.stderr
+    try:
+        html = ""
+        for _ in range(60):
+            try:
+                status, html = fetch(f"http://127.0.0.1:{port}/login")
+                if status == 200:
+                    break
+            except OSError:
+                time.sleep(0.5)
+        assert html, "the web container never answered on /login"
+        hrefs = re.findall(r'<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"', html)
+        hrefs += re.findall(r'<link[^>]+href="([^"]+\.css[^"]*)"', html)
+        assert hrefs, f"no stylesheet link in the login page: {html[:300]}"
+        status, css = fetch(f"http://127.0.0.1:{port}{hrefs[0]}")
+        assert status == 200
+        assert "--primary" in css
+    finally:
+        run("docker", "stop", name)
