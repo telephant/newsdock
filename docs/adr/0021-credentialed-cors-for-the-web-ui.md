@@ -11,7 +11,7 @@ A login cookie must reach the API from the browser. Today the browser calls the 
 3. `next.config` rewrites: build-time target, conflicts with ADR-0014's runtime config.
 
 ## Decision
-Option 1. Hostname alignment is enforced by the web server: the root layout redirects to the API's hostname when the page host differs and both are loopback aliases. The API requires `Content-Type: application/json` on writes (415 otherwise) and rejects a non-GET with an `Origin` that is not in `cors_origins` (403 `bad_origin`). ADR-0014 is not changed: `web.api_base_url` still means what the browser calls.
+Option 1. Hostname alignment is enforced by the web server's proxy (`src/proxy.ts`): it redirects to the API's hostname, keeping port and path, when the page host differs and both are loopback aliases (a layout cannot see the request path, so it cannot do this). The API requires `Content-Type: application/json` on writes (415 otherwise) and rejects a non-GET with an `Origin` that is not in `cors_origins` (403 `bad_origin`). ADR-0014 is not changed: `web.api_base_url` still means what the browser calls.
 
 ## Consequences
 + No extra hop, no SSE pass-through to build, no change to the web network design or ADR-0014. − Page and API must share a hostname (handled by the redirect; a deployment on two registrable domains would need a shared parent domain or the proxy option). − CSRF protection rests on the Origin allowlist and JSON-only bodies, because other local apps on other ports are same-site. − CORS settings now matter for security and are covered by integration tests.

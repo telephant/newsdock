@@ -51,3 +51,5 @@ web:                              # read at web server start (ADR-0014); env NEW
   api_base_url: http://127.0.0.1:8000   # what the BROWSER calls (the host-published API)
   poll_ms: 60000
   # page_size: 20                   # unset: the API's own default applies
+  session_cookie: newsdock_session  # must equal api.auth_cookie_name: the login gate looks for it
+  login_required: true              # false only with api.auth_required: false (open dev mode)

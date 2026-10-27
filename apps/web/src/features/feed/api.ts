@@ -1,5 +1,8 @@
 // Typed fetchers over the generated OpenAPI types (lib/api is generated only).
+// They go through the credentialed client, so the session cookie is sent and a 401
+// sends the user to /login.
 import type { components } from "@/lib/api/types";
+import { apiFetch } from "@/lib/client/api";
 
 export type ArticleSummary = components["schemas"]["ArticleSummary"];
 export type ArticleDetail = components["schemas"]["ArticleDetail"];
@@ -24,7 +27,7 @@ export async function fetchFeed(
   for (const [key, value] of Object.entries(filters)) {
     if (value) params.set(key, value);
   }
-  const response = await fetch(`${config.apiBaseUrl}/api/articles?${params}`);
+  const response = await apiFetch(config, `/api/articles?${params}`);
   if (!response.ok) throw new Error(`feed failed: ${response.status}`);
   return (await response.json()) as FeedPage;
 }
@@ -33,8 +36,9 @@ export async function fetchArticle(
   config: ApiConfig,
   articleId: string,
 ): Promise<ArticleDetail> {
-  const response = await fetch(
-    `${config.apiBaseUrl}/api/articles/${encodeURIComponent(articleId)}`,
+  const response = await apiFetch(
+    config,
+    `/api/articles/${encodeURIComponent(articleId)}`,
   );
   if (!response.ok) throw new Error(`article failed: ${response.status}`);
   return (await response.json()) as ArticleDetail;

@@ -14,6 +14,8 @@ test("defaults match today's values when nothing is set", () => {
     apiBaseUrl: "http://127.0.0.1:8000",
     pollMs: 60000,
     pageSize: undefined,
+    sessionCookie: "newsdock_session",
+    loginRequired: true,
   });
   expect(resolveConfig({}, () => "")).toEqual(DEFAULT_CONFIG);
 });
@@ -26,6 +28,8 @@ test("the web section of the file is used", () => {
     apiBaseUrl: "http://f:1",
     pollMs: 5000,
     pageSize: 30,
+    sessionCookie: "newsdock_session",
+    loginRequired: true,
   });
 });
 
@@ -77,4 +81,49 @@ test("bad numbers fall back to the defaults", () => {
   const config = resolveConfig(env, read);
   expect(config.pollMs).toBe(60000);
   expect(config.pageSize).toBeUndefined();
+});
+
+// ui-login T-10 (AC-8): the gate needs the API's cookie name and whether login is on
+test("session_cookie and login_required come from env, then the file", () => {
+  const { env, read } = yaml(
+    "web:\n  session_cookie: file_sid\n  login_required: false\n",
+  );
+  expect(resolveConfig(env, read)).toMatchObject({
+    sessionCookie: "file_sid",
+    loginRequired: false,
+  });
+  const config = resolveConfig(
+    {
+      ...env,
+      NEWSDOCK_WEB_SESSION_COOKIE: "env_sid",
+      NEWSDOCK_WEB_LOGIN_REQUIRED: "true",
+    },
+    read,
+  );
+  expect(config.sessionCookie).toBe("env_sid");
+  expect(config.loginRequired).toBe(true);
+});
+
+test("login_required understands the usual spellings and ignores nonsense", () => {
+  for (const [raw, expected] of [
+    ["false", false],
+    ["FALSE", false],
+    ["0", false],
+    ["no", false],
+    ["true", true],
+    ["1", true],
+    ["maybe", true], // unusable: the safe default is to require login
+    ["", true],
+  ] as const) {
+    const config = resolveConfig(
+      { NEWSDOCK_WEB_LOGIN_REQUIRED: raw },
+      () => "",
+    );
+    expect(config.loginRequired, raw).toBe(expected);
+  }
+});
+
+test("an empty cookie name falls back to the default", () => {
+  const config = resolveConfig({ NEWSDOCK_WEB_SESSION_COOKIE: "  " }, () => "");
+  expect(config.sessionCookie).toBe("newsdock_session");
 });
