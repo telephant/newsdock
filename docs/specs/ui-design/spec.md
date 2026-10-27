@@ -69,7 +69,7 @@ Thinnest slice that proves the system: **tokens + shell + feed**, then the rest 
 
 In:
 - Tailwind v4, shadcn setup (`components.json`), tokens for light and dark in one `globals.css`.
-- Primitives actually used: Button, Input, Label, Card, Badge, Table, Alert, Skeleton, Dialog (or AlertDialog), DropdownMenu, Separator, Sonner/toast for action feedback, theme toggle.
+- Primitives actually used: Button, Input, Label, Card, Badge, Table, Alert, Skeleton, AlertDialog, Separator, Sonner/toast for action feedback, theme toggle (no DropdownMenu: see AC-3).
 - App shell: header with wordmark, nav with active state and role-gated links, user menu (logout), theme toggle, host-mismatch alert restyled.
 - Restyle all 8 routes; loading, empty and error states with shared components.
 - Live page: connection status indicator and a gentle enter animation that respects reduced motion.
@@ -104,7 +104,7 @@ AC-2  Tokens are the only source of colour
 AC-3  App shell
   Given a logged-in admin
   When  any page renders
-  Then  a header shows the wordmark, nav links for the role (viewer: Feed, Live; admin adds Agents, Subscriptions; owner adds Users) with the current page marked `aria-current="page"`, a user menu with logout, and the theme toggle
+  Then  a header shows the wordmark, nav links for the role (viewer: Feed, Live; admin adds Agents, Subscriptions; owner adds Users) with the current page marked `aria-current="page"`, a user area (email, role badge, Log out button), and the theme toggle (changed at /spec-design 2026-10-27: inline user area instead of a dropdown, to keep Log out a plain control)
   Verify: auto
 
 AC-4  Feed cards

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ui-design — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#047a37; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#4ade80; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>ui-design — M2c diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#t">2 Theme boot</a><a href="#f">3 Feed and confirm</a><a href="#s">4 Live status</a></nav></header>
+
+<section id="c"><h2>1 Component layers</h2><div class="card">
+<pre class="mermaid">
+flowchart TB
+  TOK["C-1 tokens: globals.css"] --> UI["C-2 ui primitives"]
+  TOK --> THEME["C-3 theme provider + toggle"]
+  UI --> SH["C-4 app shell + Nav"]
+  UI --> ST["C-5 shared states"]
+  THEME --> SH
+  SH --> FE["C-6 feed + article"]
+  SH --> AU["C-7 auth forms"]
+  SH --> MG["C-8 management"]
+  SH --> LV["C-9 live"]
+  ST --> FE
+  ST --> MG
+  CHK["C-10 style checks"] -.->|"reads"| TOK
+  CHK -.->|"greps"| FE
+</pre></div>
+<div class="check"><b>Check:</b> (1) Does any feature import something other than C-2/C-5 for looks? (2) Is C-10 the only place that enforces tokens? (3) Is anything here fetching data inside <code>components/</code> (it must not)?</div></section>
+
+<section id="t"><h2>2 First paint and theme (F-1)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Browser
+  participant S as Next server
+  participant T as next-themes script
+  B->>S: GET /
+  S-->>B: HTML (html has no theme class) + CSS link
+  B->>T: inline script runs before paint
+  T->>T: read storage, else prefers-color-scheme
+  T-->>B: add class "dark" or none
+  B->>B: first paint in the right theme
+  B->>B: user clicks toggle, class and storage update
+</pre></div>
+<div class="check"><b>Check:</b> (1) Does the script run before the first paint? (2) What happens if storage is blocked (system theme)? (3) Does the async config <code>await connection()</code> delay the script?</div></section>
+
+<section id="f"><h2>3 Feed render and confirmed action (F-2, F-3)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User
+  participant FD as Feed
+  participant API as REST
+  participant D as AlertDialog
+  U->>FD: open /
+  FD->>FD: show ListSkeleton
+  FD->>API: GET /api/articles (unchanged)
+  API-->>FD: page or error
+  FD-->>U: ArticleItem cards or ErrorAlert or EmptyState
+  U->>D: click Revoke (admin screen)
+  D-->>U: confirm / cancel
+  U->>D: confirm
+  D->>API: existing revoke handler
+</pre></div>
+<div class="check"><b>Check:</b> (1) Is the API call identical to today? (2) Does cancel leave state untouched? (3) Are the three outcomes (cards, error, empty) mutually exclusive?</div></section>
+
+<section id="s"><h2>4 Live page status</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Connecting
+  Connecting --> Live: onopen
+  Live --> Reconnecting: onerror, browser retries
+  Reconnecting --> Live: onopen
+  Reconnecting --> Closed: readyState CLOSED
+  Closed --> Connecting: Reconnect button
+  Live --> Live: item arrives (animate in unless reduced motion)
+</pre></div>
+<div class="check"><b>Check:</b> (1) These are the four states <code>Live.tsx</code> already has (connecting, live, reconnecting, closed); the design adds only a coloured dot, no new state. (2) The status text keeps <code>role="status"</code> and its wording. (3) Is the animation off under reduced motion?</div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.12.0/mermaid.min.js"></script>
+<script>
+mermaid.initialize({ startOnLoad:true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+</script>
+</body>
+</html>
