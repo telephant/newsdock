@@ -64,6 +64,15 @@ class SqlSubscriptionsRepo:
             session.commit()
             return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
+    def delete_any(self, sub_id: str) -> bool:
+        key = as_uuid(sub_id)
+        if key is None:
+            return False
+        with Session(self._engine) as session:
+            result = session.execute(delete(Subscription).where(Subscription.id == key))
+            session.commit()
+            return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
+
     def count_own(self, agent_id: str) -> int:
         with Session(self._engine) as session:
             return int(

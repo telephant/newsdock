@@ -15,3 +15,7 @@ Key format `ndk_<prefix>_<secret>`; store `prefix` (unique) and `sha256(secret)`
 
 ## Consequences
 One enforcement point, easy to test; fast hash is safe only because keys are high-entropy random (never use this scheme for user passwords: `ui-login` will use argon2). No key rotation overlap yet (backlog). A leaked admin token is full registry control.
+
+## Amendment 2026-10-27 (ui-login, ADR-0020; follows spec D-7)
+Admin routes now accept the admin token **or** a session whose role may manage agents (admin, owner). Because sessions work without a token, an unset `NEWSDOCK_ADMIN_TOKEN` no longer hides the routes with 404: a caller with no principal gets 401, and an agent key still gets 403. A token that is not configured simply matches nothing. The token-only reset-password route (T-08) keeps the 404 when no token is set. Enforcement moved from the route-local `require_admin` to `Guards.admin` in `adapters/principal.py`; agent paths (`/mcp`, `/api/subscriptions*`) are unchanged.
+

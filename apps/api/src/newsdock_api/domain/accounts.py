@@ -167,6 +167,18 @@ class SessionStore(Protocol):
     def delete_session(self, token_hash: str) -> bool: ...
 
 
+class UserAdminStore(Protocol):
+    """What the owner's user-management routes need."""
+
+    def list_users(self) -> list[UserSummary]: ...
+
+    def get_by_id(self, user_id: str) -> StoredUser | None: ...
+
+    def set_role(self, user_id: str, role: Role) -> bool: ...
+
+    def delete_user(self, user_id: str) -> bool: ...
+
+
 class AccountStore(UserLookup, SessionStore, Protocol):
     """What the sign-up and login routes need from persistence."""
 
@@ -179,6 +191,10 @@ class AccountStore(UserLookup, SessionStore, Protocol):
     ) -> None: ...
 
     def delete_expired(self, now: datetime, idle: timedelta) -> int: ...
+
+
+class UsersStore(AccountStore, UserAdminStore, Protocol):
+    """Everything the user-facing API needs; `SqlUsersRepo` implements it all."""
 
 
 class LoginResult(NamedTuple):

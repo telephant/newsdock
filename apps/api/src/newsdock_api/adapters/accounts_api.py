@@ -20,9 +20,13 @@ from newsdock_api.domain.accounts import (
     DuplicateEmail,
     InvalidCredentials,
     InvalidEmail,
+    LastOwner,
     PasswordHasher,
+    Role,
     SignupClosed,
+    UserAdminStore,
     UserPrincipal,
+    UserSummary,
     WeakPassword,
     check_password,
     ensure_signup_open,
@@ -155,5 +159,55 @@ def build_accounts_router(
         )
         logger.info("logout")
         return response
+
+    return router
+
+
+class RoleChange(BaseModel):
+    role: Role
+
+
+def build_users_router(
+    users: UserAdminStore, require_owner: Callable[[Request], UserPrincipal]
+) -> APIRouter:
+    """Owner-only user management (AC-9, AC-10); every route needs `manage_users`."""
+    router = APIRouter(prefix="/api/users", dependencies=[Depends(require_owner)])
+
+    @router.get("")
+    def list_users() -> list[UserSummary]:
+        try:
+            return users.list_users()
+        except SQLAlchemyError as exc:
+            logger.exception("list users failed")
+            raise HTTPException(status_code=503, detail="unavailable") from exc
+
+    @router.patch("/{user_id}")
+    def change_role(user_id: str, body: RoleChange) -> PublicUser:
+        try:
+            changed = users.set_role(user_id, body.role)
+            updated = users.get_by_id(user_id) if changed else None
+        except LastOwner as exc:
+            raise HTTPException(status_code=409, detail="last_owner") from exc
+        except SQLAlchemyError as exc:
+            logger.exception("role change failed")
+            raise HTTPException(status_code=503, detail="unavailable") from exc
+        if updated is None:
+            raise HTTPException(status_code=404, detail="not_found")
+        logger.info("role change user=%s role=%s", updated.id, updated.role.value)
+        return PublicUser(id=updated.id, email=updated.email, role=updated.role.value)
+
+    @router.delete("/{user_id}", status_code=204)
+    def delete_user(user_id: str) -> Response:
+        try:
+            deleted = users.delete_user(user_id)
+        except LastOwner as exc:
+            raise HTTPException(status_code=409, detail="last_owner") from exc
+        except SQLAlchemyError as exc:
+            logger.exception("user delete failed")
+            raise HTTPException(status_code=503, detail="unavailable") from exc
+        if not deleted:
+            raise HTTPException(status_code=404, detail="not_found")
+        logger.info("user deleted user=%s", user_id)
+        return Response(status_code=204)
 
     return router

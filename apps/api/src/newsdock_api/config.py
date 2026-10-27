@@ -33,7 +33,8 @@ class Settings(LayeredSettings):
     kafka_probe_timeout_seconds: float = 1.0
     # Agent platform (ADR-0016): keys required on /mcp; per-agent requests/minute
     # (0 = no limit); the admin token is a secret and is read from the environment
-    # only (NEWSDOCK_ADMIN_TOKEN). Unset = admin routes answer 404.
+    # only (NEWSDOCK_ADMIN_TOKEN). Unset = the token opens nothing (admin/owner
+    # sessions still manage agents, ui-login); the reset-password route answers 404.
     auth_required: bool = True
     rate_limit_per_minute: int = 600
     admin_token: SecretStr | None = None

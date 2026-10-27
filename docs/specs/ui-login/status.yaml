@@ -12,11 +12,11 @@ acs:
   AC-6: {status: passing}  # TC-13, TC-14, TC-15 green (T-02, T-05, 2026-10-27)
   AC-7: {status: passing}  # TC-16, TC-17 green (T-05, 2026-10-27)
   AC-8: {status: todo}
-  AC-9: {status: in-progress}  # domain half green (T-02, 2026-10-27); routes pending
-  AC-10: {status: in-progress}  # repo half green (T-03, 2026-10-27); routes pending
+  AC-9: {status: in-progress}  # API half green (T-02, T-06); nav by role TC-25 pending
+  AC-10: {status: in-progress}  # API half green (T-03, T-06); users screen TC-27 pending
   AC-11: {status: todo}
-  AC-12: {status: todo}
+  AC-12: {status: in-progress}  # API half green (T-06); subscriptions screen TC-31 pending
   AC-13: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
-  AC-14: {status: in-progress}  # token vs session split green (T-05); admin routes by session pending (T-06)
+  AC-14: {status: passing}  # TC-35 green (T-05, T-06, 2026-10-27)
   AC-15: {status: todo}
   AC-16: {status: todo}

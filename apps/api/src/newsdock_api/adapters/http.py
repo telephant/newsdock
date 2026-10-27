@@ -19,7 +19,10 @@ from mcp.server.transport_security import TransportSecuritySettings
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
-from newsdock_api.adapters.accounts_api import build_accounts_router
+from newsdock_api.adapters.accounts_api import (
+    build_accounts_router,
+    build_users_router,
+)
 from newsdock_api.adapters.admin import build_admin_router
 from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.auth import AuthMiddleware
@@ -33,7 +36,7 @@ from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
 from newsdock_api.adapters.users_repo import SqlUsersRepo
 from newsdock_api.config import Settings
-from newsdock_api.domain.accounts import AccountStore, PasswordHasher
+from newsdock_api.domain.accounts import PasswordHasher, UsersStore
 from newsdock_api.domain.agents import (
     ANONYMOUS,
     Agent,
@@ -65,7 +68,7 @@ def create_app(
     agents_repo: AgentRegistry | None = None,
     subscriptions_repo: SubscriptionStore | None = None,
     key_lookup: KeyLookup | None = None,
-    users_repo: AccountStore | None = None,
+    users_repo: UsersStore | None = None,
     hasher: PasswordHasher | None = None,
     login_limiter: LoginLimiter | None = None,
 ) -> FastAPI:
@@ -75,7 +78,7 @@ def create_app(
     sql_agents = SqlAgentsRepo(engine)
     registry: AgentRegistry = agents_repo or sql_agents
     keys: KeyLookup = key_lookup or sql_agents
-    accounts: AccountStore = users_repo or SqlUsersRepo(engine)
+    accounts: UsersStore = users_repo or SqlUsersRepo(engine)
     password_hasher: PasswordHasher = hasher or Argon2Hasher()
     subscriptions: SubscriptionStore = subscriptions_repo or SqlSubscriptionsRepo(
         engine
@@ -214,13 +217,8 @@ def create_app(
         allow_headers=settings.cors_headers_list,
     )
 
-    app.include_router(
-        build_admin_router(
-            registry,
-            admin_token.get_secret_value() if admin_token else None,
-            subscriptions,
-        )
-    )
+    app.include_router(build_admin_router(registry, subscriptions, guards.admin))
+    app.include_router(build_users_router(accounts, guards.manage_users))
     app.include_router(
         build_stream_router(
             subscriptions=subscriptions,

@@ -22,6 +22,7 @@ from newsdock_api.domain.accounts import (
     Principal,
     SessionStore,
     UserPrincipal,
+    can,
     hash_token,
     session_valid,
     should_touch,
@@ -101,6 +102,8 @@ class Guards(NamedTuple):
     read: Callable[[Request], None]  # a user or an agent (open when auth is off)
     user: Callable[[Request], UserPrincipal]  # a logged-in human, always
     write: Callable[[Request], None]  # app-wide: Origin allowlist + JSON bodies
+    admin: Callable[[Request], Principal]  # admin token, or admin/owner session
+    manage_users: Callable[[Request], UserPrincipal]  # owner session only
 
 
 def build_guards(
@@ -151,4 +154,31 @@ def build_guards(
         if has_body and media != "application/json":
             raise HTTPException(status_code=415, detail="unsupported_media_type")
 
-    return Guards(principal=principal, read=read, user=user, write=write)
+    def forbidden_or_unauthorized(who: Principal) -> HTTPException:
+        # a known caller without the right: 403; nobody (or the wrong kind): 401
+        if isinstance(who, UserPrincipal | AgentPrincipal):
+            return HTTPException(status_code=403, detail="forbidden")
+        return HTTPException(status_code=401, detail="unauthorized")
+
+    def admin(request: Request) -> Principal:
+        who = principal(request)
+        if isinstance(who, AdminTokenPrincipal):
+            return who
+        if isinstance(who, UserPrincipal) and can(who.role, "manage_agents"):
+            return who
+        raise forbidden_or_unauthorized(who)
+
+    def manage_users(request: Request) -> UserPrincipal:
+        who = principal(request)
+        if isinstance(who, UserPrincipal) and can(who.role, "manage_users"):
+            return who
+        raise forbidden_or_unauthorized(who)
+
+    return Guards(
+        principal=principal,
+        read=read,
+        user=user,
+        write=write,
+        admin=admin,
+        manage_users=manage_users,
+    )

@@ -1,22 +1,22 @@
-"""Admin routes under /api/admin: manage agents and their keys (ADR-0016).
+"""Admin routes under /api/admin: manage agents, their keys and subscriptions.
 
-Guarded by the admin token only (an agent key is a different credential and gets
-403). Unset token = the routes do not exist (404). Plaintext keys appear in a
+Guarded by `require_admin` (adapters/principal.py): the admin token (CLI) or a
+session whose role may manage agents (admin, owner). An agent key is a different
+credential and gets 403; no credential gets 401. Plaintext keys appear in a
 response exactly once, when issued.
 """
 
-import hmac
-from typing import Annotated
+from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from newsdock_api.adapters.agents_repo import DuplicateAgentError
+from newsdock_api.domain.accounts import Principal
 from newsdock_api.domain.agents import (
     AgentRegistry,
     AgentSummary,
     make_key,
-    parse_key,
 )
 from newsdock_api.domain.subscriptions import AdminSubscription, SubscriptionStore
 
@@ -41,23 +41,9 @@ class IssuedKey(BaseModel):
 
 def build_admin_router(
     registry: AgentRegistry,
-    admin_token: str | None,
-    subscriptions: SubscriptionStore | None = None,
+    subscriptions: SubscriptionStore | None,
+    require_admin: Callable[[Request], Principal],
 ) -> APIRouter:
-    def require_admin(authorization: Annotated[str | None, Header()] = None) -> None:
-        if not admin_token:
-            raise HTTPException(status_code=404)
-        scheme, _, presented = (authorization or "").partition(" ")
-        if scheme.lower() != "bearer" or not presented:
-            raise HTTPException(status_code=401, detail="unauthorized")
-        if hmac.compare_digest(presented.encode(), admin_token.encode()):
-            return
-        # a well-formed agent key is a valid credential for the wrong door
-        status = 403 if parse_key(presented) is not None else 401
-        raise HTTPException(
-            status_code=status, detail="forbidden" if status == 403 else "unauthorized"
-        )
-
     router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 
     @router.post("/agents", status_code=201)
@@ -78,6 +64,12 @@ def build_admin_router(
     @router.get("/subscriptions")
     def list_subscriptions() -> list[AdminSubscription]:
         return subscriptions.list_all() if subscriptions else []
+
+    @router.delete("/subscriptions/{sub_id}", status_code=204)
+    def delete_subscription(sub_id: str) -> Response:
+        if subscriptions is None or not subscriptions.delete_any(sub_id):
+            raise HTTPException(status_code=404, detail="not_found")
+        return Response(status_code=204)
 
     @router.post("/agents/{agent_id}/keys", status_code=201)
     def issue_key(agent_id: str) -> IssuedKey:
