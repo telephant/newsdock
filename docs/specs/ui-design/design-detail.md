@@ -48,6 +48,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 
 **As built (T-04, 2026-10-27):** shared `PageHeader`, `EmptyState`, `ErrorAlert`, `ListSkeleton` in `components/`; `features/feed/time.ts` (`timeAgo`, pure, clock injected). The feed shows the skeleton until the first response, then cards or "No articles found"; an error hides both. Two existing assertions changed on purpose (recorded here, nothing else in the old tests moved): `Feed.test.tsx` now expects a badge reading `3 sites` instead of the text `· 3 sites`, and `page.test.tsx` expects the heading "Latest news" because the product name is the shell's wordmark. The Home page wraps the feed in `max-w-3xl`; the filter inputs gained `aria-label`s (Theme, Domain, Title contains) next to their placeholders.
 
+**As built (T-05, 2026-10-27):** `Detail` shows a back link, title, source link, a fields card, themes as badges, sources as a divided list and each analysis as a card with the payload as pretty-printed JSON in a `<pre>` (text only). Loading uses `ListSkeleton`, failure `ErrorAlert`; the old tests were not changed. The article route no longer renders its own `<main>` (the shell has one). Still to fix in later tasks: `login`, `signup`, `live` and `admin/*` pages still wrap their content in `<main>`, which nests inside the shell's `<main>`; each screen's task removes it.
+
 ## 4. Screens
 
 | Route | Component | Look |
