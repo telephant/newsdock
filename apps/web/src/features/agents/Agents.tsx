@@ -3,8 +3,25 @@
 // right after it is issued: it lives only in this component's state, never in the
 // list (the API does not return it again), and is dropped on dismiss, on the next
 // issued key and when the page unmounts. All text is escaped by React.
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
+import { type ConfirmFn, useConfirm } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { components } from "@/lib/api/types";
 import { apiRequest } from "@/lib/client/api";
 import { agentActionMessage, formatTime } from "../admin/messages";
@@ -17,13 +34,15 @@ type IssuedKey = components["schemas"]["IssuedKey"];
 type Shown = { agent: string; key: string };
 
 export function Agents({
-  confirm = (message) => window.confirm(message),
+  confirm: answer,
   copy = (text) => navigator.clipboard.writeText(text),
 }: {
-  confirm?: (message: string) => boolean;
+  confirm?: ConfirmFn;
   copy?: (text: string) => Promise<void>;
 }) {
   const { apiBaseUrl } = useRuntimeConfig();
+  const { confirm, dialog } = useConfirm(answer);
+  const nameId = useId();
   const { remote, reload } = useRemote<AgentSummary[]>("/api/admin/agents");
   const [name, setName] = useState("");
   const [shown, setShown] = useState<Shown | null>(null);
@@ -71,9 +90,10 @@ export function Agents({
 
   async function revoke(agent: AgentSummary, keyId: string, prefix: string) {
     if (
-      !confirm(
+      !(await confirm(
         `Revoke key ${prefix} of ${agent.name}? It stops working at once.`,
-      )
+        "Revoke",
+      ))
     )
       return;
     const result = await run(
@@ -96,103 +116,189 @@ export function Agents({
     setCopied(true);
   }
 
-  if (remote.status === "loading") return <p>Loading…</p>;
-  if (remote.status === "error") return <p role="alert">{remote.message}</p>;
+  if (remote.status === "loading") return <ListSkeleton rows={3} />;
+  if (remote.status === "error") return <ErrorAlert message={remote.message} />;
 
   return (
-    <section>
-      <form onSubmit={create} aria-label="new agent">
-        <label>
-          Agent name
-          <input
-            name="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. demo-financial"
-            required
-          />
-        </label>
-        <button type="submit">Create agent</button>
-      </form>
+    <section className="flex flex-col gap-6">
+      <Card>
+        <CardContent>
+          <form
+            onSubmit={create}
+            aria-label="new agent"
+            className="flex flex-col gap-3 sm:flex-row sm:items-end"
+          >
+            <div className="flex flex-1 flex-col gap-1.5">
+              <Label htmlFor={nameId}>Agent name</Label>
+              <Input
+                id={nameId}
+                name="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. demo-financial"
+                required
+              />
+            </div>
+            <Button type="submit">Create agent</Button>
+          </form>
+        </CardContent>
+      </Card>
 
-      {notice ? <p role="alert">{notice}</p> : null}
+      {notice ? <ErrorAlert message={notice} /> : null}
 
       {shown ? (
-        <section role="status" aria-label="new key">
-          <h2>New key for {shown.agent}</h2>
-          <p>
-            Copy it now: it is shown only once and cannot be recovered. Only a
-            hash is stored.
-          </p>
-          <code>{shown.key}</code>{" "}
-          <button type="button" onClick={() => void copyKey(shown.key)}>
-            Copy key
-          </button>{" "}
-          <button type="button" onClick={() => show(null)}>
-            I have copied it
-          </button>
-          {copied ? <p>Copied.</p> : null}
-        </section>
+        <Card
+          role="status"
+          aria-label="new key"
+          className="ring-2 ring-primary"
+        >
+          <CardHeader>
+            <CardTitle>New key for {shown.agent}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <p className="text-sm text-muted-foreground">
+              Copy it now: it is shown only once and cannot be recovered. Only a
+              hash is stored.
+            </p>
+            <code className="rounded-lg bg-muted p-3 font-mono text-sm break-all">
+              {shown.key}
+            </code>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" onClick={() => void copyKey(shown.key)}>
+                Copy key
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => show(null)}
+              >
+                I have copied it
+              </Button>
+              {copied ? (
+                <p className="text-sm text-primary-text">Copied.</p>
+              ) : null}
+            </div>
+          </CardContent>
+        </Card>
       ) : null}
 
-      <ul>
-        {remote.data.map((agent) => (
-          <li key={agent.agent_id}>
-            <strong>{agent.name}</strong> <em>{agent.status}</em>{" "}
-            <button
-              type="button"
-              aria-label={`New key for ${agent.name}`}
-              onClick={() => void newKey(agent)}
-            >
-              New key
-            </button>{" "}
-            {agent.status === "active" ? (
-              <button
-                type="button"
-                aria-label={`Disable ${agent.name}`}
-                onClick={() => void setEnabled(agent, false)}
-              >
-                Disable
-              </button>
-            ) : (
-              <button
-                type="button"
-                aria-label={`Enable ${agent.name}`}
-                onClick={() => void setEnabled(agent, true)}
-              >
-                Enable
-              </button>
-            )}
-            <ul>
-              {agent.keys.map((key) => (
-                <li key={key.key_id}>
-                  <code>{key.prefix}</code> created {formatTime(key.created_at)}
-                  ,{" "}
-                  {key.last_used_at
-                    ? `last used ${formatTime(key.last_used_at)}`
-                    : "never used"}
-                  {key.revoked_at ? (
-                    <span> (revoked {formatTime(key.revoked_at)})</span>
-                  ) : (
-                    <>
-                      {" "}
-                      <button
+      {remote.data.length === 0 ? (
+        <EmptyState
+          title="No agents yet"
+          description="Create the first agent above to get an API key."
+        />
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {remote.data.map((agent) => (
+            <li key={agent.agent_id}>
+              <Card>
+                <CardHeader className="flex flex-wrap items-center gap-2">
+                  <CardTitle className="break-all">{agent.name}</CardTitle>
+                  <Badge
+                    variant={
+                      agent.status === "active" ? "default" : "secondary"
+                    }
+                  >
+                    {agent.status}
+                  </Badge>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label={`New key for ${agent.name}`}
+                      onClick={() => void newKey(agent)}
+                    >
+                      New key
+                    </Button>
+                    {agent.status === "active" ? (
+                      <Button
                         type="button"
-                        aria-label={`Revoke key ${key.prefix}`}
-                        onClick={() =>
-                          void revoke(agent, key.key_id, key.prefix)
-                        }
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Disable ${agent.name}`}
+                        onClick={() => void setEnabled(agent, false)}
                       >
-                        Revoke
-                      </button>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
+                        Disable
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Enable ${agent.name}`}
+                        onClick={() => void setEnabled(agent, true)}
+                      >
+                        Enable
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Key</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Last used</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {agent.keys.map((key) => (
+                        <TableRow key={key.key_id}>
+                          <TableCell>
+                            <code className="font-mono text-sm">
+                              {key.prefix}
+                            </code>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {formatTime(key.created_at)}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {key.last_used_at
+                              ? formatTime(key.last_used_at)
+                              : "never used"}
+                          </TableCell>
+                          <TableCell>
+                            {key.revoked_at ? (
+                              <Badge
+                                variant="destructive"
+                                title={`revoked ${formatTime(key.revoked_at)}`}
+                              >
+                                revoked
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline">valid</Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {key.revoked_at ? null : (
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                aria-label={`Revoke key ${key.prefix}`}
+                                onClick={() =>
+                                  void revoke(agent, key.key_id, key.prefix)
+                                }
+                              >
+                                Revoke
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
+      {dialog}
     </section>
   );
 }

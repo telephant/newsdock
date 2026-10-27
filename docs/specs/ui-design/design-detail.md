@@ -52,6 +52,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 
 **As built (T-06, 2026-10-27):** `features/auth/CredentialForm.tsx` holds the markup both forms share (card, `Label` + `Input`, an `Alert` tied to both fields through `aria-invalid` and `aria-describedby`, full-width pending button, footer link); `LoginForm` and `SignupForm` keep their state, submit logic and messages. The form carries `aria-busy` while pending. The two pages drop their own `<main>` and sit in a `max-w-sm` column with a `PageHeader`. Existing form tests were not changed.
 
+**As built (T-07, 2026-10-27):** `components/ConfirmDialog.tsx` exports `useConfirm(override?)`, returning `{confirm(message, action), dialog}`; the default is an `AlertDialog` ("Are you sure?", Cancel and a destructive action button). The screens keep their injected `confirm` prop as the test seam, now typed `ConfirmFn` (sync or async) and awaited, so the original screen tests are unchanged and new tests cover the real dialog. Users: table with a styled native role `<select>` (kept for its editing behaviour, so no role badge). Agents: create form card, a one-time key card (`role="status"`, copy button), then a card per agent with a status badge (`active`/`disabled`) and a keys table (`valid`/`revoked` badges so each word is unique on screen). Subscriptions: table with filter fields as badges; empty state "No subscriptions yet.". The three admin pages drop their own `<main>` and use `PageHeader`.
+
 ## 4. Screens
 
 | Route | Component | Look |

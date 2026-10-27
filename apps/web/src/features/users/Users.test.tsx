@@ -161,6 +161,52 @@ test("someone without the permission sees a clear message instead of a table", a
   expect(screen.queryByRole("table")).toBeNull();
 });
 
+// TC-10, TC-11, TC-19 (AC-7, AC-13): table layout, dialog confirmation, loading state.
+test("users are listed in a table with column headers", async () => {
+  stub({ "GET /api/users": () => json(USERS) });
+  render(<Users />);
+  await screen.findByText("owner@x.io");
+  const table = screen.getByRole("table");
+  expect(
+    within(table)
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent),
+  ).toEqual(["Email", "Created", "Role", ""]);
+  expect(within(table).getAllByRole("row")).toHaveLength(1 + USERS.length);
+});
+
+test("while loading a skeleton is shown", () => {
+  stub({ "GET /api/users": () => new Promise<Response>(() => {}) as never });
+  const { container } = render(<Users />);
+  expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+});
+
+test("the default delete confirmation is a dialog: cancel sends nothing, confirm deletes", async () => {
+  const fetchMock = stub({
+    "GET /api/users": () => json(USERS),
+    "DELETE /api/users/u2": () => new Response(null, { status: 204 }),
+  });
+  render(<Users />);
+  await screen.findByText("viewer@x.io");
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete viewer@x.io" }));
+  let dialog = await screen.findByRole("alertdialog");
+  expect(dialog.textContent).toContain("viewer@x.io");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+  await vi.waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+  expect(fetchMock.mock.calls.some(([, i]) => i?.method === "DELETE")).toBe(
+    false,
+  );
+
+  fireEvent.click(screen.getByRole("button", { name: "Delete viewer@x.io" }));
+  dialog = await screen.findByRole("alertdialog");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+  await vi.waitFor(() => expect(screen.queryByText("viewer@x.io")).toBeNull());
+  expect(fetchMock.mock.calls.some(([, i]) => i?.method === "DELETE")).toBe(
+    true,
+  );
+});
+
 test("an unreachable server is reported", async () => {
   vi.stubGlobal("fetch", async () => {
     throw new TypeError("Failed to fetch");

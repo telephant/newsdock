@@ -4,6 +4,20 @@
 // All text is escaped by React.
 import { useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
+import { type ConfirmFn, useConfirm } from "@/components/ConfirmDialog";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { components } from "@/lib/api/types";
 import { apiRequest } from "@/lib/client/api";
 import { adminMessage, formatTime } from "../admin/messages";
@@ -11,12 +25,9 @@ import { useRemote } from "../admin/useRemote";
 
 type AdminSubscription = components["schemas"]["AdminSubscription"];
 
-export function Subscriptions({
-  confirm = (message) => window.confirm(message),
-}: {
-  confirm?: (message: string) => boolean;
-}) {
+export function Subscriptions({ confirm: answer }: { confirm?: ConfirmFn }) {
   const { apiBaseUrl } = useRuntimeConfig();
+  const { confirm, dialog } = useConfirm(answer);
   const { remote, update } = useRemote<AdminSubscription[]>(
     "/api/admin/subscriptions",
   );
@@ -24,9 +35,10 @@ export function Subscriptions({
 
   async function remove(sub: AdminSubscription) {
     if (
-      !confirm(
+      !(await confirm(
         `Delete the subscription of ${sub.agent_name}? Its open stream ends shortly.`,
-      )
+        "Delete",
+      ))
     )
       return;
     setNotice(null);
@@ -46,40 +58,76 @@ export function Subscriptions({
     setNotice(adminMessage(result));
   }
 
-  if (remote.status === "loading") return <p>Loading…</p>;
-  if (remote.status === "error") return <p role="alert">{remote.message}</p>;
-  if (remote.data.length === 0 && !notice) return <p>No subscriptions yet.</p>;
+  if (remote.status === "loading") return <ListSkeleton rows={3} />;
+  if (remote.status === "error") return <ErrorAlert message={remote.message} />;
+  if (remote.data.length === 0 && !notice) {
+    return (
+      <EmptyState
+        title="No subscriptions yet."
+        description="Agents create their own saved filters; they show up here."
+      />
+    );
+  }
 
   return (
-    <section>
-      {notice ? <p role="alert">{notice}</p> : null}
-      <ul>
-        {remote.data.map((sub) => {
-          const fields = Object.entries(sub.filter);
-          return (
-            <li key={sub.id}>
-              <strong>{sub.agent_name}</strong>{" "}
-              <small>created {formatTime(sub.created_at)}</small>
-              <ul>
-                {fields.length === 0 ? (
-                  <li>any article (no filter)</li>
-                ) : (
-                  fields.map(([key, value]) => (
-                    <li key={key}>{`${key}: ${String(value)}`}</li>
-                  ))
-                )}
-              </ul>
-              <button
-                type="button"
-                aria-label={`Delete subscription of ${sub.agent_name}`}
-                onClick={() => void remove(sub)}
-              >
-                Delete
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+    <section className="flex flex-col gap-4">
+      {notice ? <ErrorAlert message={notice} /> : null}
+      <div className="rounded-xl border border-border bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Agent</TableHead>
+              <TableHead>Filter</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead />
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {remote.data.map((sub) => {
+              const fields = Object.entries(sub.filter);
+              return (
+                <TableRow key={sub.id}>
+                  <TableCell className="font-medium">
+                    {sub.agent_name}
+                  </TableCell>
+                  <TableCell className="whitespace-normal">
+                    {fields.length === 0 ? (
+                      <span className="text-muted-foreground">
+                        any article (no filter)
+                      </span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5">
+                        {fields.map(([key, value]) => (
+                          <Badge
+                            key={key}
+                            variant="secondary"
+                            className="h-auto max-w-full break-all whitespace-normal"
+                          >{`${key}: ${String(value)}`}</Badge>
+                        ))}
+                      </div>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatTime(sub.created_at)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      aria-label={`Delete subscription of ${sub.agent_name}`}
+                      onClick={() => void remove(sub)}
+                    >
+                      Delete
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+      {dialog}
     </section>
   );
 }

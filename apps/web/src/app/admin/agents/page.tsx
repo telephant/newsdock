@@ -1,10 +1,14 @@
+import { PageHeader } from "@/components/PageHeader";
 import { Agents } from "@/features/agents/Agents";
 
 export default function AgentsPage() {
   return (
-    <main>
-      <h1>Agents and keys</h1>
+    <>
+      <PageHeader
+        title="Agents and keys"
+        description="Register agents and issue API keys. A key is shown once."
+      />
       <Agents />
-    </main>
+    </>
   );
 }

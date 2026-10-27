@@ -1,5 +1,11 @@
 // TC-31 (AC-12): every agent's saved filters, with delete for admins.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { Subscriptions } from "./Subscriptions";
 
@@ -140,4 +146,50 @@ test("without permission the screen explains instead of listing", async () => {
   });
   render(<Subscriptions />);
   expect((await screen.findByRole("alert")).textContent).toMatch(/permission/i);
+});
+
+// TC-10, TC-11, TC-19 (AC-7, AC-13): table layout, dialog confirmation, loading state.
+test("subscriptions are listed in a table with the filter as badges", async () => {
+  stub({ "GET /api/admin/subscriptions": () => json(SUBS) });
+  render(<Subscriptions />);
+  await screen.findByText("alpha");
+  const table = screen.getByRole("table");
+  expect(
+    within(table)
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent),
+  ).toEqual(["Agent", "Filter", "Created", ""]);
+  expect(within(table).getAllByRole("row")).toHaveLength(1 + SUBS.length);
+  expect(screen.getByText("theme: ECON_*").getAttribute("data-slot")).toBe(
+    "badge",
+  );
+});
+
+test("while loading a skeleton is shown", () => {
+  stub({
+    "GET /api/admin/subscriptions": () =>
+      new Promise<Response>(() => {}) as never,
+  });
+  const { container } = render(<Subscriptions />);
+  expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+});
+
+test("the default delete confirmation is a dialog", async () => {
+  const fetchMock = stub({
+    "GET /api/admin/subscriptions": () => json(SUBS),
+    "DELETE /api/admin/subscriptions/s1": () =>
+      new Response(null, { status: 204 }),
+  });
+  render(<Subscriptions />);
+  await screen.findByText("alpha");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Delete subscription of alpha" }),
+  );
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog.textContent).toContain("alpha");
+  expect(fetchMock.mock.calls.some(([, i]) => i?.method === "DELETE")).toBe(
+    false,
+  );
+  fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+  await vi.waitFor(() => expect(screen.queryByText("alpha")).toBeNull());
 });

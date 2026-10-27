@@ -269,3 +269,72 @@ test("a viewer sees a permission message, not the screen", async () => {
   expect((await screen.findByRole("alert")).textContent).toMatch(/permission/i);
   expect(screen.queryByLabelText("Agent name")).toBeNull();
 });
+
+// TC-10, TC-11, TC-19 (AC-7, AC-13): keys in a table, status badges, dialog, loading.
+test("each agent shows a status badge and its keys in a table", async () => {
+  stub({
+    "GET /api/admin/agents": () =>
+      json([
+        agent(),
+        agent({
+          agent_id: "a2",
+          name: "beta",
+          status: "disabled",
+          keys: [
+            key({
+              key_id: "k2",
+              prefix: "ff00ee11",
+              revoked_at: "2026-10-27T11:00:00Z",
+            }),
+          ],
+        }),
+      ]),
+  });
+  render(<Agents />);
+  await screen.findByText("alpha");
+  expect(screen.getByText("active").getAttribute("data-slot")).toBe("badge");
+  expect(screen.getByText("disabled").getAttribute("data-slot")).toBe("badge");
+  const tables = screen.getAllByRole("table");
+  expect(tables).toHaveLength(2); // one key table per agent
+  expect(
+    within(tables[0])
+      .getAllByRole("columnheader")
+      .map((h) => h.textContent),
+  ).toEqual(["Key", "Created", "Last used", "Status", ""]);
+  expect(screen.getByText(/revoked/i).getAttribute("data-slot")).toBe("badge");
+});
+
+test("while loading a skeleton is shown", () => {
+  stub({
+    "GET /api/admin/agents": () => new Promise<Response>(() => {}) as never,
+  });
+  const { container } = render(<Agents />);
+  expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+});
+
+test("an empty registry shows an empty state next to the create form", async () => {
+  stub({ "GET /api/admin/agents": () => json([]) });
+  render(<Agents />);
+  expect(await screen.findByText("No agents yet")).toBeTruthy();
+  expect(screen.getByLabelText("Agent name")).toBeTruthy();
+});
+
+test("the default revoke confirmation is a dialog", async () => {
+  let agents = [agent()];
+  const fetchMock = stub({
+    "GET /api/admin/agents": () => json(agents),
+    "DELETE /api/admin/agents/a1/keys/k1": () => {
+      agents = [agent({ keys: [key({ revoked_at: "2026-10-27T12:00:00Z" })] })];
+      return new Response(null, { status: 204 });
+    },
+  });
+  render(<Agents />);
+  await screen.findByText("alpha");
+  fireEvent.click(screen.getByRole("button", { name: "Revoke key ab12cd34" }));
+  const dialog = await screen.findByRole("alertdialog");
+  expect(dialog.textContent).toContain("ab12cd34");
+  expect(calls(fetchMock, "DELETE")).toHaveLength(0);
+  fireEvent.click(within(dialog).getByRole("button", { name: "Revoke" }));
+  await vi.waitFor(() => expect(calls(fetchMock, "DELETE")).toHaveLength(1));
+  await screen.findByText(/revoked/i);
+});

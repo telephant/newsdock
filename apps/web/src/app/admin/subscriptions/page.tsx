@@ -1,10 +1,14 @@
+import { PageHeader } from "@/components/PageHeader";
 import { Subscriptions } from "@/features/subscriptions/Subscriptions";
 
 export default function SubscriptionsPage() {
   return (
-    <main>
-      <h1>Subscriptions</h1>
+    <>
+      <PageHeader
+        title="Subscriptions"
+        description="Saved filters owned by agents. You can remove them here."
+      />
       <Subscriptions />
-    </main>
+    </>
   );
 }
