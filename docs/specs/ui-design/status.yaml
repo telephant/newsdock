@@ -8,7 +8,7 @@ acs:
   AC-1: {status: passing}  # TC-1 green, build + make build APP=web ok (T-01, 2026-10-27)
   AC-2: {status: passing}  # TC-2, TC-3 green (T-02, 2026-10-27)
   AC-3: {status: passing}  # TC-4, TC-5 green (T-03, 2026-10-27)
-  AC-4: {status: todo}
+  AC-4: {status: passing}  # TC-6, TC-7 green (T-04, 2026-10-27)
   AC-5: {status: todo}
   AC-6: {status: todo}
   AC-7: {status: todo}
@@ -17,5 +17,5 @@ acs:
   AC-10: {status: todo}
   AC-11: {status: passing}  # TC-16, TC-17 green (T-02, 2026-10-27); every text pair >= 5.2:1 in both themes, ring >= 5.2:1
   AC-12: {status: todo}
-  AC-13: {status: todo}
+  AC-13: {status: in-progress}  # feed part of TC-19 green (T-04); live and management in T-07, T-08
   AC-14: {status: in-progress}  # image builds and serves CSS by hand (T-01); automated TC-20 in T-09

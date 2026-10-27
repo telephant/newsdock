@@ -12,8 +12,9 @@ vi.stubGlobal(
 
 afterEach(cleanup);
 
-test("home page shows the product name and the feed", () => {
+test("home page shows its heading and the feed", () => {
+  // the product name now lives in the app shell's wordmark, not in the page
   render(<Home />);
-  expect(screen.getByRole("heading", { name: "newsdock" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Latest news" })).toBeTruthy();
   expect(screen.getByRole("form", { name: "filters" })).toBeTruthy();
 });

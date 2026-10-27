@@ -3,6 +3,12 @@
 // 60 s polling refresh. All text rendered via React (escaped, never HTML).
 import { useCallback, useEffect, useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
+import { EmptyState } from "@/components/EmptyState";
+import { ErrorAlert } from "@/components/ErrorAlert";
+import { ListSkeleton } from "@/components/ListSkeleton";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { fetchFeed, type ArticleSummary, type FeedFilters } from "./api";
 import { ArticleItem } from "./ArticleItem";
 
@@ -12,6 +18,7 @@ export function Feed() {
   const [articles, setArticles] = useState<ArticleSummary[]>([]);
   const [nextBefore, setNextBefore] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -19,6 +26,7 @@ export function Feed() {
       setArticles(page.articles);
       setNextBefore(page.next_before);
       setError(null);
+      setLoaded(true);
     } catch (e) {
       setError(String(e));
     }
@@ -54,21 +62,50 @@ export function Feed() {
   }
 
   return (
-    <section>
-      <form onSubmit={onFilter} aria-label="filters">
-        <input name="theme" placeholder="theme (e.g. ECON_INFLATION)" />
-        <input name="domain" placeholder="domain" />
-        <input name="text" placeholder="title contains…" />
-        <button type="submit">Filter</button>
-      </form>
-      {error ? <p role="alert">{error}</p> : null}
-      <ol>
+    <section className="flex flex-col gap-4">
+      <Card className="py-3">
+        <CardContent className="px-4">
+          <form
+            onSubmit={onFilter}
+            aria-label="filters"
+            className="flex flex-col gap-2 sm:flex-row"
+          >
+            <Input
+              name="theme"
+              aria-label="Theme"
+              placeholder="theme (e.g. ECON_INFLATION)"
+            />
+            <Input name="domain" aria-label="Domain" placeholder="domain" />
+            <Input
+              name="text"
+              aria-label="Title contains"
+              placeholder="title contains…"
+            />
+            <Button type="submit">Filter</Button>
+          </form>
+        </CardContent>
+      </Card>
+      {error ? <ErrorAlert message={error} /> : null}
+      {!loaded && !error ? <ListSkeleton /> : null}
+      {loaded && articles.length === 0 ? (
+        <EmptyState
+          title="No articles found"
+          description="Try different filters, or check back in a few minutes."
+        />
+      ) : null}
+      <ol className="flex flex-col gap-3">
         {articles.map((article) => (
           <ArticleItem key={article.article_id} article={article} />
         ))}
       </ol>
       {nextBefore ? (
-        <button onClick={() => void loadMore()}>Load more</button>
+        <Button
+          variant="outline"
+          className="self-center"
+          onClick={() => void loadMore()}
+        >
+          Load more
+        </Button>
       ) : null}
     </section>
   );

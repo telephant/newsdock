@@ -56,8 +56,41 @@ test("a grouped story shows the sites badge; single-source items do not", async 
   stubFetch();
   render(<Feed />);
   await screen.findByText(/Fed raises rates/);
-  expect(screen.getByText("· 3 sites")).toBeTruthy(); // TC-11 (AC-10)
-  expect(screen.queryByText("· 1 sites")).toBeNull();
+  expect(screen.getByText("3 sites")).toBeTruthy(); // TC-11 (AC-10), now a badge
+  expect(screen.queryByText("1 sites")).toBeNull();
+});
+
+// TC-19 (AC-13): loading, empty and failed states use the shared components.
+test("while the first page loads a skeleton is shown, then the articles", async () => {
+  stubFetch();
+  const { container } = render(<Feed />);
+  expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+  await screen.findByText(/Fed raises rates/);
+  expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+});
+
+test("an empty page shows a friendly empty state", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(
+      async () =>
+        new Response(JSON.stringify({ articles: [], next_before: null })),
+    ),
+  );
+  render(<Feed />);
+  expect(await screen.findByText("No articles found")).toBeTruthy();
+  expect(screen.queryByRole("alert")).toBeNull();
+});
+
+test("a failed fetch shows an alert and no skeleton or empty state", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response("nope", { status: 500 })),
+  );
+  const { container } = render(<Feed />);
+  expect((await screen.findByRole("alert")).textContent).toMatch(/500/);
+  expect(container.querySelector('[data-slot="skeleton"]')).toBeNull();
+  expect(screen.queryByText("No articles found")).toBeNull();
 });
 
 test("payload-ish text renders escaped, never as HTML", async () => {

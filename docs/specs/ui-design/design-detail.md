@@ -46,6 +46,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 
 **As built (T-03, 2026-10-27):** `AppShell` takes the nav as a `nav` prop that `layout.tsx` fills with `features/auth/Nav`, so `components/` imports no feature code. `ThemeToggle` renders both icons and lets CSS pick one (no mounted flag). `<main>` is `max-w-5xl`; the feed, article and form screens narrow themselves to `max-w-3xl` / `max-w-sm` in their own tasks. The host-mismatch notice is an `Alert` passed as `notice`. Tests for `next-themes` must stub `matchMedia` including `addListener`/`removeListener`. Verified in a production build: the server HTML carries the skip link, the toggle and next-themes' inline script (`localStorage`, `prefers-color-scheme`), run before paint.
 
+**As built (T-04, 2026-10-27):** shared `PageHeader`, `EmptyState`, `ErrorAlert`, `ListSkeleton` in `components/`; `features/feed/time.ts` (`timeAgo`, pure, clock injected). The feed shows the skeleton until the first response, then cards or "No articles found"; an error hides both. Two existing assertions changed on purpose (recorded here, nothing else in the old tests moved): `Feed.test.tsx` now expects a badge reading `3 sites` instead of the text `· 3 sites`, and `page.test.tsx` expects the heading "Latest news" because the product name is the shell's wordmark. The Home page wraps the feed in `max-w-3xl`; the filter inputs gained `aria-label`s (Theme, Domain, Title contains) next to their placeholders.
+
 ## 4. Screens
 
 | Route | Component | Look |
