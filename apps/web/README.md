@@ -20,7 +20,7 @@ Folders (rule DR-12): `src/app/` thin routes, `src/features/<name>/` feature cod
 
 ## Dependencies
 
-Next.js 16.3.8, React 19.2.8, TypeScript ^5, Tailwind CSS 4 with `@tailwindcss/postcss`, shadcn/ui (`@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`), `lucide-react`, `next-themes`, `sonner`, ESLint ^9, Prettier, Vitest with Testing Library. Node 24 LTS is provisioned by pnpm from `devEngines.runtime` in `package.json`; no Node on PATH is required. Versions and reasons: `docs/adr/0009-web-toolchain-and-node-pin.md`.
+Next.js 16.3.8, React 19.2.8, TypeScript ^5, Tailwind CSS 4 with `@tailwindcss/postcss`, shadcn/ui (`@base-ui/react`, `class-variance-authority`, `clsx`, `tailwind-merge`, `tw-animate-css`), `lucide-react`, `next-themes`, ESLint ^9, Prettier, Vitest with Testing Library. Node 24 LTS is provisioned by pnpm from `devEngines.runtime` in `package.json`; no Node on PATH is required. Versions and reasons: `docs/adr/0009-web-toolchain-and-node-pin.md`.
 
 ## Run/Test
 

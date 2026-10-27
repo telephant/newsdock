@@ -69,7 +69,7 @@ Thinnest slice that proves the system: **tokens + shell + feed**, then the rest 
 
 In:
 - Tailwind v4, shadcn setup (`components.json`), tokens for light and dark in one `globals.css`.
-- Primitives actually used: Button, Input, Label, Card, Badge, Table, Alert, Skeleton, AlertDialog, Separator, Sonner/toast for action feedback, theme toggle (no DropdownMenu: see AC-3).
+- Primitives actually used: Button, Input, Label, Card, Badge, Table, Alert, Skeleton, AlertDialog, theme toggle (Separator and Sonner/toast were dropped at verify, 2026-10-27: nothing used them, results are shown inline) (no DropdownMenu: see AC-3).
 - App shell: header with wordmark, nav with active state and role-gated links, user menu (logout), theme toggle, host-mismatch alert restyled.
 - Restyle all 8 routes; loading, empty and error states with shared components.
 - Live page: connection status indicator and a gentle enter animation that respects reduced motion.

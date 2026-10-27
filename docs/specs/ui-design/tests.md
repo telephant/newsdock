@@ -63,7 +63,7 @@ Defects found in the first screenshot pass and fixed in T-09 (all by looking at 
 | What | How |
 |---|---|
 | First-load CSS size gzipped (target about 50 kB) | `gzip -c .next/static/chunks/*.css | wc -c` after build. **Measured 2026-10-27: 47,644 bytes raw, 9,090 gzipped.** |
-| Lighthouse accessibility on `/` and `/login` (target 95+) | Chrome Lighthouse on the running stack. **Not measured**: no Lighthouse tool is installed here; left for `/spec-verify` or the owner. |
+| Lighthouse accessibility on `/` and `/login` (target 95+) | Chrome Lighthouse on the running stack. **Measured at verify 2026-10-27: 100** on `/` and `/login`, mobile and desktop, no failed audits (light theme, mock API data). |
 
 ## AC coverage
 
