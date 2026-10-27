@@ -38,10 +38,17 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     base = settings.mcp_url.removesuffix("/mcp")
+    # reads need a key once the API requires auth (ui-login); same key as the MCP client
+    headers = (
+        {"Authorization": f"Bearer {settings.api_key.get_secret_value()}"}
+        if settings.api_key
+        else {}
+    )
     articles = dedupe_by_title(
         httpx.get(
             f"{base}/api/articles",
             params={"limit": args.limit},
+            headers=headers,
             timeout=settings.export_timeout_seconds,
         ).json()["articles"]
     )

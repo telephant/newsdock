@@ -84,8 +84,22 @@ def env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("NEWSDOCK_ADMIN_TOKEN", raising=False)
 
 
+class NoKeys:
+    """A key lookup that knows nothing: every agent key is unregistered."""
+
+    def find_key(self, prefix: str) -> None:
+        return None
+
+    def touch_key(self, key_id: str, now: datetime) -> None:
+        pass
+
+
 def client(registry: FakeRegistry, token: str | None = TOKEN) -> TestClient:
-    return TestClient(create_app(Settings(admin_token=token), agents_repo=registry))
+    return TestClient(
+        create_app(
+            Settings(admin_token=token), agents_repo=registry, key_lookup=NoKeys()
+        )
+    )
 
 
 def auth(token: str = TOKEN) -> dict[str, str]:
@@ -166,7 +180,9 @@ def test_missing_agent_key_or_wrong_token_changes_nothing() -> None:
         ({}, 401),  # no token
         ({"Authorization": "Bearer wrong"}, 401),
         ({"Authorization": "Basic abc"}, 401),
-        ({"Authorization": f"Bearer {agent_key}"}, 403),  # a valid-shaped agent key
+        # a well-formed but unregistered key is just unknown (a registered key gets
+        # 403: test_roles_api.py::test_admin_token_matrix)
+        ({"Authorization": f"Bearer {agent_key}"}, 401),
     ]
     for headers, status in cases:
         assert (
@@ -177,10 +193,13 @@ def test_missing_agent_key_or_wrong_token_changes_nothing() -> None:
     assert registry.agents == {}
 
 
-def test_unset_admin_token_disables_the_routes() -> None:
+def test_unset_admin_token_means_the_token_opens_nothing() -> None:
+    # ui-login (ADR-0016 amendment 2026-10-27): admin/owner sessions manage agents
+    # without a token, so the routes are no longer hidden with 404; they answer 401
+    # to anyone who has no principal, including a caller presenting a "token".
     c = client(FakeRegistry(), token=None)
-    assert c.get("/api/admin/agents", headers=auth()).status_code == 404
+    assert c.get("/api/admin/agents", headers=auth()).status_code == 401
     assert (
         c.post("/api/admin/agents", json={"name": "x"}, headers=auth()).status_code
-        == 404
+        == 401
     )

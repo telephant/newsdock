@@ -12,8 +12,9 @@ BEFORE = json.loads(
     (ROOT / "infra/scripts/tests/fixtures/config_defaults_before.json").read_text()
 )["api"]
 NEW_DEFAULTS = {
-    "cors_allow_methods": "GET",
-    "cors_allow_headers": "*",
+    "cors_allow_methods": "GET,POST,PATCH,DELETE",  # ui-login: writes (ADR-0021)
+    "cors_allow_headers": "Content-Type,Last-Event-ID",
+    "cors_allow_cookies": True,
     "first_run_window_minutes": 60,
     "max_payload_bytes": 65536,
     "search_page_default": 20,
@@ -109,3 +110,42 @@ def test_committed_yaml_lists_auth_defaults_and_no_secret() -> None:
     assert raw["api"]["auth_required"] is True
     assert raw["api"]["rate_limit_per_minute"] == 600
     assert "admin_token" not in raw["api"]
+
+
+# TC-34 (AC-13, AC-3): account settings, defaults and the committed file
+AUTH_DEFAULTS = {
+    "auth_signup_open": True,
+    "auth_min_pw_length": 10,
+    "auth_session_idle_hours": 12,
+    "auth_session_absolute_days": 7,
+    "auth_login_max_failures": 5,
+    "auth_login_window_minutes": 15,
+    "auth_cookie_secure": False,
+    "auth_cookie_name": "newsdock_session",
+}
+
+
+def test_account_settings_defaults() -> None:
+    s = Settings()
+    for name, value in AUTH_DEFAULTS.items():
+        assert getattr(s, name) == value, name
+    assert s.session_idle == timedelta(hours=12)
+    assert s.session_absolute == timedelta(days=7)
+    assert s.login_window_seconds == 15 * 60
+
+
+def test_committed_yaml_rows_equal_the_account_defaults() -> None:
+    import yaml
+
+    raw = yaml.safe_load((ROOT / "infra/config/newsdock.yaml").read_text())
+    for name, value in AUTH_DEFAULTS.items():
+        assert raw["api"][name] == value, name
+
+
+def test_account_settings_can_be_overridden(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, monkeypatch, "api:\n  auth_signup_open: false\n")
+    assert Settings().auth_signup_open is False
+    monkeypatch.setenv("NEWSDOCK_AUTH_LOGIN_MAX_FAILURES", "2")
+    assert Settings().auth_login_max_failures == 2

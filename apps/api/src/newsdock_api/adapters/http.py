@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
@@ -19,22 +19,33 @@ from mcp.server.transport_security import TransportSecuritySettings
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
+from newsdock_api.adapters.accounts_api import (
+    build_accounts_router,
+    build_recovery_router,
+    build_users_router,
+)
 from newsdock_api.adapters.admin import build_admin_router
 from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.auth import AuthMiddleware
 from newsdock_api.adapters.kafka_health import kafka_reachable
 from newsdock_api.adapters.listener import NotifyListener, listen_dsn
+from newsdock_api.adapters.live import build_live_router
+from newsdock_api.adapters.passwords import Argon2Hasher, make_dummy_hash
+from newsdock_api.adapters.principal import PrincipalResolver, build_guards
 from newsdock_api.adapters.repo import SqlArticleRepo
 from newsdock_api.adapters.sse import build_stream_router
 from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
+from newsdock_api.adapters.users_repo import SqlUsersRepo
 from newsdock_api.config import Settings
+from newsdock_api.domain.accounts import PasswordHasher, UsersStore
 from newsdock_api.domain.agents import (
     ANONYMOUS,
     Agent,
     AgentRegistry,
     KeyLookup,
 )
+from newsdock_api.domain.loginlimit import LoginLimiter
 from newsdock_api.domain.ratelimit import FixedWindowLimiter
 from newsdock_api.domain.records import (
     ArticleDetail,
@@ -59,6 +70,9 @@ def create_app(
     agents_repo: AgentRegistry | None = None,
     subscriptions_repo: SubscriptionStore | None = None,
     key_lookup: KeyLookup | None = None,
+    users_repo: UsersStore | None = None,
+    hasher: PasswordHasher | None = None,
+    login_limiter: LoginLimiter | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(DbSettings())
@@ -66,6 +80,8 @@ def create_app(
     sql_agents = SqlAgentsRepo(engine)
     registry: AgentRegistry = agents_repo or sql_agents
     keys: KeyLookup = key_lookup or sql_agents
+    accounts: UsersStore = users_repo or SqlUsersRepo(engine)
+    password_hasher: PasswordHasher = hasher or Argon2Hasher()
     subscriptions: SubscriptionStore = subscriptions_repo or SqlSubscriptionsRepo(
         engine
     )
@@ -178,21 +194,58 @@ def create_app(
             listener_task.cancel()
             await asyncio.gather(listener_task, return_exceptions=True)
 
-    app = FastAPI(title="newsdock API", lifespan=lifespan)
+    admin_token = settings.admin_token
+    guards = build_guards(
+        PrincipalResolver(
+            sessions=accounts,
+            keys=keys,
+            admin_token=admin_token.get_secret_value() if admin_token else None,
+            idle=settings.session_idle,
+        ),
+        auth_required=settings.auth_required,
+        cookie_name=settings.auth_cookie_name,
+        allowed_origins=settings.cors_origins_list,
+        admin_token_configured=admin_token is not None,
+    )
+    app = FastAPI(
+        title="newsdock API",
+        lifespan=lifespan,
+        dependencies=[Depends(guards.write)],  # Origin allowlist + JSON bodies
+    )
     app.state.wake_hub = hub
     app.add_middleware(  # the web UI calls /api/* from the browser (TC-25)
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
+        allow_credentials=settings.cors_allow_cookies,
         allow_methods=settings.cors_methods_list,
         allow_headers=settings.cors_headers_list,
     )
 
-    admin_token = settings.admin_token
+    app.include_router(build_admin_router(registry, subscriptions, guards.admin))
+    limiter_for_logins = login_limiter or LoginLimiter(
+        settings.auth_login_max_failures, settings.login_window_seconds
+    )
+    app.include_router(build_users_router(accounts, guards.manage_users))
     app.include_router(
-        build_admin_router(
-            registry,
-            admin_token.get_secret_value() if admin_token else None,
-            subscriptions,
+        build_recovery_router(
+            accounts,
+            password_hasher,
+            limiter_for_logins,
+            require_token=guards.admin_token_only,
+            min_password_length=settings.auth_min_pw_length,
+        )
+    )
+    app.include_router(
+        build_live_router(
+            service=service,
+            hub=hub,
+            limiter=StreamLimiter(settings.live_max_streams_per_user),
+            require_live=guards.live,
+            session_alive=guards.session_alive,
+            cookie_name=settings.auth_cookie_name,
+            keepalive_seconds=settings.sse_keepalive_seconds,
+            fallback_poll_seconds=settings.sse_fallback_poll_seconds,
+            max_text_length=settings.subscription_text_max_length,
         )
     )
     app.include_router(
@@ -207,6 +260,21 @@ def create_app(
         )
     )
     app.include_router(
+        build_accounts_router(
+            accounts,
+            password_hasher,
+            limiter_for_logins,
+            require_user=guards.user,
+            dummy_hash=make_dummy_hash(password_hasher),
+            signup_open=settings.auth_signup_open,
+            min_password_length=settings.auth_min_pw_length,
+            cookie_name=settings.auth_cookie_name,
+            cookie_secure=settings.auth_cookie_secure,
+            session_idle=settings.session_idle,
+            session_absolute=settings.session_absolute,
+        )
+    )
+    app.include_router(
         build_subscriptions_router(
             subscriptions,
             max_per_agent=settings.subscriptions_max_per_agent,
@@ -214,7 +282,7 @@ def create_app(
         )
     )
 
-    @app.get("/api/articles")
+    @app.get("/api/articles", dependencies=[Depends(guards.read)])
     def rest_articles(
         theme: str | None = None,
         domain: str | None = None,
@@ -242,7 +310,7 @@ def create_app(
         )
         return FeedPage(articles=articles, next_before=next_before)
 
-    @app.get("/api/articles/{article_id}")
+    @app.get("/api/articles/{article_id}", dependencies=[Depends(guards.read)])
     def rest_article(article_id: str) -> ArticleDetail:
         try:
             return get_article(repo, article_id)

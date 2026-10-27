@@ -72,6 +72,9 @@ class FakeStore:
     def exists(self, sub_id: str) -> bool:
         return sub_id in self.rows
 
+    def delete_any(self, sub_id: str) -> bool:
+        return self.rows.pop(sub_id, None) is not None
+
     def list_all(self) -> list[AdminSubscription]:
         return [
             AdminSubscription(**r.model_dump(), agent_name=self.owner_names[r.id])
@@ -255,4 +258,4 @@ def test_admin_lists_all_subscriptions_with_agent_names() -> None:
     assert c.get("/api/admin/subscriptions", headers=bearer(alpha)).status_code == 403
     assert c.get("/api/admin/subscriptions").status_code == 401
     off = make_app(keys, store, admin_token=None)
-    assert off.get("/api/admin/subscriptions", headers=bearer(ADMIN)).status_code == 404
+    assert off.get("/api/admin/subscriptions", headers=bearer(ADMIN)).status_code == 401

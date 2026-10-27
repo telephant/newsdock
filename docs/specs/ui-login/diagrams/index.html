@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ui-login — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>ui-login — Milestone 2 part 3 diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Sign-up, login, read</a><a href="#e">3 Data model</a><a href="#l">4 Live feed</a><a href="#t">5 Session lifecycle</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  B["browser (C-15 client)"] -->|"cookie, credentialed CORS"| MW["C-12 principal resolver"]
+  B -.->|"pages"| WEB["web server: gate + host check"]
+  AG["agent (key)"] --> MW
+  CLI["CLI (admin token)"] --> MW
+  MW --> RST["C-17 reset-password"]
+  MW --> ACC["C-13 account routes"]
+  MW --> LIVE["C-14 live feed"]
+  MW --> ART["C-6 article + admin routes"]
+  ACC --> DOM["C-10 accounts domain"]
+  ACC --> REPO[("C-11 users, sessions")]
+  MW --> REPO
+  LIVE --> HUB["WakeHub (push-delivery)"]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is every credential parsed in exactly one place (C-12)?</li>
+<li>Do page and API share one hostname, so the cookie is first-party-site?</li>
+<li>Is C-17 reachable only with the admin token, never with a session?</li>
+<li>Is the domain (C-10) free of I/O and of any import of the repo?</li>
+<li>Do agent paths still go through the unchanged agent branch of C-12?</li></ul></div></section>
+
+<section id="s"><h2>2 Sign-up, login, authorized read</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as Browser
+  participant A as API (C-12/C-13)
+  participant D as Postgres
+  U->>A: POST /api/auth/signup (CORS, JSON)
+  A->>D: lock, insert user (owner if first)
+  A-->>U: 201 user
+  U->>A: POST /api/auth/login (credentials: include)
+  A->>D: load user, verify argon2id
+  A->>D: insert session (sha256 of token)
+  A-->>U: 200 + Set-Cookie (httpOnly, Lax)
+  U->>A: GET /api/articles (cookie)
+  A->>D: session join user, role check
+  A-->>U: 200 articles
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is only the sha256 of the session token stored, never the cookie value?</li>
+<li>Is the role read from the database on every request (so demotion is immediate)?</li>
+<li>Does an unknown email take the same path and time as a wrong password?</li>
+<li>Does sign-up avoid setting a cookie (one cookie-setting path)?</li>
+<li>Is an Origin outside cors_origins refused on every write?</li></ul></div></section>
+
+<section id="e"><h2>3 Data model</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  users ||--o{ sessions : "has (cascade)"
+  users {
+    uuid id PK
+    text email UK
+    text password_hash
+    text role "owner|admin|viewer"
+    timestamptz created_at
+  }
+  sessions {
+    text token_hash PK
+    uuid user_id FK
+    timestamptz created_at
+    timestamptz last_seen_at
+    timestamptz expires_at
+  }
+  agents ||--o{ api_keys : "unchanged"
+  agents ||--o{ subscriptions : "unchanged"
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Should agents carry an owner user id now, or stay global (assumed global)?</li>
+<li>Is a text role with a CHECK constraint enough, or do you want a lookup table?</li>
+<li>Does deleting a user remove their sessions and nothing else?</li></ul></div></section>
+
+<section id="l"><h2>4 Live feed (EventSource with credentials)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as Browser (EventSource)
+  participant L as API live (C-14)
+  participant D as Postgres
+  U->>L: GET /api/live (withCredentials, cookie)
+  L->>D: latest seq (start cursor)
+  D-->>L: NOTIFY articles_new
+  L->>D: list_new(cursor)
+  L-->>U: event: article (id = cursor)
+  L-->>U: : ping (keep-alive, re-check session)
+  U->>L: reconnect with Last-Event-ID (CORS-allowed header)
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is NOTIFY only a wake-up while the data comes from the cursor query?</li>
+<li>Does a logout or deletion end the stream within one keep-alive interval?</li>
+<li>Is Last-Event-ID in the CORS allow list so reconnects resume?</li></ul></div></section>
+
+<section id="t"><h2>5 Session lifecycle</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Active: login ok
+  Active --> Active: request (last_seen_at touched, at most once a minute)
+  Active --> Expired: idle limit passed
+  Active --> Expired: absolute limit passed
+  Active --> Revoked: logout
+  Active --> Revoked: user deleted
+  Expired --> [*]: row purged
+  Revoked --> [*]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is an Expired session rejected even before its row is purged?</li>
+<li>Does a role change keep the session but change what it may do?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

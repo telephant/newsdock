@@ -1,10 +1,12 @@
 # newsdock-web
 
-Next.js + TypeScript UI, component C-8. Talks to the API over REST only. Milestone M0 provides the scaffold and a placeholder home page; the real UI arrives in M1.
+Next.js + TypeScript UI, component C-8. Talks to the API over REST only (the browser calls it directly, with the login cookie, ADR-0021).
 
 ## Purpose
 
-Browse the news feed, filter it and see agent scores (M1). Today: a placeholder page proving the toolchain.
+Browse the news feed, filter it and see agent scores (M1). Since M2 `ui-login`: sign up and log in (`/signup`, `/login`), a live feed (`/live`), and role-based management screens: agents and keys and subscriptions for admins (`/admin/agents`, `/admin/subscriptions`), users for owners (`/admin/users`).
+
+Login plumbing: `src/proxy.ts` (Next 16's proxy) redirects `localhost` to the API's hostname and sends visitors without the session cookie to `/login` (an optimistic gate; the API decides every permission); `src/lib/client/api.ts` is the credentialed fetch wrapper (a 401 goes to `/login`); `src/features/auth/` holds the session provider, the forms and the navigation. Settings in the `web:` section: `api_base_url`, `poll_ms`, `page_size`, `session_cookie` (must equal `api.auth_cookie_name`), `login_required`. Open the app at `http://127.0.0.1:3000`.
 
 ## Entrypoint
 

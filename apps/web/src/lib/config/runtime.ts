@@ -31,6 +31,15 @@ function positiveInt(value: unknown): number | undefined {
   return typeof n === "number" && Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
+function flag(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const word = value.trim().toLowerCase();
+  if (["true", "1", "yes", "on"].includes(word)) return true;
+  if (["false", "0", "no", "off"].includes(word)) return false;
+  return undefined;
+}
+
 function text(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }
@@ -56,6 +65,14 @@ export function resolveConfig(
       positiveInt(env.NEWSDOCK_WEB_PAGE_SIZE) ??
       positiveInt(file.page_size) ??
       DEFAULT_CONFIG.pageSize,
+    sessionCookie:
+      text(env.NEWSDOCK_WEB_SESSION_COOKIE) ??
+      text(file.session_cookie) ??
+      DEFAULT_CONFIG.sessionCookie,
+    loginRequired:
+      flag(env.NEWSDOCK_WEB_LOGIN_REQUIRED) ??
+      flag(file.login_required) ??
+      DEFAULT_CONFIG.loginRequired,
   };
 }
 

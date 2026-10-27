@@ -59,6 +59,10 @@ class ArticleRepo(Protocol):
         text: str | None = None,
     ) -> list[ArticleSummary]: ...
 
+    def latest_seq(self) -> int | None:
+        """The newest article's seq; None while the table is empty."""
+        ...
+
     def upsert_analysis(
         self, article_id: str, agent_name: str, payload: dict[str, Any]
     ) -> bool: ...
@@ -122,6 +126,12 @@ class ArticleService:
             limit=_clamp(limit, self._limits.search_default, self._limits.search_max),
             before=before,
         )
+
+    def latest_cursor(self) -> str:
+        """A cursor at the newest article: reading after it yields only new rows.
+
+        An empty table gives position 0, so the first article ever stored is seen."""
+        return encode_cursor(self._repo.latest_seq() or 0)
 
     def list_new(
         self,

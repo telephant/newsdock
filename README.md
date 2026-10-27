@@ -56,20 +56,36 @@ make down            # stop everything (data volumes are kept)
 | `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
 | `make agent-create NAME=<name>` | Register an agent and print its API key once (needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up) |
+| `make user-reset-password EMAIL=<email>` | Owner recovery: set a user's password (asks twice, never echoed; ends that user's sessions and lifts a login lockout; needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up). Only the admin token can do this; an admin or owner session cannot |
 | `make config-python` | Check `infra/config/newsdock.yaml` and that no tunable literal crept back into code |
 | `make test-rules` | Prove each enforced rule fails when violated |
 | `make test-infra [SCENE=<name>]` | Docker tests; scenes scope the run to what you're working on: `db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images` (no scene = everything, ~4 min warm). Needs Docker and ports 5433/29092 free |
 | `make docs-check` | README sections and relative links |
 
+## Accounts and login (M2)
+
+The UI needs a login. Open **http://127.0.0.1:3000** (the compose default; `http://localhost:3000` is redirected there, because the login cookie only works when page and API share a hostname). Use *Sign up*: **the first account becomes the `owner`**, every later one a `viewer`.
+
+| Role | May |
+|---|---|
+| `viewer` | read the feed and articles, watch `/live` |
+| `admin` | also manage agents and keys, and view or delete subscriptions (`/admin/agents`, `/admin/subscriptions`) |
+| `owner` | also change roles and delete users (`/admin/users`); the last owner can never be demoted or deleted |
+
+- **Sign-up is open by default.** Anyone who can reach the web port can register a read-only `viewer` account. Close it with `api.auth_signup_open: false` in `infra/config/newsdock.yaml` (then create accounts by temporarily re-opening it); there is no email verification, invite or CAPTCHA in this milestone.
+- **Locked-out owner:** `make user-reset-password EMAIL=<email>` asks for a new password twice (not echoed), ends that user's sessions and lifts a login lockout. It needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up; a session cannot do this, only the token.
+- **Reads are no longer open:** `GET /api/articles*` accepts a browser session or an agent key. `api.auth_required: false` (with `web.login_required: false`) switches login off for local experiments.
+- Passwords are hashed with argon2id; sessions are server-side (12 h idle, 7 days absolute, both in the config file); five wrong passwords for one account lock it for 15 minutes.
+
 ## Agents and API keys (M2)
 
-MCP (`/mcp`) needs an agent API key; `api.auth_required` in the config file (default `true`) turns that off for local experiments. Agents are registered by an admin, there is no self-service.
+MCP (`/mcp`) needs an agent API key; `api.auth_required` in the config file (default `true`) turns that off for local experiments. Agents are registered by an admin (in the UI at `/admin/agents`, or with the admin token below), there is no self-service.
 
-1. Put a long random `NEWSDOCK_ADMIN_TOKEN` in `.env` and start the stack (the admin routes return 404 while the token is empty).
-2. `make agent-create NAME=demo-financial` prints the agent's key **once**; only a hash is stored. More routes: `GET /api/admin/agents`, `POST /api/admin/agents/{id}/keys`, `DELETE /api/admin/agents/{id}/keys/{key_id}`, `POST /api/admin/agents/{id}/disable|enable` (all with `Authorization: Bearer <admin token>`).
+1. For the command line, put a long random `NEWSDOCK_ADMIN_TOKEN` in `.env` and start the stack (while it is empty the token opens nothing; admins and owners can still manage agents in the UI).
+2. `make agent-create NAME=demo-financial` prints the agent's key **once**; only a hash is stored. More routes: `GET /api/admin/agents`, `POST /api/admin/agents/{id}/keys`, `DELETE /api/admin/agents/{id}/keys/{key_id}`, `POST /api/admin/agents/{id}/disable|enable` (all with `Authorization: Bearer <admin token>`, or a logged-in admin or owner session).
 3. Put the key in `.env` as `NEWSDOCK_AGENT_API_KEY` and restart the agent. Any MCP client sends `Authorization: Bearer <key>`.
 
-The server keeps each agent's position: `list_new_articles` without a cursor resumes after the last `ack_cursor` the agent sent (call it after finishing a batch), and each agent is limited to `api.rate_limit_per_minute` requests (HTTP 429 with `Retry-After`). **Reading is still open:** the web UI's `GET /api/*` routes need no key until the UI-login spec lands (spec D-7).
+The server keeps each agent's position: `list_new_articles` without a cursor resumes after the last `ack_cursor` the agent sent (call it after finishing a batch), and each agent is limited to `api.rate_limit_per_minute` requests (HTTP 429 with `Retry-After`). **Reading needs a login or a key** (ui-login closed the old open-reads risk): `GET /api/articles*` accepts a browser session or an agent key.
 
 ## Subscriptions and push streams (M2)
 
@@ -92,6 +108,7 @@ All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/c
 
 - **Change a value:** edit the file and `docker compose ... up -d <service>`, or set the env var in `.env` / the compose `environment:`.
 - **Point a service at another file:** `NEWSDOCK_CONFIG_FILE=/path/to/newsdock.yaml` (compose mounts `infra/config` read-only at `/etc/newsdock`).
+- **Login settings** (`api.auth_*`, `api.cors_*`, `web.session_cookie`, `web.login_required`) are in the same file; `web.session_cookie` must equal `api.auth_cookie_name`.
 - **Secrets** (`DATABASE_URL`, `POSTGRES_PASSWORD`) stay in `.env`; a secret-looking key in the file stops the service at startup.
 - **Host ports** (`API_PORT`, `WEB_PORT`, `POSTGRES_PORT`) are `.env` values because compose cannot read the YAML.
 - Details: [ADR-0013](docs/adr/0013-layered-config-package-and-yaml.md), [spec](docs/specs/externalize-config/spec.md).

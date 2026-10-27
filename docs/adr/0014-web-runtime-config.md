@@ -16,3 +16,7 @@ Option 1 with the `yaml` npm package for the file read. Env (`NEWSDOCK_WEB_*`) o
 
 ## Consequences
 + One image runs anywhere; same override model as the Python side. − The root layout is dynamically rendered (no static prerender of the shell); acceptable because the feed is client-fetched anyway. − A new npm dependency (`yaml`) and a vitest suite for the loader. − Fetch helpers lose their module-level `API_BASE` constant and take it as an argument.
+
+## Amendment 2026-10-27 (ui-login, ADR-0021)
+The runtime config now also carries `session_cookie` (the API's login cookie name, default `newsdock_session`) and `login_required` (default true), env `NEWSDOCK_WEB_SESSION_COOKIE` and `NEWSDOCK_WEB_LOGIN_REQUIRED`, because the web server cannot read the API's settings and its login gate needs both. They follow the same env > file > defaults rule. `api_base_url` is unchanged: it is still what the browser calls (ADR-0021 chose credentialed CORS over a proxy).
+

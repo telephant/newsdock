@@ -41,7 +41,13 @@ SERVICES: dict[str, type[BaseSettings]] = {
 }
 # newsdock_db has no section of its own: its pool keys live under `common`.
 COMMON_ONLY: list[type[BaseSettings]] = [DbSettings]
-WEB_KEYS = {"api_base_url": None, "poll_ms": 60000, "page_size": None}
+WEB_KEYS = {
+    "api_base_url": None,
+    "poll_ms": 60000,
+    "page_size": None,
+    "session_cookie": "newsdock_session",
+    "login_required": True,
+}
 
 BANNED_STRINGS = {"gkg.raw", "gkg.clean", "gkg.dlq"}
 BANNED_NAMES = {

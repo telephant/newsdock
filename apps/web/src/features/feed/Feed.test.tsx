@@ -2,6 +2,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
 import { ConfigProvider } from "@/components/ConfigProvider";
+import { DEFAULT_CONFIG } from "@/lib/config/types";
 import { Feed } from "./Feed";
 import type { FeedPage } from "./api";
 
@@ -75,7 +76,12 @@ test("feed requests articles from the configured API base and page size", async 
   vi.stubGlobal("fetch", fetchMock);
   render(
     <ConfigProvider
-      value={{ apiBaseUrl: "http://x:9", pollMs: 1000, pageSize: 25 }}
+      value={{
+        ...DEFAULT_CONFIG,
+        apiBaseUrl: "http://x:9",
+        pollMs: 1000,
+        pageSize: 25,
+      }}
     >
       <Feed />
     </ConfigProvider>,
@@ -93,7 +99,7 @@ test("feed polls at the configured interval", async () => {
     vi.stubGlobal("fetch", fetchMock);
     render(
       <ConfigProvider
-        value={{ apiBaseUrl: "http://x:9", pollMs: 1000, pageSize: undefined }}
+        value={{ ...DEFAULT_CONFIG, apiBaseUrl: "http://x:9", pollMs: 1000 }}
       >
         <Feed />
       </ConfigProvider>,
