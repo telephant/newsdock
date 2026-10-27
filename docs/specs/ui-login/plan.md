@@ -16,7 +16,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Tests: [tests.md](
 | 8 | Open questions / unchecked items | grep `- [ ]` in spec and design | **pass**: none; all design checklist items ticked with dates |
 
 Findings carried as risks (none block the plan):
-- **R-1 (medium)** Browser behaviour of cross-port cookies and `EventSource` with credentials, and `Last-Event-ID` in CORS preflight, rest on **[memory]**; T-01 verifies them first. If the real-browser check fails the plan stops for a decision (ADR-0021 option 2, the proxy).
+- **R-1 (resolved 2026-10-27 by T-01, Chrome only)** Cross-port cookies, `EventSource` with credentials and `Last-Event-ID` in CORS all work with a hostname-aligned page and API. Residual: Safari and Firefox untested (**[memory]**); M-1 and M-3 should be repeated in one of them if available.
 - **R-2 (medium)** T-05 changes the shared auth middleware and T-09 factors the agent SSE loop; the agent suites (TC-17, TC-37) are the guard and must stay unchanged.
 - **R-3 (low)** Open sign-up (D-3) is the user's choice against the recommendation; documented in the README in T-14, switchable with `auth_signup_open`.
 - **R-4 (low)** Login throttle is in memory and per account (one API worker); a locked account can be locked out by an attacker for one window.
@@ -65,4 +65,8 @@ Tests first and red→green; `make check` green; `make test APP=api` or `APP=web
 
 ## Progress
 
-<!-- filled by /spec-implement: one line per task with date and result -->
+- [x] **T-01** Spike (2026-10-27) — passed, no design change.
+  - argon2-cffi 25.1.0 added to `apps/api/pyproject.toml` and `uv.lock`. Defaults (argon2id v19, t=3, m=64 MiB, p=4): hash median 22.5 ms / p95 23.7 ms; verify ok 22.9 / 24.3 ms; verify wrong 23.6 / 24.5 ms (M-a). Far below the 200 ms target.
+  - Credentialed CORS with real uvicorn + Starlette: a listed origin gets `Allow-Origin` (echoed, never `*`), `Allow-Credentials: true`, methods `GET, POST, PATCH, DELETE`, headers incl. `Content-Type`, `Last-Event-ID`; an unlisted origin's preflight is 400 with no `Allow-Origin`.
+  - Real browser (headless Chrome, throwaway page on :3000 and API on :8000, files kept out of the repo): page `http://localhost:3000` → API `http://localhost:8000`: login 200, cookie stored, `fetch` with credentials 200, `EventSource` with credentials connected with the cookie, and after the server closed the stream the browser reconnected by itself sending `Last-Event-ID: 1`, which the server saw. Page `http://localhost:3000` → API `http://127.0.0.1:8000`: login 200 but the next `fetch` got 401 and the stream request carried no cookie, confirming that host alignment (design C-15) is needed.
+  - Not covered: Safari and Firefox; production `Secure` cookies over HTTPS.

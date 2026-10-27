@@ -67,7 +67,7 @@ Learning goals: password storage and session design, cookie security, role-based
 - **[verified 2026-10-27]** `apps/api/.../config.py` sets `cors_allow_methods = "GET"` and local origins only, so state-changing browser calls need a config or proxy change.
 - **[verified 2026-10-27]** Latest migration is `0005_subscriptions`; this spec adds users and sessions as `0006`.
 - **[verified 2026-10-27]** `apps/web/src` has `app/`, `components/`, `features/{article,feed}`, `lib/{api,config}`; the UI reads only public REST.
-- **[memory]** Browsers' `EventSource` cannot set headers but does send cookies for same-origin requests, so a cookie session suits SSE (this is why the agent stream needs a key header and the human one does not).
+- **[verified 2026-10-27, T-01 spike, headless Chrome]** A page on `http://localhost:3000` that logs in against `http://localhost:8000` gets an `httpOnly; SameSite=Lax` cookie and sends it on credentialed `fetch` and on `EventSource` with `withCredentials`; the browser's automatic `Last-Event-ID` on reconnect passes CORS. Against `http://127.0.0.1:8000` from the `localhost` page the cookie is not sent (401), so hostname alignment is required. Only Chrome was tested; Safari and Firefox are **[memory]**. Browsers' `EventSource` cannot set custom headers, so a cookie session suits SSE (this is why the agent stream needs a key header and the human one does not).
 - **[assumption]** argon2 library choice (`argon2-cffi`) and its parameters are decided at design.
 
 ## 4. Scope of this milestone (walking skeleton)

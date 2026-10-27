@@ -47,7 +47,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 | TC-39 | AC-15 | manual | See checklist M-3 |
 | TC-40 | AC-16 | integration | Given `a@x.io` with a session and the admin token configured; When `POST /api/admin/users/reset-password` with the token, then with an admin session, then with an owner session; Then 204, 403, 403; the old password and old session get 401, the new password logs in; unknown email 404; weak password 422; no token configured 404 |
 | TC-41 | AC-16 | unit | `make user-reset-password` script: with a fake `curl` and `read -s` input on stdin the new password is never in curl's argv or the printed output, a missing `EMAIL` or `.env` or token exits non-zero with usage |
-| TC-42 | AC-4, AC-15 | spike | T-01: argon2-cffi measured on the dev machine; real uvicorn answers a credentialed preflight with `Last-Event-ID`; in a real browser a page on `localhost:3000` logs in against `localhost:8000`, gets the cookie, and an `EventSource` with credentials connects (result recorded in plan.md Progress) |
+| TC-42 | AC-4, AC-15 | spike (done 2026-10-27, passed; findings in plan.md Progress) | T-01: argon2-cffi measured on the dev machine; real uvicorn answers a credentialed preflight with `Last-Event-ID`; in a real browser a page on `localhost:3000` logs in against `localhost:8000`, gets the cookie, and an `EventSource` with credentials connects (result recorded in plan.md Progress) |
 
 ## Manual checklists
 

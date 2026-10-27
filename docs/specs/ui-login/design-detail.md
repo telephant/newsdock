@@ -80,7 +80,7 @@ Cookie attributes: `HttpOnly; SameSite=Lax; Path=/; Max-Age=<absolute>`; `Secure
 3. On failure: increment counter, 401 `{"error":"invalid_credentials"}` (same body for unknown email).
 4. On success: clear counter, optionally rehash if `check_needs_rehash`, create session (`secrets.token_urlsafe(32)`, store sha256), delete this user's expired sessions, set cookie.
 
-argon2-cffi `PasswordHasher()` defaults (RFC 9106 low-memory profile) are the starting point; the provisional target of ~200 ms/hash is measured in T-tasks, then tuned **[assumption]**. Hashing runs in `run_in_threadpool`.
+argon2-cffi `PasswordHasher()` defaults are used as is: argon2id v19, t=3, m=64 MiB, p=4, 16-byte salt, 32-byte hash. **[verified 2026-10-27, T-01, dev machine]** median 22.5 ms, p95 23.7 ms per hash; a wrong-password verify takes 23.6 ms median, so the 200 ms target holds with a wide margin and no tuning is proposed. Hashing runs in `run_in_threadpool`.
 
 ### First-owner and last-owner locks
 ```
@@ -107,7 +107,7 @@ Optional ad-hoc filter (`theme`, `domain`, `text`) as query parameters, same SQL
 
 **API client** `src/lib/api/client.ts` wraps `fetch` with `credentials: "include"` and `Content-Type: application/json` for bodies; a 401 on any call except `/api/auth/*` redirects to `/login?next=<path>`; other errors surface as typed results. The live page uses `new EventSource(`${apiBaseUrl}/api/live`, {withCredentials: true})`; the browser resends `Last-Event-ID` itself. Types stay generated from `openapi.json` (`pnpm run generate:api`); new routes are added there.
 
-**CORS (API, C-6)**: `CORSMiddleware(allow_origins=cors_origins_list, allow_credentials=True, allow_methods=[GET,POST,PATCH,DELETE], allow_headers=[Content-Type, Last-Event-ID])`. Credentialed responses need an explicit origin and the wildcard is not honoured for credentials **[memory: Fetch/CORS spec]**, which is why `allow_headers` is a list now. Preflight tests assert the response headers (T-task).
+**CORS (API, C-6)**: `CORSMiddleware(allow_origins=cors_origins_list, allow_credentials=True, allow_methods=[GET,POST,PATCH,DELETE], allow_headers=[Content-Type, Last-Event-ID])`. Credentialed responses need an explicit origin and the wildcard is not honoured for credentials **[memory: Fetch/CORS spec]**, which is why `allow_headers` is a list now. **[verified 2026-10-27, T-01]** Starlette answers a preflight from a listed origin with `Allow-Origin` = that origin, `Allow-Credentials: true`, methods `GET, POST, PATCH, DELETE` and headers including `Content-Type` and `Last-Event-ID`; an unlisted origin's preflight gets 400 and no `Allow-Origin`. Preflight tests assert these headers (T-07).
 
 **Gate** `src/proxy.ts` (Next 16 name for middleware **[verified: docs/01-app/01-getting-started/16-proxy.md]**): matcher excludes `/login`, `/signup`, `_next/*`, `favicon.ico`; a missing `newsdock_session` cookie redirects to `/login?next=<path>`. The cookie is visible to the web server only because cookies are host-scoped, not port-scoped **[memory: RFC 6265]**, and the API host equals the page host (below). Docs say proxy is for optimistic checks only **[verified]**: every data call is authorized by the API, so a forged cookie shows an empty shell and gets 401s.
 

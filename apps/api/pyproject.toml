@@ -12,6 +12,7 @@ dependencies = [
     "uvicorn>=0.30",
     "mcp>=2.3",
     "psycopg>=3.2",
+    "argon2-cffi==25.1.0",
 ]
 
 [build-system]
