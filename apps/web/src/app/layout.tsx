@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import { connection } from "next/server";
 import { ConfigProvider } from "@/components/ConfigProvider";
+import { Nav } from "@/features/auth/Nav";
+import { SessionProvider } from "@/features/auth/SessionProvider";
 import { getRuntimeConfig } from "@/lib/config/runtime";
 import { MISMATCH_HEADER } from "@/lib/hosts";
 
@@ -25,7 +27,12 @@ export default async function RootLayout({
     <html lang="en">
       <body>
         {hostProblem ? <p role="alert">{hostProblem}</p> : null}
-        <ConfigProvider value={config}>{children}</ConfigProvider>
+        <ConfigProvider value={config}>
+          <SessionProvider>
+            <Nav />
+            {children}
+          </SessionProvider>
+        </ConfigProvider>
       </body>
     </html>
   );

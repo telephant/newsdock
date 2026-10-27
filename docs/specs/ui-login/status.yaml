@@ -11,8 +11,8 @@ acs:
   AC-5: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
   AC-6: {status: passing}  # TC-13, TC-14, TC-15 green (T-02, T-05, 2026-10-27)
   AC-7: {status: passing}  # TC-16, TC-17 green (T-05, 2026-10-27)
-  AC-8: {status: in-progress}  # gate, client, host alignment green: TC-18, TC-19, TC-20 (T-10, 2026-10-27); forms TC-21 (T-11) and manual TC-22 pending
-  AC-9: {status: in-progress}  # API half green (T-02, T-06); nav by role TC-25 pending
+  AC-8: {status: in-progress}  # TC-18..TC-21 green (T-10, T-11, 2026-10-27); manual TC-22 pending (T-14)
+  AC-9: {status: passing}  # TC-23, TC-24, TC-25 green (T-02, T-06, T-11, 2026-10-27)
   AC-10: {status: in-progress}  # API half green (T-03, T-06); users screen TC-27 pending
   AC-11: {status: todo}
   AC-12: {status: in-progress}  # API half green (T-06); subscriptions screen TC-31 pending
