@@ -50,6 +50,8 @@ Font: `--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragi
 
 **As built (T-05, 2026-10-27):** `Detail` shows a back link, title, source link, a fields card, themes as badges, sources as a divided list and each analysis as a card with the payload as pretty-printed JSON in a `<pre>` (text only). Loading uses `ListSkeleton`, failure `ErrorAlert`; the old tests were not changed. The article route no longer renders its own `<main>` (the shell has one). Still to fix in later tasks: `login`, `signup`, `live` and `admin/*` pages still wrap their content in `<main>`, which nests inside the shell's `<main>`; each screen's task removes it.
 
+**As built (T-06, 2026-10-27):** `features/auth/CredentialForm.tsx` holds the markup both forms share (card, `Label` + `Input`, an `Alert` tied to both fields through `aria-invalid` and `aria-describedby`, full-width pending button, footer link); `LoginForm` and `SignupForm` keep their state, submit logic and messages. The form carries `aria-busy` while pending. The two pages drop their own `<main>` and sit in a `max-w-sm` column with a `PageHeader`. Existing form tests were not changed.
+
 ## 4. Screens
 
 | Route | Component | Look |

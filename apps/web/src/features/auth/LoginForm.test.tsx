@@ -147,3 +147,27 @@ test("the form links to sign-up and uses password-manager friendly fields", () =
     "current-password",
   );
 });
+
+// TC-9 (AC-6): the error belongs to the form and the fields; pending is visible.
+test("the error is inside the form and marks both fields invalid", async () => {
+  setup(() => json({ detail: "invalid_credentials" }, 401));
+  const email = screen.getByLabelText("Email");
+  expect(email.getAttribute("aria-invalid")).toBeNull();
+  submit();
+  const alert = await screen.findByRole("alert");
+  expect(alert.closest("form")).not.toBeNull();
+  for (const field of [email, screen.getByLabelText("Password")]) {
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(alert.id);
+  }
+});
+
+test("while in flight the button reads 'Logging in…' and the form is busy", async () => {
+  setup(() => new Promise<Response>(() => {}) as never);
+  submit();
+  const button = await screen.findByRole("button", { name: "Logging in…" });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(
+    screen.getByRole("form", { name: "log in" }).getAttribute("aria-busy"),
+  ).toBe("true");
+});

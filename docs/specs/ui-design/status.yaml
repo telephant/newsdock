@@ -10,7 +10,7 @@ acs:
   AC-3: {status: passing}  # TC-4, TC-5 green (T-03, 2026-10-27)
   AC-4: {status: passing}  # TC-6, TC-7 green (T-04, 2026-10-27)
   AC-5: {status: passing}  # TC-8 green (T-05, 2026-10-27)
-  AC-6: {status: todo}
+  AC-6: {status: passing}  # TC-9 green (T-06, 2026-10-27)
   AC-7: {status: todo}
   AC-8: {status: todo}
   AC-9: {status: in-progress}  # toggle + stored choice green in jsdom (T-03); flash-free first paint is manual M-1 (T-09)

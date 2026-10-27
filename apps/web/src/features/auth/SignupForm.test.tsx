@@ -90,3 +90,27 @@ test("an unexpected code is plain text, and the form offers a way back to login"
     "new-password",
   );
 });
+
+// TC-9 (AC-6): the error belongs to the form and the fields; pending is visible.
+test("the error is inside the form and marks both fields invalid", async () => {
+  setup(() => json({ detail: "email_taken" }, 409));
+  const email = screen.getByLabelText("Email");
+  expect(email.getAttribute("aria-invalid")).toBeNull();
+  submit();
+  const alert = await screen.findByRole("alert");
+  expect(alert.closest("form")).not.toBeNull();
+  for (const field of [email, screen.getByLabelText("Password")]) {
+    expect(field.getAttribute("aria-invalid")).toBe("true");
+    expect(field.getAttribute("aria-describedby")).toBe(alert.id);
+  }
+});
+
+test("while in flight the button reads 'Signing up…' and the form is busy", async () => {
+  setup(() => new Promise<Response>(() => {}) as never);
+  submit();
+  const button = await screen.findByRole("button", { name: "Signing up…" });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  expect(
+    screen.getByRole("form", { name: "sign up" }).getAttribute("aria-busy"),
+  ).toBe("true");
+});

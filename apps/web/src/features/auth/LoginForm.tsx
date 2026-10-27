@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
 import { apiRequest } from "@/lib/client/api";
+import { CredentialForm, footerLink } from "./CredentialForm";
 import { loginMessage } from "./messages";
 
 export function LoginForm({
@@ -40,37 +41,26 @@ export function LoginForm({
   }
 
   return (
-    <form onSubmit={onSubmit} aria-label="log in">
-      <label>
-        Email
-        <input
-          name="email"
-          type="text"
-          inputMode="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-      </label>
-      <label>
-        Password
-        <input
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-      </label>
-      {error ? <p role="alert">{error}</p> : null}
-      <button type="submit" disabled={pending}>
-        {pending ? "Logging in…" : "Log in"}
-      </button>
-      <p>
-        No account yet? <Link href="/signup">Sign up</Link>
-      </p>
-    </form>
+    <CredentialForm
+      label="log in"
+      email={email}
+      onEmail={setEmail}
+      password={password}
+      onPassword={setPassword}
+      passwordAutoComplete="current-password"
+      error={error}
+      pending={pending}
+      submitLabel="Log in"
+      pendingLabel="Logging in…"
+      onSubmit={onSubmit}
+      footer={
+        <>
+          No account yet?{" "}
+          <Link href="/signup" className={footerLink}>
+            Sign up
+          </Link>
+        </>
+      }
+    />
   );
 }

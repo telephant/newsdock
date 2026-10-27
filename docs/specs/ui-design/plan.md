@@ -26,7 +26,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Tests: [tests.md](
 | T-03 | Theme, app shell, Nav | AC-3, AC-9 | B skeleton (tokens + shell + feed). **Done 2026-10-27** |
 | T-04 | Shared states, Feed, ArticleItem | AC-4, AC-13 | B. **Done 2026-10-27** |
 | T-05 | Article detail | AC-5 | C screens. **Done 2026-10-27** |
-| T-06 | Login and sign-up | AC-6 | C |
+| T-06 | Login and sign-up | AC-6 | C. **Done 2026-10-27** |
 | T-07 | Management screens | AC-7, AC-13 | C |
 | T-08 | Live page | AC-8, AC-13 | C |
 | T-09 | Image test, screenshots, dark and responsive review | AC-14, AC-9, AC-10 | D proof |
