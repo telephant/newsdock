@@ -61,6 +61,8 @@ Relative time keeps `new Date(...).toLocaleString()` in the `title` so existing 
 
 ## 5. Checks
 
+**As built (T-02, 2026-10-27):** `infra/scripts/check_web_style.py [ROOT]` (stdlib only), run by `make style-web`, which `make check-web` depends on; tests in `infra/scripts/tests/rules/test_check_web_style.py` (marker `rules`, no pnpm needed, so they also run in `make test-rules-python`). Comment lines (`//`, `/*`, `*`) are ignored so code may name what it forbids. The text/ring tokens in `globals.css` must be `#rrggbb` (other tokens may use any colour syntax). Final values pass: light text pairs 5.2 to 16.7:1, dark 6.6 to 16.7:1, ring 5.2:1 light and 10.8:1 dark; the radius is 0.875rem. New tokens `--primary-text` and `--destructive-foreground` are mapped in `@theme inline` (`text-primary-text`, `text-destructive-foreground`).
+
 - `infra/scripts/check_web_style.py` (run from `make check-web`, and covered by `make test-rules` with a failing fixture):
   1. Colour literals: regex for `#[0-9a-fA-F]{3,8}\b`, `rgb(`, `hsl(`, `oklch(` and palette classes `\b(bg|text|border|ring|fill|stroke|from|to|via)-(red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|slate|gray|zinc|neutral|stone)-\d{2,3}\b` in `apps/web/src/**/*.{ts,tsx,css}` except `app/globals.css`, `components/ui/**`, `lib/api/**` and test files.
   2. Contrast: parse `globals.css` `:root` and `.dark` hex values, compute WCAG ratios for pairs (`foreground/background`, `muted-foreground/background`, `card-foreground/card`, `primary-foreground/primary`, `primary-text/background`, `destructive-foreground/destructive` if present), fail under 4.5.

@@ -6,7 +6,7 @@ adrs: {ADR-0022: accepted}
 gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
 acs:
   AC-1: {status: passing}  # TC-1 green, build + make build APP=web ok (T-01, 2026-10-27)
-  AC-2: {status: todo}
+  AC-2: {status: passing}  # TC-2, TC-3 green (T-02, 2026-10-27)
   AC-3: {status: todo}
   AC-4: {status: todo}
   AC-5: {status: todo}
@@ -15,7 +15,7 @@ acs:
   AC-8: {status: todo}
   AC-9: {status: todo}
   AC-10: {status: todo}
-  AC-11: {status: todo}
+  AC-11: {status: passing}  # TC-16, TC-17 green (T-02, 2026-10-27); every text pair >= 5.2:1 in both themes, ring >= 5.2:1
   AC-12: {status: todo}
   AC-13: {status: todo}
   AC-14: {status: in-progress}  # image builds and serves CSS by hand (T-01); automated TC-20 in T-09
