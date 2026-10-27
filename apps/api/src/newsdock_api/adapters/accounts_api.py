@@ -7,9 +7,11 @@ cookie values nor hashes are logged; INFO lines carry the user id and role only.
 """
 
 import logging
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -20,6 +22,7 @@ from newsdock_api.domain.accounts import (
     InvalidEmail,
     PasswordHasher,
     SignupClosed,
+    UserPrincipal,
     WeakPassword,
     check_password,
     ensure_signup_open,
@@ -52,6 +55,7 @@ def build_accounts_router(
     hasher: PasswordHasher,
     limiter: LoginLimiter,
     *,
+    require_user: Callable[[Request], UserPrincipal],
     dummy_hash: str,
     signup_open: bool,
     min_password_length: int,
@@ -129,5 +133,27 @@ def build_accounts_router(
         )
         logger.info("login user=%s role=%s", user.id, user.role.value)
         return PublicUser(id=user.id, email=user.email, role=user.role.value)
+
+    @router.get("/me")
+    def me(user: Annotated[UserPrincipal, Depends(require_user)]) -> PublicUser:
+        return PublicUser(id=user.user_id, email=user.email, role=user.role.value)
+
+    @router.post("/logout", status_code=204)
+    def logout(request: Request) -> Response:
+        """End the session named by the cookie; 204 even if it was already gone."""
+        token = request.cookies.get(cookie_name)
+        if not token:
+            raise HTTPException(status_code=401, detail="unauthorized")
+        try:
+            store.delete_session(hash_token(token))
+        except SQLAlchemyError as exc:
+            logger.exception("logout failed")
+            raise HTTPException(status_code=503, detail="unavailable") from exc
+        response = Response(status_code=204)
+        response.delete_cookie(
+            cookie_name, path="/", httponly=True, samesite="lax", secure=cookie_secure
+        )
+        logger.info("logout")
+        return response
 
     return router

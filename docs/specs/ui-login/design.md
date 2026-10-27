@@ -18,7 +18,7 @@ New ids continue after C-9; C-6 (API) and C-8 (web) are extended.
 |---|---|---|---|
 | C-10 | Accounts domain (`domain/accounts.py`) | roles, permission table, password policy, login-failure limiter | pure; no I/O |
 | C-11 | Users and sessions repo (`adapters/users_repo.py`) | SQL for `users`, `sessions`; first-owner and last-owner locks | migration `0006` |
-| C-12 | Principal resolver (`adapters/auth.py`, extended) | session cookie / agent key / admin token → one principal on `scope["state"]` | extends ADR-0016 middleware; rate limit unchanged for agents |
+| C-12 | Principal resolver and guards (`adapters/principal.py`) | session cookie / agent key / admin token → one principal; FastAPI dependencies `read`, `user` and an app-wide `write` guard (Origin allowlist, JSON bodies) | dependencies, not the outer middleware, so 401/403 keep their CORS headers; `AuthMiddleware` keeps `/mcp` and `/api/subscriptions*` unchanged (ADR-0016/0019) |
 | C-13 | Account routes (`adapters/accounts_api.py`) | `/api/auth/{signup,login,logout,me}`, `/api/users*` | role guards as dependencies |
 | C-14 | Live feed stream (`adapters/live.py`) | `GET /api/live` SSE for sessions | reuses `WakeHub`, `list_new`, cursor ids |
 | C-15 | Web gate + API client (`src/proxy.ts`, `lib/api/client.ts`, host alignment in the root layout) | redirect cookie-less visitors to `/login`; every call uses `credentials: "include"`, `EventSource` uses `withCredentials`; redirect to the API's hostname when the page host differs | gate is optimistic only; the API decides |

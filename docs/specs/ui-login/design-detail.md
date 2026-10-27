@@ -29,12 +29,14 @@ The sink's 7-day retention does not touch these tables. `agents` and `api_keys` 
 
 Order for a request to a protected route:
 
+If an `Authorization` header is present it alone decides (no fallback to the cookie); otherwise the cookie decides. Implemented in `PrincipalResolver` (T-05).
+
 1. `Authorization: Bearer ndk_<prefix>_<secret>` → agent (existing `authenticate`).
 2. `Authorization: Bearer <admin token>` (constant-time compare) → `AdminToken` principal, honoured **only** on `/api/admin/*`.
 3. Session cookie `newsdock_session` → `User` principal (sha256 of cookie → `sessions` join `users`; reject when `expires_at < now()` or `last_seen_at + idle < now()`).
 4. None → anonymous.
 
-`scope["state"]` gets `principal`; the existing `agent` and `key_id` keys are kept so MCP and agent streams are untouched (NFR-3). A request carrying both a key and a cookie uses the key.
+**As built (T-05, 2026-10-27):** the resolver is called from FastAPI dependencies (`Guards.read`, `Guards.user`, and `Guards.write` registered app-wide) and caches the result on `request.state.principal`. It is not run in the outer `AuthMiddleware`: that middleware wraps CORS, so a 401 it produced would carry no `Access-Control-Allow-Origin` and the credentialed web UI could not read it. `AuthMiddleware` still enforces `/mcp` and `/api/subscriptions*` with its own `agent`/`key_id` state, so MCP and agent streams are untouched (NFR-3). A request carrying both a key and a cookie uses the key; a bad key does not fall back to the cookie. The write guard returns 403 `bad_origin` for a non-GET whose `Origin` is not in `cors_origins` and 415 when a body is present and its type is not `application/json`; GET and OPTIONS are never blocked by it. `logout` needs the cookie itself (401 without one, 204 for an already ended session).
 
 Protection map:
 

@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
@@ -26,6 +26,7 @@ from newsdock_api.adapters.auth import AuthMiddleware
 from newsdock_api.adapters.kafka_health import kafka_reachable
 from newsdock_api.adapters.listener import NotifyListener, listen_dsn
 from newsdock_api.adapters.passwords import Argon2Hasher, make_dummy_hash
+from newsdock_api.adapters.principal import PrincipalResolver, build_guards
 from newsdock_api.adapters.repo import SqlArticleRepo
 from newsdock_api.adapters.sse import build_stream_router
 from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
@@ -188,7 +189,23 @@ def create_app(
             listener_task.cancel()
             await asyncio.gather(listener_task, return_exceptions=True)
 
-    app = FastAPI(title="newsdock API", lifespan=lifespan)
+    admin_token = settings.admin_token
+    guards = build_guards(
+        PrincipalResolver(
+            sessions=accounts,
+            keys=keys,
+            admin_token=admin_token.get_secret_value() if admin_token else None,
+            idle=settings.session_idle,
+        ),
+        auth_required=settings.auth_required,
+        cookie_name=settings.auth_cookie_name,
+        allowed_origins=settings.cors_origins_list,
+    )
+    app = FastAPI(
+        title="newsdock API",
+        lifespan=lifespan,
+        dependencies=[Depends(guards.write)],  # Origin allowlist + JSON bodies
+    )
     app.state.wake_hub = hub
     app.add_middleware(  # the web UI calls /api/* from the browser (TC-25)
         CORSMiddleware,
@@ -197,7 +214,6 @@ def create_app(
         allow_headers=settings.cors_headers_list,
     )
 
-    admin_token = settings.admin_token
     app.include_router(
         build_admin_router(
             registry,
@@ -224,6 +240,7 @@ def create_app(
             or LoginLimiter(
                 settings.auth_login_max_failures, settings.login_window_seconds
             ),
+            require_user=guards.user,
             dummy_hash=make_dummy_hash(password_hasher),
             signup_open=settings.auth_signup_open,
             min_password_length=settings.auth_min_pw_length,
@@ -241,7 +258,7 @@ def create_app(
         )
     )
 
-    @app.get("/api/articles")
+    @app.get("/api/articles", dependencies=[Depends(guards.read)])
     def rest_articles(
         theme: str | None = None,
         domain: str | None = None,
@@ -269,7 +286,7 @@ def create_app(
         )
         return FeedPage(articles=articles, next_before=next_before)
 
-    @app.get("/api/articles/{article_id}")
+    @app.get("/api/articles/{article_id}", dependencies=[Depends(guards.read)])
     def rest_article(article_id: str) -> ArticleDetail:
         try:
             return get_article(repo, article_id)

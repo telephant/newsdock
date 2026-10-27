@@ -13,6 +13,8 @@ from typing import NamedTuple, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
+from newsdock_api.domain.agents import Agent
+
 EMAIL_MAX_LENGTH = 254
 PASSWORD_MAX_LENGTH = 128
 TOUCH_INTERVAL = timedelta(seconds=60)  # `last_seen_at` is refreshed at most this often
@@ -130,7 +132,42 @@ class UserLookup(Protocol):
     def find_by_email(self, email: str) -> StoredUser | None: ...
 
 
-class AccountStore(UserLookup, Protocol):
+class UserPrincipal(BaseModel):
+    """A logged-in human; `role` is read from the database on every request."""
+
+    model_config = ConfigDict(frozen=True)
+
+    user_id: str
+    email: str
+    role: Role
+
+
+class AgentPrincipal(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    agent: Agent
+    key_id: str
+
+
+class AdminTokenPrincipal(BaseModel):
+    """The shared admin token (CLI break-glass); honoured on admin routes only."""
+
+    model_config = ConfigDict(frozen=True)
+
+
+# None = anonymous
+Principal = UserPrincipal | AgentPrincipal | AdminTokenPrincipal | None
+
+
+class SessionStore(Protocol):
+    def find_session(self, token_hash: str) -> SessionInfo | None: ...
+
+    def touch_session(self, token_hash: str, now: datetime) -> None: ...
+
+    def delete_session(self, token_hash: str) -> bool: ...
+
+
+class AccountStore(UserLookup, SessionStore, Protocol):
     """What the sign-up and login routes need from persistence."""
 
     def create_user(self, email: str, password_hash: str) -> StoredUser: ...

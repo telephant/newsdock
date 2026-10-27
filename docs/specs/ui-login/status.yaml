@@ -7,16 +7,16 @@ acs:
   AC-1: {status: in-progress}  # sign-up/login done (T-04); logs in logout/reset later
   AC-2: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
   AC-3: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
-  AC-4: {status: in-progress}  # sign-up/login done (T-04); /me, CORS, CSRF pending (T-05, T-07)
+  AC-4: {status: in-progress}  # TC-8, TC-10 green (T-04, T-05); CORS TC-9 pending (T-07)
   AC-5: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
-  AC-6: {status: todo}
-  AC-7: {status: todo}
+  AC-6: {status: passing}  # TC-13, TC-14, TC-15 green (T-02, T-05, 2026-10-27)
+  AC-7: {status: passing}  # TC-16, TC-17 green (T-05, 2026-10-27)
   AC-8: {status: todo}
   AC-9: {status: in-progress}  # domain half green (T-02, 2026-10-27); routes pending
   AC-10: {status: in-progress}  # repo half green (T-03, 2026-10-27); routes pending
   AC-11: {status: todo}
   AC-12: {status: todo}
   AC-13: {status: passing}  # TC route/domain/repo tests green (T-02..T-04, 2026-10-27)
-  AC-14: {status: todo}
+  AC-14: {status: in-progress}  # token vs session split green (T-05); admin routes by session pending (T-06)
   AC-15: {status: todo}
   AC-16: {status: todo}
