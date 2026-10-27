@@ -56,6 +56,7 @@ class Settings(LayeredSettings):
     sse_max_streams_per_agent: int = 5
     sse_keepalive_seconds: int = 15
     sse_fallback_poll_seconds: int = 30
+    live_max_streams_per_user: int = 3  # concurrent live-feed streams per user (429)
     uvicorn_workers: int = 1
     uvicorn_log_level: str = "info"
 

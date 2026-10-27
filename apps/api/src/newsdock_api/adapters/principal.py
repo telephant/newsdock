@@ -61,6 +61,10 @@ class PrincipalResolver:
             return self._from_cookie(session_cookie)
         return None
 
+    def session_alive(self, token: str) -> bool:
+        """Is this cookie still a live session? (open streams re-check it)"""
+        return isinstance(self._from_cookie(token), UserPrincipal)
+
     def _from_authorization(self, header: str) -> Principal:
         found = authenticate(header, self._keys.find_key)
         if found is not None:
@@ -105,6 +109,10 @@ class Guards(NamedTuple):
     admin: Callable[[Request], Principal]  # admin token, or admin/owner session
     manage_users: Callable[[Request], UserPrincipal]  # owner session only
     admin_token_only: Callable[[Request], None]  # the CLI token, nothing else
+    live: Callable[
+        [Request], UserPrincipal | None
+    ]  # live feed: a user, or anyone in dev
+    session_alive: Callable[[str], bool]
 
 
 def build_guards(
@@ -176,6 +184,15 @@ def build_guards(
             return who
         raise forbidden_or_unauthorized(who)
 
+    def live(request: Request) -> UserPrincipal | None:
+        # dev mode (auth off) opens the feed like the reads; otherwise a user, any role
+        if not auth_required:
+            return None
+        who = principal(request)
+        if isinstance(who, UserPrincipal):
+            return who
+        raise forbidden_or_unauthorized(who)  # nobody: 401; an agent key: 403
+
     def admin_token_only(request: Request) -> None:
         # no token configured: the route does not exist; sessions never qualify, so
         # an admin cannot take over the owner account
@@ -194,4 +211,6 @@ def build_guards(
         admin=admin,
         manage_users=manage_users,
         admin_token_only=admin_token_only,
+        live=live,
+        session_alive=resolver.session_alive,
     )

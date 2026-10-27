@@ -29,6 +29,7 @@ from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.auth import AuthMiddleware
 from newsdock_api.adapters.kafka_health import kafka_reachable
 from newsdock_api.adapters.listener import NotifyListener, listen_dsn
+from newsdock_api.adapters.live import build_live_router
 from newsdock_api.adapters.passwords import Argon2Hasher, make_dummy_hash
 from newsdock_api.adapters.principal import PrincipalResolver, build_guards
 from newsdock_api.adapters.repo import SqlArticleRepo
@@ -232,6 +233,19 @@ def create_app(
             limiter_for_logins,
             require_token=guards.admin_token_only,
             min_password_length=settings.auth_min_pw_length,
+        )
+    )
+    app.include_router(
+        build_live_router(
+            service=service,
+            hub=hub,
+            limiter=StreamLimiter(settings.live_max_streams_per_user),
+            require_live=guards.live,
+            session_alive=guards.session_alive,
+            cookie_name=settings.auth_cookie_name,
+            keepalive_seconds=settings.sse_keepalive_seconds,
+            fallback_poll_seconds=settings.sse_fallback_poll_seconds,
+            max_text_length=settings.subscription_text_max_length,
         )
     )
     app.include_router(

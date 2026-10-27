@@ -117,6 +117,11 @@ class SqlArticleRepo:
                 for r in rows
             ]
 
+    def latest_seq(self) -> int | None:
+        with Session(self._engine) as session:
+            newest = session.scalar(select(func.max(Article.seq)))
+            return int(newest) if newest is not None else None
+
     def list_new(
         self,
         *,

@@ -103,6 +103,8 @@ Advisory transaction locks are released at commit/rollback **[memory: Postgres d
 4. Loop identical to `sse.py`: note `hub.generation()` → cursor query via `service.list_new(cursor, limit=200)` → emit `id: <cursor>\nevent: article\ndata: <json>` → wait on the hub with `sse_keepalive_seconds`; ping when idle; fallback poll every `sse_fallback_poll_seconds`.
 5. Every keep-alive tick re-checks that the session is still valid (logout, expiry, deletion or demotion below viewer ends the stream). Latency bound = `sse_keepalive_seconds`.
 
+**As built (T-09, 2026-10-27):** the loop lives in `adapters/streaming.py` (`article_events`, `Slot`, `frame`) and is used unchanged by the agent router and by `adapters/live.py`. The start cursor is `ArticleService.latest_cursor()` (`encode_cursor(max(seq))`, or position 0 on an empty table so the very first article is seen), read before the response starts. A caller that is an agent key gets 403, nobody 401; with `auth_required=false` the feed is open and not session-bound (one shared `anonymous` cap). The per-user cap is `live_max_streams_per_user` (3) on its own `StreamLimiter`. The keep-alive re-check calls `PrincipalResolver.session_alive`, which also refreshes `last_seen_at` at most once a minute: an open tab therefore keeps its session from idling out, but never past the absolute 7-day limit.
+
 Optional ad-hoc filter (`theme`, `domain`, `text`) as query parameters, same SQL path as `list_new`; no new filter language **[assumption]**. The common loop in `sse.py` is factored into a helper used by both routers; the agent-specific parts (`_still_allowed`, stored cursor) are passed in. No behaviour change for agents (existing tests are the guard).
 
 ## 5. Web (C-15, C-16)

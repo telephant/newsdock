@@ -34,6 +34,7 @@ api:
   sse_max_streams_per_agent: 5        # concurrent SSE streams per agent (429 above)
   sse_keepalive_seconds: 15           # ': ping' interval; also the revoked-key re-check
   sse_fallback_poll_seconds: 30       # re-query even without a NOTIFY (listener outage)
+  live_max_streams_per_user: 3        # concurrent live-feed streams per user (429 above)
   auth_signup_open: true              # false closes self-sign-up (ADR-0020, spec D-3)
   auth_min_pw_length: 10
   auth_session_idle_hours: 12         # a session unused this long ends

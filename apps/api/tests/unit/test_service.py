@@ -40,6 +40,7 @@ class FakeRepo:
         self.upserts: list[tuple[str, str]] = []
         self.articles_exist = True
         self.new: list[ArticleSummary] = []
+        self.newest: int | None = None
 
     def search(self, *, limit: int, **kwargs: object) -> list[ArticleSummary]:
         self.search_limits.append(limit)
@@ -58,6 +59,9 @@ class FakeRepo:
         self.list_calls.append((after_seq, since, limit))
         self.filters.append((theme, domain, text))
         return self.new
+
+    def latest_seq(self) -> int | None:
+        return self.newest
 
     def upsert_analysis(
         self, article_id: str, agent_name: str, payload: dict[str, object]
@@ -199,3 +203,15 @@ def test_list_new_passes_the_filter_through() -> None:
     assert repo.filters == [("ECON_*", "a.org", "fed")]
     svc.list_new(cursor=None, limit=10)
     assert repo.filters[-1] == (None, None, None)
+
+
+# ui-login T-09 (AC-15): the live feed starts at the newest article
+def test_latest_cursor_points_at_the_newest_article() -> None:
+    svc, repo = service()
+    repo.newest = 41
+    assert decode_cursor(svc.latest_cursor()) == 41
+
+
+def test_latest_cursor_on_an_empty_table_is_position_zero() -> None:
+    svc, _ = service()  # newest is None: the first article ever must still be seen
+    assert decode_cursor(svc.latest_cursor()) == 0
