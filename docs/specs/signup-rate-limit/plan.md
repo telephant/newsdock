@@ -31,6 +31,10 @@ Findings: none open. Note for T-02: the existing Docker sign-up tests may sign u
 | T-04 | Web messages for the 429 and the agent limit | AC-10, AC-14 | T-02, T-03 |
 | T-05 | Docs and final checks | all (docs), AC-15 | T-04 |
 
+## Progress
+
+- T-01 ✅ 2026-10-28 — spike TC-8: `TestClient(app, client=(host, port))` reaches `request.client.host`, so the route tests can give each client its own address. `domain/signuplimit.py` (`SignupLimiter`: two fixed windows, atomic under a lock, refusals record nothing and never extend a window, `Retry-After` is the larger remaining time, bounded table, 0 = off per limit) with TC-1…TC-7 plus a 60-thread overshoot test; settings `auth_signup_max_per_address=5`, `auth_signup_max_total=50`, `auth_signup_window_minutes=60`, `agents_max_per_user=10`, `signup_window_seconds`, and the four rows in `infra/config/newsdock.yaml` (TC-22). `make check-python`: 488 passed (mypy strict, import-linter, config check green). Note: ruff also formats the Python code blocks in the spec markdown, so new design docs must keep them formatted.
+
 ## Milestones
 
 - **Skeleton (T-01 + T-02):** a flood of sign-ups from one address is refused with a 429 on a real database. AC-1…AC-9, AC-15.

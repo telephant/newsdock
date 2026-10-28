@@ -142,6 +142,39 @@ def test_committed_yaml_rows_equal_the_account_defaults() -> None:
         assert raw["api"][name] == value, name
 
 
+# TC-22 (AC-15): sign-up limits and the agent quota (signup-rate-limit)
+LIMIT_DEFAULTS = {
+    "auth_signup_max_per_address": 5,
+    "auth_signup_max_total": 50,
+    "auth_signup_window_minutes": 60,
+    "agents_max_per_user": 10,
+}
+
+
+def test_signup_limit_settings_defaults() -> None:
+    s = Settings()
+    for name, value in LIMIT_DEFAULTS.items():
+        assert getattr(s, name) == value, name
+    assert s.signup_window_seconds == 3600
+
+
+def test_committed_yaml_rows_equal_the_limit_defaults() -> None:
+    import yaml
+
+    raw = yaml.safe_load((ROOT / "infra/config/newsdock.yaml").read_text())
+    for name, value in LIMIT_DEFAULTS.items():
+        assert raw["api"][name] == value, name
+
+
+def test_signup_limits_can_be_overridden_and_switched_off(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, monkeypatch, "api:\n  auth_signup_max_total: 0\n")
+    assert Settings().auth_signup_max_total == 0
+    monkeypatch.setenv("NEWSDOCK_AGENTS_MAX_PER_USER", "3")
+    assert Settings().agents_max_per_user == 3
+
+
 def test_account_settings_can_be_overridden(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -50,6 +50,13 @@ class Settings(LayeredSettings):
     auth_login_window_minutes: int = 15
     auth_cookie_secure: bool = False  # plain-HTTP compose; true behind TLS
     auth_cookie_name: str = "newsdock_session"
+    # Sign-up limits and the agent quota (M2e signup-rate-limit): counted sign-ups per
+    # peer address and in total per window (429 above); 0 = off. Agents one non-owner
+    # user may own (409 above); 0 = off.
+    auth_signup_max_per_address: int = 5
+    auth_signup_max_total: int = 50
+    auth_signup_window_minutes: int = 60
+    agents_max_per_user: int = 10
     # Push delivery (M2 part 2): subscriptions and SSE streams
     subscriptions_max_per_agent: int = 20
     subscription_text_max_length: int = 200
@@ -81,6 +88,10 @@ class Settings(LayeredSettings):
     @property
     def login_window_seconds(self) -> int:
         return self.auth_login_window_minutes * 60
+
+    @property
+    def signup_window_seconds(self) -> int:
+        return self.auth_signup_window_minutes * 60
 
     @property
     def allowed_hosts_list(self) -> list[str]:

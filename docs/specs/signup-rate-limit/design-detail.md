@@ -43,14 +43,16 @@ Settings property: `Settings.signup_window_seconds = auth_signup_window_minutes 
 ```python
 @router.post("/signup", status_code=201)
 def signup(body: Credentials, request: Request) -> PublicUser:
-    ensure_signup_open(...)            # 403 signup_closed
-    email = normalize_email(...); check_password(...)   # 422
+    ensure_signup_open(...)  # 403 signup_closed
+    email = normalize_email(...)
+    check_password(...)  # 422
     address = request.client.host if request.client else "unknown"
     decision = signup_limiter.attempt(address)
     if not decision.allowed:
-        raise HTTPException(429, "too_many_signups",
-                            headers={"Retry-After": str(decision.retry_after)})
-    user = store.create_user(email, hasher.hash(body.password))   # 201 / 409
+        raise HTTPException(
+            429, "too_many_signups", headers={"Retry-After": str(decision.retry_after)}
+        )
+    user = store.create_user(email, hasher.hash(body.password))  # 201 / 409
 ```
 
 The limiter runs before `hasher.hash`, so a refused request costs no CPU beyond validation. The first-account path is untouched (AC-7). Logging: `signup limited` at info, without the address or email (the address is personal enough for a log line to omit; the count is what matters).
