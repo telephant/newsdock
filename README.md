@@ -2,13 +2,14 @@
 
 A shared "news dock" for AI agents: ingest the GDELT GKG news feed once (clean, dedup, 7-day store) so any custom agent can plug in through an MCP server or REST. Kafka and Postgres run locally in Docker; there is no hosted demo.
 
-**Status:** M1 `mvp` implemented: live GDELT GKG → Kafka → processor → Postgres (7-day retention) → MCP + REST → demo financial-relevance agent (Ollama) → Next.js UI. See the [roadmap](docs/roadmap.md).
+**Status:** M1 `mvp` implemented: live GDELT GKG → Kafka → processor → Postgres (7-day retention) → MCP + REST → demo financial-relevance agent (Ollama) → Next.js UI. M3 part 1 adds semantic search: an embedder fills title embeddings (pgvector) and the MCP tool `semantic_search` finds articles by meaning. See the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
 ```
 GDELT GKG (15-min slots) → ingester → Kafka gkg.raw → processor → gkg.clean / gkg.dlq
                                                             → sink → Postgres (7 days)
+Postgres ← embedder (titles → Ollama, host → vectors)
 Postgres → api (MCP /mcp + REST /api/*) → demo agent (Ollama, host) and web UI (:3000)
 ```
 
@@ -29,7 +30,7 @@ Install these once; the repo documents nothing else as manual:
 | Docker Desktop | `brew install --cask docker-desktop` | Start it and wait until it is running |
 | uv | `brew install uv` | Provisions Python 3.12 automatically |
 | pnpm | `brew install pnpm` | Provisions Node 24 LTS automatically (`devEngines` in `apps/web/package.json`) |
-| Ollama | `brew install --cask ollama-app` | Then `ollama pull <any small model>` (used by the M1 demo agent) |
+| Ollama | `brew install --cask ollama-app` | Then `ollama pull llama3.2:3b` (the demo agent) and `ollama pull nomic-embed-text` (the embedder and `semantic_search`) |
 
 ## Quick start
 
@@ -53,7 +54,7 @@ make down            # stop everything (data volumes are kept)
 | `make test APP=<name>` | Tests of one app: `ingester processor sink api agent web` |
 | `make build [APP=<name>]` | Build images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); no `.env` needed |
 | `make up` / `make down` | Start (and wait for) Kafka and Postgres, create topics, migrate / stop |
-| `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
+| `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 9 services (pipeline, embedder, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
 | `make agent-create NAME=<name>` | Register an agent and print its API key once (needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up) |
 | `make user-reset-password EMAIL=<email>` | Owner recovery: set a user's password (asks twice, never echoed; ends that user's sessions and lifts a login lockout; needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up). Only the admin token can do this; an admin or owner session cannot |
@@ -105,7 +106,7 @@ Each event is `id: <cursor>`, `event: article`, `data: <article summary JSON>`; 
 
 ## Configuration
 
-All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/config/newsdock.yaml): a `common:` section that every service inherits, and one section per service (`ingester`, `processor`, `sink`, `api`, `agent`, `web`). Docker env vars override any key (**env > file > built-in defaults**), and the file's values equal the defaults, so an empty file changes nothing. Nested keys flatten with `_` into the env name, e.g. `sink.retention_days` ↔ `NEWSDOCK_RETENTION_DAYS`, `common.kafka.topics.clean` ↔ `NEWSDOCK_KAFKA_TOPICS_CLEAN` (agent: prefix `NEWSDOCK_AGENT_`).
+All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/config/newsdock.yaml): a `common:` section that every service inherits, and one section per service (`ingester`, `processor`, `sink`, `embedder`, `api`, `agent`, `web`). Docker env vars override any key (**env > file > built-in defaults**), and the file's values equal the defaults, so an empty file changes nothing. Nested keys flatten with `_` into the env name, e.g. `sink.retention_days` ↔ `NEWSDOCK_RETENTION_DAYS`, `common.kafka.topics.clean` ↔ `NEWSDOCK_KAFKA_TOPICS_CLEAN` (agent: prefix `NEWSDOCK_AGENT_`).
 
 - **Change a value:** edit the file and `docker compose ... up -d <service>`, or set the env var in `.env` / the compose `environment:`.
 - **Point a service at another file:** `NEWSDOCK_CONFIG_FILE=/path/to/newsdock.yaml` (compose mounts `infra/config` read-only at `/etc/newsdock`).
@@ -146,6 +147,7 @@ The directory and layering rules (`domain/` pure, `adapters/` for I/O, apps neve
 - **Raw `docker compose` complains about missing variables:** pass the env file, e.g. `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - **Port already in use:** Postgres defaults to host port 5433 (a local Postgres often owns 5432); change `POSTGRES_PORT` in `.env`. Kafka uses 29092.
 - **`ollama list` shows no model:** run `ollama pull llama3.2:3b` (the demo agent's model, chosen in the M1 spike).
+- **Embedder logs `ollama unavailable`, or `semantic_search` answers `embedding_unavailable`:** Ollama is not running on the host or `nomic-embed-text` is not pulled (`ollama pull nomic-embed-text`). Nothing is lost: articles are stored without a vector and the embedder fills them in on a later pass; `hybrid` search falls back to word matching meanwhile.
 - **Agent logs `batch failed`:** usually Ollama is not running on the host (`ollama list` must answer); the agent retries and, because it only acks after a finished batch, re-reads the same batch.
 - **A stream stays silent:** check the subscription's filter (`GET /api/subscriptions`) and that new articles are arriving (GDELT slots land every ~15 min); `: ping` lines mean the connection is healthy. A `429` on connect means the agent already has `api.sse_max_streams_per_agent` open streams.
 - **Agent logs `the API rejected this agent's key (HTTP 401)`:** `NEWSDOCK_AGENT_API_KEY` is empty, wrong or revoked; issue a new key with `make agent-create` (or set `api.auth_required: false` for local experiments).
