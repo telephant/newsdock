@@ -62,6 +62,20 @@ class SqlAgentsRepo:
                 is not None
             )
 
+    def count_owned(self, owner_id: str) -> int:
+        """Agents this user created, whatever their status (the quota counts all)."""
+        if as_uuid(owner_id) is None:
+            return 0
+        with Session(self._engine) as session:
+            return int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(AgentRow)
+                    .where(AgentRow.owner_id == owner_id)
+                )
+                or 0
+            )
+
     def add_key(
         self, agent_id: str, key: GeneratedKey, scope: AgentScope
     ) -> str | None:

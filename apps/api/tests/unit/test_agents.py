@@ -10,12 +10,29 @@ from newsdock_api.domain.agents import (
     Agent,
     GeneratedKey,
     StoredKey,
+    agent_quota_reached,
     authenticate,
     hash_secret,
     make_key,
     parse_key,
     verify,
 )
+
+
+@pytest.mark.parametrize(
+    ("owned", "maximum", "reached"),
+    [
+        (0, 0, False),
+        (50, 0, False),
+        (0, 2, False),
+        (1, 2, False),
+        (2, 2, True),
+        (3, 2, True),
+    ],
+)
+def test_agent_quota_truth_table(owned: int, maximum: int, reached: bool) -> None:
+    """TC-17 (AC-11): 0 switches the quota off; otherwise reached at the maximum."""
+    assert agent_quota_reached(owned, maximum) is reached
 
 
 def test_make_key_format_and_entropy() -> None:

@@ -65,6 +65,17 @@ def _names(world: World, scope: AgentScope) -> list[str]:
     return sorted(a.name for a in world.agents.list_agents(scope))
 
 
+# TC-17 (AC-11): the quota counts every agent a user owns, disabled ones included
+def test_count_owned_counts_all_statuses_per_owner(world: World) -> None:
+    assert world.agents.count_owned(world.user_a) == 1
+    assert world.agents.count_owned(world.user_b) == 1
+    world.agents.create_agent("a2", make_key(), world.user_a)
+    assert world.agents.set_status(world.a1, "disabled", world.a)
+    assert world.agents.count_owned(world.user_a) == 2  # the disabled one counts
+    assert world.agents.count_owned(world.user_b) == 1  # other users are unaffected
+    assert world.agents.count_owned("00000000-0000-0000-0000-000000000000") == 0
+
+
 # TC-5: creator recorded; listing follows the scope (AC-2, AC-3, AC-5)
 def test_creator_is_recorded_and_listing_follows_the_scope(world: World) -> None:
     assert _names(world, world.a) == ["a1"]

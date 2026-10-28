@@ -24,6 +24,7 @@ from newsdock_api.domain.agents import (
     AgentRegistry,
     AgentScope,
     AgentSummary,
+    agent_quota_reached,
     make_key,
 )
 from newsdock_api.domain.subscriptions import AdminSubscription, SubscriptionStore
@@ -51,6 +52,8 @@ def build_admin_router(
     registry: AgentRegistry,
     subscriptions: SubscriptionStore | None,
     require_admin: Callable[[Request], Principal],
+    *,
+    max_agents_per_user: int,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/admin")
 
@@ -67,8 +70,18 @@ def build_admin_router(
     def create_agent(
         body: NewAgent, who: UserPrincipal | AdminTokenPrincipal = Depends(caller)
     ) -> IssuedAgent:
-        key = make_key()
         owner_id = who.user_id if isinstance(who, UserPrincipal) else None
+        # The quota binds exactly the callers whose scope is "own": the owner role and
+        # the admin token see everything and are exempt (signup-rate-limit D-7). It is
+        # checked before the name, so at the cap every name answers too_many_agents.
+        # A soft cap: two simultaneous creates may overshoot by the requests in flight.
+        if (
+            owner_id is not None
+            and not scope_for(who).everything
+            and agent_quota_reached(registry.count_owned(owner_id), max_agents_per_user)
+        ):
+            raise HTTPException(status_code=409, detail="too_many_agents")
+        key = make_key()
         try:
             agent = registry.create_agent(body.name, key, owner_id)
         except DuplicateAgentError as exc:

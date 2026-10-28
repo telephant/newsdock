@@ -43,6 +43,9 @@ class FakeRegistry:
     def agent_visible(self, agent_id: str, scope: AgentScope) -> bool:
         return agent_id in self.agents
 
+    def count_owned(self, owner_id: str) -> int:
+        return 0
+
     def add_key(
         self, agent_id: str, key: GeneratedKey, scope: AgentScope
     ) -> str | None:

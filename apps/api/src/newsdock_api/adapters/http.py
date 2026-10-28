@@ -223,7 +223,14 @@ def create_app(
         allow_headers=settings.cors_headers_list,
     )
 
-    app.include_router(build_admin_router(registry, subscriptions, guards.admin))
+    app.include_router(
+        build_admin_router(
+            registry,
+            subscriptions,
+            guards.admin,
+            max_agents_per_user=settings.agents_max_per_user,
+        )
+    )
     limiter_for_logins = login_limiter or LoginLimiter(
         settings.auth_login_max_failures, settings.login_window_seconds
     )

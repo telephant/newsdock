@@ -130,6 +130,14 @@ class AgentScope(BaseModel):
 ALL = AgentScope(everything=True)
 
 
+def agent_quota_reached(owned: int, maximum: int) -> bool:
+    """True when a user who owns `owned` agents may not create another.
+
+    `maximum <= 0` switches the quota off (signup-rate-limit D-7).
+    """
+    return maximum > 0 and owned >= maximum
+
+
 class AgentRegistry(Protocol):
     """What the admin routes need from persistence (implemented by SqlAgentsRepo).
 
@@ -142,6 +150,10 @@ class AgentRegistry(Protocol):
     ) -> RegisteredAgent: ...
 
     def agent_visible(self, agent_id: str, scope: AgentScope) -> bool: ...
+
+    def count_owned(self, owner_id: str) -> int:
+        """Agents the user created, of any status (for the quota)."""
+        ...
 
     def add_key(
         self, agent_id: str, key: GeneratedKey, scope: AgentScope

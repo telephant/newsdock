@@ -97,6 +97,9 @@ class Registry:
         agent["status"] = status
         return True
 
+    def count_owned(self, owner_id: str) -> int:
+        return sum(1 for a in self.agents.values() if a["owner_id"] == owner_id)
+
     def list_agents(self, scope: AgentScope) -> list[AgentSummary]:
         return [
             AgentSummary(
@@ -166,10 +169,15 @@ def _guard(request: Request) -> Principal:
 
 
 class Env:
-    def __init__(self) -> None:
+    def __init__(self, max_agents: int = 0) -> None:
         self.registry = Registry()
         self.subs = Subscriptions(self.registry)
-        router = build_admin_router(self.registry, self.subs, _guard)  # type: ignore[arg-type]
+        router = build_admin_router(
+            self.registry,
+            self.subs,  # type: ignore[arg-type]
+            _guard,
+            max_agents_per_user=max_agents,
+        )
         self.router = router
         app = FastAPI()
         app.include_router(router)
@@ -343,3 +351,51 @@ def test_every_agent_and_subscription_route_is_in_the_isolation_matrix(
         "an /api/admin agent or subscription route is not covered by the "
         f"ownership tests: {routes ^ COVERED}"
     )
+
+
+# --- TC-17, TC-18, TC-19: the per-user agent quota (AC-11, AC-12, AC-13) ---
+def _create(env: Env, who: str, name: str) -> int:
+    return env.client.post(
+        "/api/admin/agents", json={"name": name}, headers={"x-caller": who}
+    ).status_code
+
+
+def test_a_user_at_the_quota_cannot_create_another_agent() -> None:
+    env = Env(max_agents=2)  # user a already owns a1
+    assert _create(env, "a", "a2") == 201
+    # a disabled agent still counts toward the quota
+    assert env.call("a", "POST", f"/api/admin/agents/{env.ids['a1']}/disable") == 204
+    before = len(env.registry.agents)
+    response = env.client.post(
+        "/api/admin/agents", json={"name": "a3"}, headers={"x-caller": "a"}
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "too_many_agents"
+    assert len(env.registry.agents) == before  # nothing was created
+
+
+def test_at_the_quota_the_quota_message_wins_over_a_taken_name() -> None:
+    env = Env(max_agents=1)  # user a owns a1 already
+    response = env.client.post(
+        "/api/admin/agents", json={"name": "a1"}, headers={"x-caller": "a"}
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"] == "too_many_agents"
+
+
+def test_a_zero_quota_means_off() -> None:
+    env = Env(max_agents=0)
+    assert [_create(env, "a", f"extra{i}") for i in range(5)] == [201] * 5
+
+
+def test_the_owner_role_and_the_token_are_exempt() -> None:
+    env = Env(max_agents=2)
+    for who in ("owner", "token"):
+        assert [_create(env, who, f"{who}-{i}") for i in range(3)] == [201] * 3
+
+
+def test_the_quota_is_per_user() -> None:
+    env = Env(max_agents=2)
+    assert _create(env, "a", "a2") == 201  # a is now at the quota
+    assert _create(env, "a", "a3") == 409
+    assert _create(env, "b", "b2") == 201  # b owns b1 only
