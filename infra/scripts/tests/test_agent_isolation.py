@@ -74,7 +74,9 @@ def test_agent_reaches_the_api(stack: None) -> None:
 
 # TC-33 / externalize-config TC-22: the app healthcheck passes on a fresh heartbeat
 # (max age written by the worker itself) and fails on a stale one
-@pytest.mark.parametrize("service", ["ingester", "processor", "sink", "agent"])
+@pytest.mark.parametrize(
+    "service", ["ingester", "processor", "sink", "agent", "embedder"]
+)
 def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
     check = f"python -m newsdock_{service}.adapters.healthcheck"
     fresh = _exec(service, "sh", "-c", check)
@@ -92,7 +94,7 @@ def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
     assert stale.returncode != 0, f"{service}: stale heartbeat passed the check"
 
 
-def test_all_eight_services_report_healthy(stack: None) -> None:
+def test_all_nine_services_report_healthy(stack: None) -> None:
     result = _compose("ps", "--format", "json")
     rows = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
     states = {
@@ -101,7 +103,8 @@ def test_all_eight_services_report_healthy(stack: None) -> None:
         if row.get("Service") not in ("topics", "migrate")  # run-to-completion
     }
     assert set(states) == {
-        "kafka", "postgres", "ingester", "processor", "sink", "api", "agent", "web",
+        "kafka", "postgres", "ingester", "processor", "sink", "embedder", "api",
+        "agent", "web",
     }  # fmt: skip
     unhealthy = {s: h for s, h in states.items() if h != "healthy"}
     assert not unhealthy, f"not healthy: {unhealthy}"

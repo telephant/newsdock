@@ -1,5 +1,5 @@
 # newsdock command runner. Plain GNU Make 3.81 syntax only (no .ONESHELL, no $(file ...)).
-PYTHON_APPS := ingester processor sink api agent
+PYTHON_APPS := ingester processor sink api agent embedder
 APPS_DIR ?= apps
 WEB := pnpm --dir apps/web
 # Compose reads .env when present, else the placeholder .env.example (enough for build, down).
@@ -84,6 +84,7 @@ build: ## Build app images: make build [APP=<name>] (no .env needed)
 #   kafka     raw publish + processor routing        (Kafka only, ~1 min)
 #   sink      dedup, retention, poison fallback      (Postgres, ~30 s)
 #   api       MCP tools, REST, cursor, CORS          (Postgres, ~30 s)
+#   embedder  embed worker, fake Ollama              (Postgres, ~30 s)
 #   pipeline  ingest -> process -> store re-ingest   (Postgres, ~40 s)
 #   e2e       full 8-service stack, agent isolation  (~2 min, builds images)
 #   stack     M0 make up/down lifecycle              (~2.5 min)
@@ -93,16 +94,17 @@ SCENE_db       := packages/db
 SCENE_kafka    := apps/ingester/tests/integration apps/processor/tests/integration
 SCENE_sink     := apps/sink/tests/integration
 SCENE_api      := apps/api/tests/integration
+SCENE_embedder := apps/embedder/tests/integration
 SCENE_pipeline := infra/scripts/tests/test_reingest.py infra/scripts/tests/test_story_agent.py
 SCENE_e2e      := infra/scripts/tests/test_agent_isolation.py
 SCENE_stack    := infra/scripts/tests/test_stack.py
 SCENE_images   := infra/scripts/tests/test_images.py
 
-test-infra: ## Docker tests; all scenes, or one: make test-infra SCENE=<db|kafka|sink|api|pipeline|e2e|stack|images>
+test-infra: ## Docker tests; all scenes, or one: make test-infra SCENE=<db|kafka|sink|api|embedder|pipeline|e2e|stack|images>
 ifeq ($(SCENE),)
 	uv run pytest -m docker
 else
-	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api pipeline e2e stack images)" >&2; exit 2; }
+	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api embedder pipeline e2e stack images)" >&2; exit 2; }
 	uv run pytest -m docker $(SCENE_$(SCENE))
 endif
 

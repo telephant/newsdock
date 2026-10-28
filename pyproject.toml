@@ -44,6 +44,7 @@ mypy_path = [
     "apps/sink/src",
     "apps/api/src",
     "apps/agent/src",
+    "apps/embedder/src",
     "packages/core/src",
     "packages/config/src",
     "packages/db/src",
@@ -62,6 +63,7 @@ root_packages = [
     "newsdock_sink",
     "newsdock_api",
     "newsdock_agent",
+    "newsdock_embedder",
 ]
 include_external_packages = true
 
@@ -74,6 +76,7 @@ modules = [
     "newsdock_sink",
     "newsdock_api",
     "newsdock_agent",
+    "newsdock_embedder",
 ]
 
 [[tool.importlinter.contracts]]
@@ -89,6 +92,7 @@ forbidden_modules = [
     "newsdock_sink",
     "newsdock_api",
     "newsdock_agent",
+    "newsdock_embedder",
     "confluent_kafka",
     "psycopg",
     "sqlalchemy",
@@ -106,6 +110,7 @@ source_modules = [
     "newsdock_sink.domain",
     "newsdock_api.domain",
     "newsdock_agent.domain",
+    "newsdock_embedder.domain",
 ]
 forbidden_modules = [
     "newsdock_ingester.adapters",
@@ -113,6 +118,7 @@ forbidden_modules = [
     "newsdock_sink.adapters",
     "newsdock_api.adapters",
     "newsdock_agent.adapters",
+    "newsdock_embedder.adapters",
     "newsdock_config",
     "newsdock_db",
     "newsdock_embedding",
@@ -136,6 +142,7 @@ forbidden_modules = [
     "newsdock_sink",
     "newsdock_api",
     "newsdock_agent",
+    "newsdock_embedder",
 ]
 
 [[tool.importlinter.contracts]]
@@ -151,4 +158,5 @@ forbidden_modules = [
     "newsdock_sink",
     "newsdock_api",
     "newsdock_agent",
+    "newsdock_embedder",
 ]

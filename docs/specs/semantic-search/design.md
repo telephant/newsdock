@@ -45,7 +45,7 @@ Result: `{"articles": [ArticleSummary + "score" + "matched_by"], "mode": "...", 
 
 Errors: `embedding_unavailable` (vector mode, Ollama down or wrong dimension), `invalid_query` (empty or too long), `unauthorized` / rate limit as for every tool.
 
-**Config (ADR-0013).** `common:` (read only by apps that declare the field): `embedding_model` (`nomic-embed-text`), `embedding_dimension` (768), `embedding_document_prefix`, `embedding_query_prefix`, `embedding_ollama_url` (env `OLLAMA_URL`). `embedder:` `batch_size` (32), `poll_interval_seconds` (10), `idle_poll_seconds` (30), `ollama_timeout_seconds`, `backoff_seconds`. `api:` `semantic_candidates` (50), `semantic_rrf_k` (60), `semantic_query_max_length` (500), `semantic_ef_search` (100), `semantic_ollama_timeout_seconds`. All numbers are starting points to be measured, not requirements.
+**Config (ADR-0013).** `common:` (read only by apps that declare the field): `embedding_model` (`nomic-embed-text`), `embedding_dimension` (768), `embedding_document_prefix`, `embedding_query_prefix`, `embedding_ollama_url` (env `OLLAMA_URL`). `embedder:` `batch_size` (32), `poll_interval_seconds` (10, the pause when nothing is left), `ollama_timeout_seconds` (60), `backoff_seconds` (5) doubling up to `backoff_max_seconds` (60), `skip_after_failures` (3), `skip_table_max_entries` (1000), `heartbeat_max_age_seconds` (360). `api:` `semantic_candidates` (50), `semantic_rrf_k` (60), `semantic_query_max_length` (500), `semantic_ef_search` (100), `semantic_ollama_timeout_seconds`. All numbers are starting points to be measured, not requirements.
 
 ## 4. Tricky parts
 

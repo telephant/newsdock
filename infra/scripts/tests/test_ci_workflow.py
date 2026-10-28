@@ -13,7 +13,7 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[3]
 WORKFLOW = REPO / ".github" / "workflows" / "ci.yml"
-PYTHON_APPS = {"ingester", "processor", "sink", "api", "agent"}
+PYTHON_APPS = {"ingester", "processor", "sink", "api", "agent", "embedder"}
 BUILD_FILTERS = PYTHON_APPS | {"web", "migrate"}
 
 

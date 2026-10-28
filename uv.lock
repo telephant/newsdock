@@ -15,6 +15,7 @@ members = [
     "newsdock-config",
     "newsdock-core",
     "newsdock-db",
+    "newsdock-embedder",
     "newsdock-embedding",
     "newsdock-ingester",
     "newsdock-processor",
@@ -1174,6 +1175,25 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1" },
 ]
 provides-extras = ["migrate"]
+
+[[package]]
+name = "newsdock-embedder"
+version = "0.0.0"
+source = { editable = "apps/embedder" }
+dependencies = [
+    { name = "newsdock-config" },
+    { name = "newsdock-db" },
+    { name = "newsdock-embedding" },
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "newsdock-config", editable = "packages/config" },
+    { name = "newsdock-db", editable = "packages/db" },
+    { name = "newsdock-embedding", editable = "packages/embedding" },
+    { name = "pydantic-settings", specifier = ">=2.15" },
+]
 
 [[package]]
 name = "newsdock-embedding"

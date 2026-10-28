@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
-PYTHON_APPS = ["ingester", "processor", "sink", "api", "agent"]
+PYTHON_APPS = ["ingester", "processor", "sink", "api", "agent", "embedder"]
 
 
 def run_make(*args: str) -> subprocess.CompletedProcess[str]:

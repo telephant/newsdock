@@ -25,7 +25,7 @@ loop:
   rows = SELECT url_hash, title FROM articles
          WHERE embedding IS NULL OR embedding_model IS DISTINCT FROM :model
          ORDER BY seq DESC LIMIT :batch
-  if no rows: heartbeat; sleep idle_poll_seconds; continue      # AC-3: no request sent
+  if no rows: heartbeat; sleep poll_interval_seconds; continue  # AC-3: no request sent
   try: vectors = embed_documents([title...])                    # C-36, one /api/embed call
   except OllamaError: log; heartbeat; sleep backoff; continue   # AC-4
   for (hash, vec) in zip(rows, vectors):
@@ -38,7 +38,7 @@ loop:
 - Newest first, so fresh articles become searchable before the backfill reaches old ones.
 - A row whose vector keeps being rejected would be selected forever; the batch moves on only because newer rows sort first. Plan T-0x adds a bounded skip (`embed_failures` counter in memory per process) so one bad title cannot stall the head of the queue.
 - Domain (`domain/`): batch selection rules and the "needs embedding" predicate as pure functions; adapters: SQL and Ollama.
-- Healthcheck follows ADR-0015: the worker writes its allowed heartbeat age (3 × the longer of `idle_poll_seconds` and `ollama_timeout_seconds`).
+- Healthcheck follows ADR-0015: the worker writes its allowed heartbeat age, setting `heartbeat_max_age_seconds` (360), which must exceed one worst-case loop (`ollama_timeout_seconds` + `backoff_max_seconds` = 120). The heartbeat is written after every pass, also while Ollama or the database is down, because restarting the worker would not fix either.
 
 ## 3. Embedding package (C-36)
 

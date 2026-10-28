@@ -152,6 +152,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+  embedder:  # C-35: fills articles.embedding through Ollama on the host (ADR-0024)
+    build:
+      context: ..
+      dockerfile: apps/embedder/Dockerfile
+    image: newsdock-embedder:dev
+    profiles: [apps]
+    restart: unless-stopped
+    networks: [data]
+    environment:
+      <<: [*db-env, *config-file]
+      OLLAMA_URL: http://host.docker.internal:11434  # `ollama pull nomic-embed-text` first
+    volumes:
+      - *config-volume
+    depends_on:
+      postgres: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-m", "newsdock_embedder.adapters.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
   api:
     build:
       context: ..
