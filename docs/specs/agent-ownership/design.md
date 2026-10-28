@@ -18,7 +18,7 @@ An `agents.owner_id` column records the creating user. One pure function, `scope
 | C-23 | Admin routes | Read the principal, build the scope once, pass it down; 404 when the repo says "not visible" |
 | C-24 | Permission table and guard | `manage_agents` held by all roles; the guard accepts any user session or the admin token |
 | C-25 | Migration 0007 and model | `agents.owner_id` nullable FK to `users.id`, `ON DELETE SET NULL`, indexed; additive |
-| C-26 | Web | `canManageAgents` true for any role; Agents table shows the creator for the owner role; types regenerated from OpenAPI |
+| C-26 | Web | `canManageAgents` true for any role; each agent card shows its creator for the owner role; types regenerated from OpenAPI |
 
 ## Flows
 

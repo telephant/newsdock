@@ -87,7 +87,7 @@ Unknown id, foreign id and ownerless id (for non-owners) all take the same 404 b
 
 - `features/auth/roles.ts`: `canManageAgents(role) → role !== null`; `asRole` is unchanged.
 - Nav and the `/admin/agents`, `/admin/subscriptions` page guards already call `canManageAgents`, so viewers get the links with no other change.
-- `Agents.tsx`: when `useSession().role === "owner"`, add a "Creator" column (`owner_email` or "no owner"); the empty-state text becomes "You have no agents yet." for non-owners.
+- `Agents.tsx`: when `useSession().role === "owner"`, add a "Created by <email | no owner>" line to each agent card (the page lists agents as cards, not a table); the empty-state title becomes "You have no agents yet." for everyone.
 - `pnpm --dir apps/web run` generator refreshes `src/lib/api/openapi.json` and `types.ts` from the API; the check that generated types are current already exists in `check-web`.
 - All text is rendered as escaped React text (unchanged rule); the email is shown only to the owner role, and the API already limits the field to what the scope may see.
 
@@ -111,7 +111,7 @@ Unknown id, foreign id and ownerless id (for non-owners) all take the same 404 b
 - Isolation is enforced in SQL predicates that take the scope as a required argument; the web only mirrors it.
 - Foreign ids return 404, not 403, so ids cannot be probed. Name probing through 409 is accepted (spec D-8).
 - Open sign-up now grants key creation (spec risk 2); the existing per-agent rate limit and the `auth_signup_open` flag are the brakes, the sign-up rate limit stays in the backlog.
-- The owner sees user emails on the Agents table; users never see another user's email through agents.
+- The owner sees user emails on the Agents page; users never see another user's email through agents.
 - No secret, key hash or password hash is added to any response.
 
 ## 9. Test seams (for /spec-plan)

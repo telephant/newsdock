@@ -1,6 +1,6 @@
 # agent-ownership — Spec (M2d: agents belong to the user who created them)
 
-Status: init approved 2026-10-28 (revised same day: owner sees all, every user manages own agents) · design approved 2026-10-28 ([ADR-0023](../../adr/0023-agent-ownership-by-scope-filter.md))
+Status: init approved 2026-10-28 (revised same day: owner sees all, every user manages own agents) · design approved 2026-10-28 ([ADR-0023](../../adr/0023-agent-ownership-by-scope-filter.md)) · implemented and verified 2026-10-28 (pass with follow-ups, see [verify.md](verify.md))
 
 ## 0. Review guide
 
@@ -160,7 +160,7 @@ AC-10  The CLI and user management still work
 AC-11  The web shows what the API returns
   Given the web is built against the API types and the API returns one agent and one subscription for the caller
   When  a viewer opens the Agents and Subscriptions pages
-  Then  each renders only the returned rows (an empty-state sentence when none), the nav shows both links for a viewer, and the owner's Agents table additionally shows each agent's creator
+  Then  each renders only the returned rows (an empty-state sentence when none), the nav shows both links for a viewer, and the owner's Agents list additionally shows each agent's creator
   Verify: auto
 ```
 
