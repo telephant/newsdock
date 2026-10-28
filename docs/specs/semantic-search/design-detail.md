@@ -100,7 +100,7 @@ The tool is registered next to the other tools in `adapters/http.py`; auth and t
 
 ## 7. Capacity (arithmetic, not measured)
 
-350,000 rows × 768 floats × 4 bytes ≈ 1.1 GB of raw vectors, plus an HNSW index of similar order **[assumption]**. Story dedup means fewer canonicals than rows. Fallbacks, in order: `halfvec(768)` (half the size, supported to 4,000 dimensions **[verified: pgvector README]**), a smaller `embedding_dimension`, or embedding only recent days.
+350,000 rows × 768 floats × 4 bytes ≈ 1.1 GB of raw vectors. Measured on 50,000 rows (spike.md): HNSW 195 MB, whole relation 400 MB, so about 1.4 GB of HNSW and about 2.8 GB in total at a full window **[extrapolated]**. Story dedup means fewer canonicals than rows. Worker speed: the model embeds about 205 titles/s but the HNSW insert costs about 7.5 ms a row, so the worker is index-bound at about 130 rows/s and a full backfill takes about 45 minutes **[estimate]**. Because `embedding` is indexed, each UPDATE is not heap-only and also writes the other indexes of `articles` (R-5). Fallbacks, in order: `halfvec(768)` (half the size, supported to 4,000 dimensions **[verified: pgvector README]**), a smaller `embedding_dimension`, or embedding only recent days.
 
 ## 8. Failure table (full)
 

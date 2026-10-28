@@ -71,7 +71,7 @@ Errors: `embedding_unavailable` (vector mode, Ollama down or wrong dimension), `
 
 ## 6. Technology
 
-Postgres + pgvector 0.8 HNSW **[verified: image tag `pgvector/pgvector:0.8.7-pg16-trixie`; README]**; Ollama `POST /api/embed` with a list `input` **[verified: Ollama API docs]**; model `nomic-embed-text` (768 dimensions, 2K context) **[memory]**; psycopg/SQLAlchemy as today; `httpx` for Ollama (already used by the agent **[assumption]**). `pgvector` Python package for the SQLAlchemy `Vector` type **[assumption: a new dependency of `newsdock_db`]**.
+Postgres + pgvector 0.8 HNSW **[verified: image tag `pgvector/pgvector:0.8.7-pg16-trixie`; README]**; Ollama `POST /api/embed` with a list `input` **[verified: Ollama API docs]**; model `nomic-embed-text` (768 dimensions **[verified: spike.md]**, 2K context **[verified: ollama.com]**); psycopg/SQLAlchemy as today; `httpx` for Ollama (already used by the agent **[assumption]**). `pgvector` Python package for the SQLAlchemy `Vector` type **[assumption: a new dependency of `newsdock_db`]**.
 
 ## 7. AC coverage
 
@@ -97,5 +97,5 @@ Postgres + pgvector 0.8 HNSW **[verified: image tag `pgvector/pgvector:0.8.7-pg1
 - [x] Embeddings as columns on `articles` (not a side table), HNSW cosine, fixed 768 dimensions (ADR-0025; accepted on defaults).
 - [x] The keyword leg of hybrid is Postgres full-text (`english`) on the title with a GIN index, not `ILIKE` (spec D-8, amends AC-1; accepted on defaults).
 - [x] The worker stays healthy while Ollama is down (a dependency outage is not a reason to restart it).
-- [ ] ~1 GB of vectors plus an index of similar size at a full 350k-row window is acceptable on the dev machine **[assumption: 350k × 768 × 4 B]**; `halfvec` is the fallback (backlog).
-- [ ] `nomic-embed-text` and its prefixes hold up on real titles: unverified until Ollama runs (plan T-01 spike).
+- [ ] About 2.8 GB in total (HNSW about 1.4 GB) at a full 350k-row window is acceptable on the dev machine **[extrapolated from 50k rows in spike.md]**; `halfvec` is the fallback (backlog).
+- [x] `nomic-embed-text` runs here: 768 dimensions, about 205 titles/s, clean 404 when not pulled (T-01 spike, 2026-10-28). Whether its task prefixes help is still open and is compared on the eval corpus in T-08.

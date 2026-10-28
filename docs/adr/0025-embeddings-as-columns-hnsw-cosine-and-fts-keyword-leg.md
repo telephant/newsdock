@@ -20,7 +20,8 @@ Spec `semantic-search` needs vector storage and search (D-7), a fixed vector siz
 
 ## Consequences
 + Simple joins, one retention path, easy model swap. + Hybrid works on real queries.
-− About 1.1 GB of raw vectors at a full window plus the index **[assumption]**; `halfvec` halves it and is the first fallback.
+− About 2.8 GB in total at a full window (HNSW about 1.4 GB), extrapolated from a 50,000-row spike **[extrapolated]**; `halfvec` halves the vectors and is the first fallback.
+− Because `embedding` is indexed, each embedding UPDATE is not heap-only and also writes the other indexes of `articles`, and leaves one dead tuple for autovacuum (spike.md, R-5). A side table avoids this but breaks filtered search (iterative scan cannot see join filters), so the decision stands; measure the real backfill at verify.
 − `english` stemming favours English titles.
 − Switching to a side table later (to hold several models side by side, backlog) is a migration and a repo change.
 − Adds the `pgvector` Python package to `newsdock_db` **[assumption]**.

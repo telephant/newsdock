@@ -189,7 +189,7 @@ Provisional targets — measure first: embedding throughput (titles/second), tim
 
 ## 8. Assumptions
 
-- **[memory]** `nomic-embed-text` produces 768-dim vectors and works for English titles through Ollama's embeddings endpoint.
+- **[verified: spike.md, 2026-10-28]** `nomic-embed-text` produces 768-dim vectors through Ollama's `/api/embed`. Whether it ranks English news titles well is measured by AC-14, not assumed.
 - **[assumption]** English-first titles; non-English titles are embedded as they are and may rank poorly.
 - **[assumption]** A single worker is enough; the window is about 350k titles.
 - **[assumption]** pgvector 0.8 HNSW handles this size on a laptop (no sharding).

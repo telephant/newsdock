@@ -23,8 +23,9 @@ Findings fixed: a garbled sentence in `tests.md` test data.
 
 Open risks carried into implementation (the design review file does not exist, so these come from the design checklist):
 
-- **R-1 (medium):** the ~1 GB vector plus similar-size index at a full window is arithmetic, not measured **[assumption]**. Decision: measure in `/spec-verify` (tests.md Measurements); fall back to `halfvec`, a smaller dimension or fewer days.
-- **R-2 (medium):** `nomic-embed-text`, its 768 dimensions and prefixes are **[memory]**; Ollama was not reachable at spec time. Decision: T-01 verifies on the real model. If Ollama is unavailable where the tasks run, T-01 records that, TC-7 and TC-16 stay manual, and every other test uses the fake Ollama.
+- **R-1 (medium):** about 2.8 GB total (HNSW about 1.4 GB) at a full window, extrapolated from 50,000 rows in the spike. Decision: confirm the real size in `/spec-verify` (tests.md Measurements); fall back to `halfvec`, a smaller dimension or fewer days.
+- **R-2 (low, was medium):** the model, its 768 dimensions, the endpoint and its speed were verified in T-01 (spike.md). Still open: whether the task prefixes help; T-08 compares both settings on the eval corpus.
+- **R-5 (low):** because `embedding` is indexed, each embedding UPDATE also writes the other seven indexes of `articles` and leaves one dead tuple; the HNSW insert (about 7.5 ms a row) dominates, so the worker runs at about 130 rows/s and a full backfill takes about 45 minutes **[estimate]**. Decision: ADR-0025 stands (a side table would break filtered search); measure the real backfill at verify.
 - **R-3 (low):** the worker accepts that a persistently rejected title is skipped in memory only (restarts retry it once).
 - **R-4 (low):** `make test-infra` scenes are still unrun from two earlier verifies; T-03 moves `test_stack.py` to head `0008`, and T-09 runs the scenes if the ports are free.
 
@@ -63,4 +64,4 @@ Tests written first and green · `make check-python` (and `check-web` if touched
 
 ## Progress
 
-(filled by `/spec-implement`)
+- T-01 ✅ 2026-10-28 — spike, findings in [spike.md](spike.md); no production code. Verified: `nomic-embed-text` returns 768-dim finite vectors via `/api/embed` at about 205 titles/s; a missing model is a clean 404 JSON error; pgvector 0.8.7 HNSW needs `iterative_scan` for filtered queries (1 of 20 rows without, 20 of 20 with `relaxed_order` or `strict_order`); `pgvector` 0.5.1 works with SQLAlchemy 2.1.3 and psycopg 3.3 on Python 3.12; the agent reaches Ollama through `host.docker.internal` with no `extra_hosts`. Found: index build on 50k rows took 176 s (not paid, the migration builds on an empty column), HNSW is 195 MB per 50k rows, embedding UPDATEs are index-bound at about 130 rows/s (R-5); prefixes inconclusive (T-08 compares). Side effects on this machine: `nomic-embed-text` was pulled and a local `ollama serve` was started; the throwaway pgvector container was removed.
