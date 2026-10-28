@@ -17,6 +17,7 @@ ROOT_DIRS = {"apps", "packages", "infra", "docs", ".github"}
 ROOT_FILES = {
     "Makefile",
     "pyproject.toml",
+    "conftest.py",  # loads the pytest plugin that guards fixed-port Docker tests
     "uv.lock",
     ".python-version",
     ".env.example",

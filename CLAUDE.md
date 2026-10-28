@@ -27,6 +27,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 
 ## Workflow
 - A local pass is not CI: the first GitHub run found a non-existent action tag (`setup-uv@v10`), a test PATH that hid a real `/usr/bin/docker`, and a job without pnpm. After touching `.github/`, push and read the run (`gh run watch`, `gh run view --log-failed`).
+- Docker tests never share the dev stack's ports (incident 2026-10-28: tests truncated the dev database, because `docker compose up --wait` exits 0 even when a container cannot bind its port). Postgres tests take the `side_db` fixture (`newsdock_db.testing.side_postgres`: own compose project, free port, checks the container is running, healthy and owns the port). Modules that start a whole stack or Kafka on fixed ports (5433, 29092, 8000, 3000) are refused in setup by `infra/scripts/dev_stack_guard.py` while those ports are busy; stop the dev stack (`make down`) to run them. Never write a Docker test that trusts `compose up`'s exit code or a fixed host port.
 - Work follows the spec pipeline: `/spec-init` → `/spec-design` → `/spec-plan` → `/spec-implement` → `/spec-verify`, one folder per feature under `docs/specs/<name>/`.
 - Implement one task at a time from `docs/specs/mvp/tasks/T-NN.md`, test first. Use only the context that task names.
 - Every acceptance criterion `AC-n` in `spec.md` must end up covered by a test or a manual check listed in `tests.md`.

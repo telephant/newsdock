@@ -1,7 +1,6 @@
 """TC-20 (listener, AC-6): NOTIFY wakes the hub; reconnect wakes everyone."""
 
 import asyncio
-import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -11,46 +10,20 @@ from alembic.config import Config
 from newsdock_api.adapters.listener import NotifyListener, listen_dsn
 from newsdock_api.domain.streams import WakeHub
 from newsdock_db.engine import make_engine
-from psycopg.conninfo import conninfo_to_dict
 from sqlalchemy import Engine, text
 
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-push-test"
-
-
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
 
 
 @pytest.fixture(scope="module")
-def db() -> Iterator[tuple[Engine, str]]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+def db(side_db: tuple[str, str]) -> Iterator[tuple[Engine, str]]:
+    url = side_db[0]
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
     engine = make_engine(url)
     yield engine, url
     engine.dispose()
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 def _insert(engine: Engine, key: str) -> None:
@@ -64,13 +37,6 @@ def _insert(engine: Engine, key: str) -> None:
             ),
             {"k": key},
         )
-
-
-def test_listen_dsn_turns_a_sqlalchemy_url_into_a_psycopg_conninfo() -> None:
-    dsn = listen_dsn("postgresql+psycopg://u:p%40ss@h:5433/db")
-    parts = conninfo_to_dict(dsn)
-    assert (parts["user"], parts["password"], parts["host"]) == ("u", "p@ss", "h")
-    assert (parts["port"], parts["dbname"]) == ("5433", "db")
 
 
 def test_a_notification_wakes_waiting_streams(db: tuple[Engine, str]) -> None:

@@ -1,11 +1,9 @@
 """TC-34 + TC-14: migrations match the ORM metadata; cascade works (needs Docker).
 
-Runs in its own compose project (`newsdock-db-test`) against `.env.example`
-values, so a real dev stack and the owner's `.env` are untouched. Needs port
-5433 free.
+Runs against a throwaway Postgres from the `side_db` fixture (own compose project,
+free port), so a real dev stack is never touched.
 """
 
-import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,42 +22,11 @@ from sqlalchemy.orm import Session
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-db-test"
-
-
-def _env_example() -> dict[str, str]:
-    out: dict[str, str] = {}
-    for line in (ROOT / ".env.example").read_text().splitlines():
-        if "=" in line and not line.startswith("#"):
-            key, _, value = line.partition("=")
-            out[key.strip()] = value.strip()
-    return out
-
-
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-
-
-@pytest.fixture(scope="module")
-def database_url() -> Iterator[str]:
-    env = _env_example()
-    up = _compose("up", "-d", "--wait", "postgres")
-    assert up.returncode == 0, up.stderr
-    port = env.get("POSTGRES_PORT", "5433")
-    yield (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{port}/{env['POSTGRES_DB']}"
-    )
-    _compose("down", "-v", "--remove-orphans")
 
 
 @pytest.fixture()
-def migrated_url(database_url: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
-    monkeypatch.setenv("DATABASE_URL", database_url)
+def migrated_url(side_db: tuple[str, str]) -> Iterator[str]:
+    database_url = side_db[0]
     cfg = Config(str(ROOT / "infra" / "migrations" / "alembic.ini"))
     command.upgrade(cfg, "head")
     yield database_url

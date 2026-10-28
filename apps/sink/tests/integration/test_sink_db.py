@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import subprocess
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -26,40 +25,17 @@ pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
 FIXTURES = ROOT / "packages" / "core" / "tests" / "fixtures"
-PROJECT = "newsdock-sink-test"
 SLOT = "20261004081500"
 BASE = "http://x"
 
 
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-
-
 @pytest.fixture(scope="module")
-def engine_url(request: pytest.FixtureRequest) -> Iterator[str]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+def engine_url(
+    request: pytest.FixtureRequest, side_db: tuple[str, str]
+) -> Iterator[str]:
+    url = side_db[0]
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
-    mp.undo()
     yield url
-    _compose("down", "-v", "--remove-orphans")
 
 
 @pytest.fixture()
