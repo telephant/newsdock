@@ -188,6 +188,23 @@ test("a new key replaces the previous one on screen", async () => {
   expect(screen.queryByText(KEY)).toBeNull();
 });
 
+// TC-21 (AC-14): at the agent limit the page says so instead of a generic error
+test("the agent limit is explained", async () => {
+  stub({
+    "GET /api/admin/agents": () => json([agent()]),
+    "POST /api/admin/agents": () => json({ detail: "too_many_agents" }, 409),
+  });
+  render(<Agents />);
+  await screen.findByText("alpha");
+  fireEvent.change(screen.getByLabelText("Agent name"), {
+    target: { value: "beta" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Create agent" }));
+  expect((await screen.findByRole("alert")).textContent).toMatch(
+    /reached the agent limit/i,
+  );
+});
+
 test("name problems are explained", async () => {
   stub({
     "GET /api/admin/agents": () => json([agent()]),

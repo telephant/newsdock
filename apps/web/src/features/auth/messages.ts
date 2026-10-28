@@ -27,6 +27,12 @@ export function loginMessage(failure: Failure): string {
 
 export function signupMessage(failure: Failure): string {
   if (failure.kind === "unreachable") return UNREACHABLE;
+  if (failure.status === 429) {
+    const wait = failure.retryAfter
+      ? ` in ${formatWait(failure.retryAfter)}`
+      : " later";
+    return `Too many sign-ups from here. Try again${wait}.`;
+  }
   switch (failure.detail) {
     case "email_taken":
       return "That email is already registered. Try logging in instead.";

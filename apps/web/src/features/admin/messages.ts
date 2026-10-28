@@ -29,6 +29,9 @@ export function agentActionMessage(failure: Failure): string {
   if (failure.kind === "error" && failure.detail === "name_taken") {
     return "An agent with that name already exists.";
   }
+  if (failure.kind === "error" && failure.detail === "too_many_agents") {
+    return "You have reached the agent limit. Ask an owner to raise it.";
+  }
   if (failure.kind === "error" && failure.status === 422) {
     return "Use 1 to 40 lowercase letters, digits, _ or - for the agent name.";
   }

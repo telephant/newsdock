@@ -13,9 +13,9 @@ acs:
   AC-7: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
   AC-8: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
   AC-9: {status: in-progress}  # limiter TC green (T-01); route in T-02
-  AC-10: {status: todo}
+  AC-10: {status: passing}  # TC-20, TC-21 green (T-04, 2026-10-28)
   AC-11: {status: passing}  # TC-17..TC-19 green (T-03, 2026-10-28)
   AC-12: {status: passing}  # TC-17..TC-19 green (T-03, 2026-10-28)
   AC-13: {status: passing}  # TC-17..TC-19 green (T-03, 2026-10-28)
-  AC-14: {status: todo}
+  AC-14: {status: passing}  # TC-20, TC-21 green (T-04, 2026-10-28)
   AC-15: {status: passing}  # TC-22 + make config-python green (T-01, 2026-10-28)

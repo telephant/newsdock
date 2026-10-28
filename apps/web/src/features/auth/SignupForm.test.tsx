@@ -67,6 +67,33 @@ test.each([
   },
 );
 
+// TC-20 (AC-10): a rate-limited sign-up says when to try again and stays on the form
+test("a 429 with a wait explains the limit and when to retry", async () => {
+  const { navigate } = setup(
+    () =>
+      new Response(JSON.stringify({ detail: "too_many_signups" }), {
+        status: 429,
+        headers: { "content-type": "application/json", "retry-after": "120" },
+      }),
+  );
+  submit();
+  const alert = (await screen.findByRole("alert")).textContent ?? "";
+  expect(alert).toMatch(/too many sign-ups/i);
+  expect(alert).toMatch(/try again in about 2 minutes/i);
+  expect(navigate).not.toHaveBeenCalled();
+  expect((screen.getByLabelText("Email") as HTMLInputElement).value).toBe(
+    "new@x.io",
+  );
+});
+
+test("a 429 without a wait says to try again later", async () => {
+  setup(() => json({ detail: "too_many_signups" }, 429));
+  submit();
+  expect((await screen.findByRole("alert")).textContent).toMatch(
+    /too many sign-ups.*try again later/i,
+  );
+});
+
 test("an unreachable server is reported", async () => {
   setup(() => {
     throw new TypeError("Failed to fetch");
