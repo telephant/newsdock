@@ -61,6 +61,7 @@ from newsdock_api.domain.service import (
     encode_cursor,
     get_article,
 )
+from newsdock_api.domain.signuplimit import SignupLimiter
 from newsdock_api.domain.streams import StreamLimiter, WakeHub
 from newsdock_api.domain.subscriptions import SubscriptionStore
 
@@ -73,6 +74,7 @@ def create_app(
     users_repo: UsersStore | None = None,
     hasher: PasswordHasher | None = None,
     login_limiter: LoginLimiter | None = None,
+    signup_limiter: SignupLimiter | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(DbSettings())
@@ -259,11 +261,17 @@ def create_app(
             fallback_poll_seconds=settings.sse_fallback_poll_seconds,
         )
     )
+    limiter_for_signups = signup_limiter or SignupLimiter(
+        settings.auth_signup_max_per_address,
+        settings.auth_signup_max_total,
+        settings.signup_window_seconds,
+    )
     app.include_router(
         build_accounts_router(
             accounts,
             password_hasher,
             limiter_for_logins,
+            limiter_for_signups,
             require_user=guards.user,
             dummy_hash=make_dummy_hash(password_hasher),
             signup_open=settings.auth_signup_open,

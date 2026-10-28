@@ -4,14 +4,14 @@ updated: 2026-10-28
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided}
 gates: {init: approved, design: approved, plan: approved, implement: in-progress, verify: pending}
 acs:
-  AC-1: {status: in-progress}  # limiter TC green (T-01); route in T-02
-  AC-2: {status: in-progress}  # limiter TC green (T-01); route in T-02
-  AC-3: {status: in-progress}  # limiter TC green (T-01); route in T-02
-  AC-4: {status: in-progress}  # limiter TC green (T-01); route in T-02
-  AC-5: {status: todo}
-  AC-6: {status: todo}
-  AC-7: {status: todo}
-  AC-8: {status: in-progress}  # limiter TC green (T-01); route in T-02
+  AC-1: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-2: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-3: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-4: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-5: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-6: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-7: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
+  AC-8: {status: passing}  # TC green (T-01, T-02, 2026-10-28)
   AC-9: {status: in-progress}  # limiter TC green (T-01); route in T-02
   AC-10: {status: todo}
   AC-11: {status: todo}

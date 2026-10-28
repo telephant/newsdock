@@ -37,6 +37,7 @@ from newsdock_api.domain.accounts import (
     verify_login,
 )
 from newsdock_api.domain.loginlimit import LoginLimiter
+from newsdock_api.domain.signuplimit import UNKNOWN_ADDRESS, SignupLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def build_accounts_router(
     store: AccountStore,
     hasher: PasswordHasher,
     limiter: LoginLimiter,
+    signup_limiter: SignupLimiter,
     *,
     require_user: Callable[[Request], UserPrincipal],
     dummy_hash: str,
@@ -71,7 +73,7 @@ def build_accounts_router(
     router = APIRouter(prefix="/api/auth")
 
     @router.post("/signup", status_code=201)
-    def signup(body: Credentials) -> PublicUser:
+    def signup(body: Credentials, request: Request) -> PublicUser:
         try:
             ensure_signup_open(signup_open)
         except SignupClosed as exc:
@@ -83,6 +85,18 @@ def build_accounts_router(
             raise HTTPException(status_code=422, detail="invalid_email") from exc
         except WeakPassword as exc:
             raise HTTPException(status_code=422, detail="invalid_password") from exc
+        # Only requests that passed the checks above count, and a refusal comes
+        # before the argon2 hash and the database write (signup-rate-limit D-3).
+        # The socket peer address is used; X-Forwarded-For is forgeable (D-6).
+        address = request.client.host if request.client else UNKNOWN_ADDRESS
+        decision = signup_limiter.attempt(address)
+        if not decision.allowed:
+            logger.info("signup limited")
+            raise HTTPException(
+                status_code=429,
+                detail="too_many_signups",
+                headers={"Retry-After": str(decision.retry_after)},
+            )
         try:
             user = store.create_user(email, hasher.hash(body.password))
         except DuplicateEmail as exc:

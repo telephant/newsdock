@@ -101,6 +101,7 @@ def base(engine: Engine) -> Iterator[str]:
         auth_required=True, rate_limit_per_minute=0,
         sse_keepalive_seconds=KEEPALIVE, sse_fallback_poll_seconds=60,
         live_max_streams_per_user=CAP,
+        auth_signup_max_per_address=0, auth_signup_max_total=0,  # many users, one host
     )  # fmt: skip
     with _serve(settings) as url:
         yield url
@@ -111,6 +112,7 @@ def open_base(engine: Engine) -> Iterator[str]:
     settings = Settings(
         auth_required=False, rate_limit_per_minute=0,
         sse_keepalive_seconds=KEEPALIVE, sse_fallback_poll_seconds=60,
+        auth_signup_max_per_address=0, auth_signup_max_total=0,
     )  # fmt: skip
     with _serve(settings) as url:
         yield url
