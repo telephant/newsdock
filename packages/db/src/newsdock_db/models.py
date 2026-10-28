@@ -8,6 +8,7 @@ they do not drift from these models. Apps use them only in `adapters/`.
 from datetime import datetime
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
@@ -67,6 +68,10 @@ class Article(Base):
     tone_neg: Mapped[float | None] = mapped_column(REAL, nullable=True)
     tone_polarity: Mapped[float | None] = mapped_column(REAL, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # semantic-search (M3, migration 0008): filled by the embedder worker, never by
+    # the sink; NULL = not embedded yet. Canonical rows only (ADR-0024, ADR-0025).
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_articles_published_at", "published_at"),
@@ -74,6 +79,18 @@ class Article(Base):
         Index("ix_articles_themes", "themes", postgresql_using="gin"),
         Index("ix_articles_domain", "domain"),
         Index("ix_articles_story_key_published_at", "story_key", "published_at"),
+        Index(
+            "ix_articles_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index(
+            "ix_articles_title_fts",
+            text("to_tsvector('english', title)"),
+            postgresql_using="gin",
+        ),
     )
 
 

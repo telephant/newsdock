@@ -13,7 +13,8 @@ CREATE INDEX ix_articles_title_fts ON articles
   USING gin (to_tsvector('english', title));
 ```
 
-- Both columns nullable, so the migration is metadata-only and every existing row is unchanged (AC-1). Downgrade drops the indexes, then the columns.
+- Both columns nullable, so the migration is metadata-only and every existing row is unchanged (AC-1). Forward-only (DR-11): there is no downgrade.
+- Role `embedder_rw` (NOLOGIN, like the other service roles): `SELECT` on `articles` and `UPDATE (embedding, embedding_model)`; no insert, no delete, no update of any other column.
 - Rows with `embedding IS NULL` are not in the HNSW index.
 - Alembic runs the extension-dependent DDL through `op.execute`; the ORM model gets `Vector(768)` from the `pgvector` package.
 

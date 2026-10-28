@@ -14,7 +14,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 
 | TC | AC | Level | Case |
 |---|---|---|---|
-| TC-1 | AC-1 | integration | Given a database at head `0007` with articles, When `0008` is applied, Then `articles` has nullable `embedding` (vector 768) and `embedding_model`, an HNSW cosine index and a GIN index on `to_tsvector('english', title)`, and all earlier columns and rows are identical; downgrade removes them |
+| TC-1 | AC-1 | integration | Given a database at head `0007` with articles, When `0008` is applied, Then `articles` has nullable `embedding` (vector 768) and `embedding_model`, an HNSW cosine index and a GIN index on `to_tsvector('english', title)`, and all earlier columns and rows are identical; the role `embedder_rw` may update only the two embedding columns; the ORM metadata matches the migration (no downgrade: migrations are forward-only, DR-11) |
 | TC-2 | AC-2 | integration | Given a fake Ollama and one canonical article with no embedding, When the worker runs one pass, Then the row has a 768-dimension vector and `embedding_model` = the configured model |
 | TC-3 | AC-3 | unit | Given a repo where nothing needs embedding and a counting embedder, When a pass runs, Then the embedder is called 0 times and no UPDATE is issued; a second pass over embedded rows behaves the same |
 | TC-4 | AC-4 | integration | Given Ollama refusing connections, When the sink-style insert adds articles and the worker runs, Then the inserts exist, their embeddings stay NULL, a failure is logged, and after Ollama recovers the next pass embeds them |

@@ -5,7 +5,7 @@ decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided
 # init, design and plan approved on the user's instruction "finish M3 by using /spec-*"; decisions and ADR-0024/0025 are recommended defaults, not answered one by one
 gates: {init: approved, design: approved, plan: approved, implement: pending, verify: pending}
 acs:
-  AC-1: {status: todo}
+  AC-1: {status: passing}  # TC-1 (T-03), 2026-10-28
   AC-2: {status: in-progress}  # T-02 client done; worker in T-05
   AC-3: {status: todo}
   AC-4: {status: in-progress}  # T-02 client done; worker in T-05
@@ -17,6 +17,6 @@ acs:
   AC-10: {status: in-progress}  # T-02 errors done; tool in T-07
   AC-11: {status: todo}
   AC-12: {status: todo}
-  AC-13: {status: todo}
+  AC-13: {status: passing}  # TC-14 (T-03), 2026-10-28
   AC-14: {status: todo}
   AC-15: {status: in-progress}  # T-02 package takes no config; settings in T-05, T-06
