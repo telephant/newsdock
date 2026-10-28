@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-ownership — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>agent-ownership — M2d diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 Create, list, act</a><a href="#e">3 Data model and user delete</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  U["user session (any role)"] --> G["C-24 guard: user or token"]
+  OW["owner session"] --> G
+  TK["admin token (CLI)"] --> G
+  G --> R["C-23 admin routes"]
+  R --> SC["C-20 scope_for (pure)"]
+  R --> AR["C-21 agents repo"]
+  R --> SR["C-22 subscriptions repo"]
+  AR --> DB[("C-25 agents.owner_id")]
+  SR --> DB
+  AG["agent + key"] -->|unchanged| MCP["/mcp, /api/subscriptions*"]
+  MCP --> DB
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does every repo call that touches agents or subscriptions receive the scope from C-20?</li>
+<li>Do the agent-facing paths stay outside the scope entirely?</li>
+<li>Is the owner role and the token the only way to an unfiltered scope?</li>
+<li>Is C-20 free of I/O (pure domain)?</li></ul></div></section>
+
+<section id="s"><h2>2 Create, list and act on one agent</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Browser (user B)
+  participant A as API (C-23)
+  participant D as Postgres
+  B->>A: POST /api/admin/agents {name}
+  A->>D: INSERT agent (owner_id = B)
+  A-->>B: 201 key shown once
+  B->>A: GET /api/admin/agents
+  A->>D: SELECT ... WHERE owner_id = B
+  A-->>B: B's agents only
+  B->>A: POST /api/admin/agents/{a1}/disable (a1 owned by A)
+  A->>D: UPDATE ... WHERE id = a1 AND owner_id = B
+  D-->>A: 0 rows
+  A-->>B: 404 not_found
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is "not yours" indistinguishable from "does not exist" for B?</li>
+<li>Is the ownership test inside the same statement as the write (no check-then-act gap)?</li>
+<li>Would the owner role's request omit the owner_id predicate and succeed?</li></ul></div></section>
+
+<section id="e"><h2>3 Data model and what a user delete does</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  users ||--o{ agents : "owner_id (SET NULL)"
+  agents ||--o{ api_keys : "agent_id (CASCADE)"
+  agents ||--o{ subscriptions : "agent_id (CASCADE)"
+  agents ||--o| agent_cursors : "agent_id (CASCADE)"
+  users {
+    uuid id PK
+    text role
+  }
+  agents {
+    uuid id PK
+    text name UK
+    uuid owner_id FK "NULL = no owner"
+  }
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>After deleting user A, do A's agents keep keys, cursor and subscriptions?</li>
+<li>Does an agent with owner_id NULL show up for viewers and admins? (it must not)</li>
+<li>Is the unique name still global, so two users cannot both own "demo"?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>
