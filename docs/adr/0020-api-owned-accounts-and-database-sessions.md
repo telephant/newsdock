@@ -16,3 +16,6 @@ All (a). The API is the only place that decides who someone is and what they may
 
 ## Consequences
 + Logout and revocation are immediate; no key rotation or JWT blocklist. + Agent and human auth share the middleware and the same tests. + Nothing to sync between two services. − One DB read per authenticated request (small indexed join; acceptable at this scale). − The API grows an account surface (signup, throttle, lock rules) that an auth library would otherwise supply. − Login throttling is in memory, valid for one API worker (same limit as the agent limiter). − Per-user agents, invites, email flows and MFA are later additions, not free.
+
+## Amendment 2026-10-28 (agent-ownership, ADR-0023)
+Per-user agents arrived: `manage_agents` now means "manage the agents you may see" and is held by `owner`, `admin` and `viewer` alike (so `admin` and `viewer` have the same permissions), while `manage_users` stays with `owner`. The `owner` role additionally sees every agent through the unfiltered scope. The permission dict in `domain/accounts.py` is still the one place roles are decided.

@@ -19,3 +19,6 @@ One enforcement point, easy to test; fast hash is safe only because keys are hig
 ## Amendment 2026-10-27 (ui-login, ADR-0020; follows spec D-7)
 Admin routes now accept the admin token **or** a session whose role may manage agents (admin, owner). Because sessions work without a token, an unset `NEWSDOCK_ADMIN_TOKEN` no longer hides the routes with 404: a caller with no principal gets 401, and an agent key still gets 403. A token that is not configured simply matches nothing. The token-only reset-password route (T-08) keeps the 404 when no token is set. Enforcement moved from the route-local `require_admin` to `Guards.admin` in `adapters/principal.py`; agent paths (`/mcp`, `/api/subscriptions*`) are unchanged.
 
+## Amendment 2026-10-28 (agent-ownership, ADR-0023)
+Admin routes now accept the admin token **or any signed-in user** (`manage_agents` is held by every role), and what a caller sees and changes is limited by an `AgentScope`: the `owner` role and the admin token reach every agent, other users only the agents they created (`agents.owner_id`). A leaked admin token is still full registry control. Key format, storage and the agent-facing paths are unchanged.
+

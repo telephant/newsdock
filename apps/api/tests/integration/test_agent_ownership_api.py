@@ -238,3 +238,24 @@ def test_only_the_owner_role_manages_users(world: Callable[[], World]) -> None:
         assert w.req(who, "GET", "/api/users").status_code == status, who
     assert w.fresh().get("/api/users", headers=_bearer(key)).status_code == 403
     assert w.fresh().get("/api/users").status_code == 401
+
+
+# TC-14 (API half): `make agent-create` is this request; the agent has no owner (AC-10)
+def test_the_cli_request_creates_an_ownerless_agent_the_owner_can_manage(
+    world: Callable[[], World], engine: Engine
+) -> None:
+    w = world()
+    response = w.fresh().post(
+        NAMES,
+        headers={**_bearer(TOKEN), "Content-Type": "application/json"},
+        json={"name": "demo-financial"},
+    )
+    assert response.status_code == 201
+    assert response.json()["api_key"].startswith("ndk_")
+    with engine.connect() as conn:
+        owner = conn.execute(
+            text("SELECT owner_id FROM agents WHERE name = 'demo-financial'")
+        ).scalar_one()
+    assert owner is None
+    assert w.names("a") == []  # not in an ordinary user's list
+    assert w.names("owner") == ["demo-financial"]  # the owner role can manage it
