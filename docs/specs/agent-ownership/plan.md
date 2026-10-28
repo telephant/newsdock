@@ -35,6 +35,7 @@ Findings: none open. One note carried into T-05: the exact command that exports 
 ## Progress
 
 - T-01 ✅ 2026-10-28 — migration `0007_agent_owner` (additive, forward-only per DR-11), `Agent.owner_id`, `test_stack` head `0007`; TC-1, TC-2 and a model/migration drift check green in `apps/api/tests/integration/test_agent_owner_migration.py`. Findings: (1) DR-11 makes migrations forward-only, so the "downgrade removes the column" clause was dropped from AC-1, TC-1 and the design (no behaviour change); (2) a dev stack on 5433 was running, so this test file runs its own Postgres on port 55433 through a temporary copy of `.env.example` and leaves the dev stack alone; the older Docker tests (and `make test-infra`) still need 5433 free.
+- T-02 ✅ 2026-10-28 — `AgentScope`/`ALL` and `AgentSummary.owner_id|owner_email` in `domain/agents.py`, `scope_for` and `manage_agents` for all roles in `domain/accounts.py`; TC-3, TC-4 green (`make check-python`: 455 passed, mypy and import-linter green). Deviation: the `AgentRegistry` protocol change moved to T-03 (it cannot change before the repo without breaking mypy). Heads-up for T-04: the Docker test `test_roles_api.py` still asserts that a viewer gets 403 on the agent routes, which is now wrong by design.
 
 ## Milestones
 

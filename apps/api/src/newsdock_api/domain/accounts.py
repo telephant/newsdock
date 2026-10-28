@@ -13,7 +13,7 @@ from typing import NamedTuple, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
-from newsdock_api.domain.agents import Agent
+from newsdock_api.domain.agents import ALL, Agent, AgentScope
 
 EMAIL_MAX_LENGTH = 254
 PASSWORD_MAX_LENGTH = 128
@@ -31,7 +31,8 @@ class Role(StrEnum):
 PERMISSIONS: dict[str, frozenset[Role]] = {
     "read_articles": frozenset({Role.OWNER, Role.ADMIN, Role.VIEWER}),
     "live_feed": frozenset({Role.OWNER, Role.ADMIN, Role.VIEWER}),
-    "manage_agents": frozenset({Role.OWNER, Role.ADMIN}),
+    # every user manages their own agents; AgentScope limits which (ADR-0023)
+    "manage_agents": frozenset({Role.OWNER, Role.ADMIN, Role.VIEWER}),
     "manage_users": frozenset({Role.OWNER}),
 }
 
@@ -157,6 +158,14 @@ class AdminTokenPrincipal(BaseModel):
 
 # None = anonymous
 Principal = UserPrincipal | AgentPrincipal | AdminTokenPrincipal | None
+
+
+def scope_for(principal: UserPrincipal | AdminTokenPrincipal) -> AgentScope:
+    """The agents a caller may see: all for the owner role and the admin token,
+    otherwise only the ones they created (ADR-0023)."""
+    if isinstance(principal, AdminTokenPrincipal) or principal.role is Role.OWNER:
+        return ALL
+    return AgentScope(everything=False, owner_id=principal.user_id)
 
 
 class SessionStore(Protocol):

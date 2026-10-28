@@ -110,6 +110,24 @@ class AgentSummary(BaseModel):
     name: str
     status: str
     keys: list[KeySummary]
+    owner_id: str | None = None  # the creating user; None = no owner (ADR-0023)
+    owner_email: str | None = None
+
+
+class AgentScope(BaseModel):
+    """Which agents a caller may see and manage (ADR-0023).
+
+    `everything` is explicit so `owner_id=None` never means both "all agents" and
+    "agents with no owner". Repos take a scope as a required argument.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    everything: bool
+    owner_id: str | None = None  # set when `everything` is False
+
+
+ALL = AgentScope(everything=True)
 
 
 class AgentRegistry(Protocol):

@@ -5,21 +5,25 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from newsdock_api.domain.accounts import (
     PERMISSIONS,
+    AdminTokenPrincipal,
     InvalidCredentials,
     InvalidEmail,
     Role,
     SignupClosed,
     StoredUser,
+    UserPrincipal,
     WeakPassword,
     can,
     check_password,
     ensure_signup_open,
     normalize_email,
+    scope_for,
     session_expiry,
     session_valid,
     should_touch,
     verify_login,
 )
+from pydantic import ValidationError
 
 NOW = datetime(2026, 10, 27, 12, 0, 0, tzinfo=UTC)
 IDLE = timedelta(hours=12)
@@ -76,13 +80,15 @@ def test_permission_table() -> None:
     every = {Role.OWNER, Role.ADMIN, Role.VIEWER}
     assert PERMISSIONS["read_articles"] == every
     assert PERMISSIONS["live_feed"] == every
-    assert PERMISSIONS["manage_agents"] == {Role.OWNER, Role.ADMIN}
+    # agent-ownership (ADR-0023): every user manages their own agents
+    assert PERMISSIONS["manage_agents"] == every
     assert PERMISSIONS["manage_users"] == {Role.OWNER}
 
 
 def test_can_follows_the_table() -> None:
     assert can(Role.VIEWER, "read_articles")
-    assert not can(Role.VIEWER, "manage_agents")
+    assert can(Role.VIEWER, "manage_agents")
+    assert not can(Role.VIEWER, "manage_users")
     assert can(Role.ADMIN, "manage_agents")
     assert not can(Role.ADMIN, "manage_users")
     assert can(Role.OWNER, "manage_users")
@@ -222,3 +228,28 @@ def test_touch_is_skipped_when_last_seen_is_recent() -> None:
     assert not should_touch(NOW, NOW - timedelta(seconds=59))
     assert should_touch(NOW, NOW - timedelta(seconds=60))
     assert should_touch(NOW, NOW - timedelta(hours=1))
+
+
+# --- TC-3: who sees which agents (AC-3, AC-5) -----------------------------------
+
+
+def _user(role: Role, user_id: str = "u-1") -> UserPrincipal:
+    return UserPrincipal(user_id=user_id, email=f"{user_id}@x.io", role=role)
+
+
+def test_the_owner_role_and_the_admin_token_see_everything() -> None:
+    assert scope_for(_user(Role.OWNER)).everything
+    assert scope_for(AdminTokenPrincipal()).everything
+
+
+@pytest.mark.parametrize("role", [Role.ADMIN, Role.VIEWER])
+def test_other_roles_see_only_their_own_agents(role: Role) -> None:
+    scope = scope_for(_user(role, "u-7"))
+    assert not scope.everything
+    assert scope.owner_id == "u-7"
+
+
+def test_scope_is_immutable() -> None:
+    scope = scope_for(_user(Role.VIEWER))
+    with pytest.raises(ValidationError):
+        scope.owner_id = "someone-else"  # type: ignore[misc]

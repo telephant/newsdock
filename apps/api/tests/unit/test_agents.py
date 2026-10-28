@@ -116,3 +116,19 @@ def test_authenticate_rejects_unknown_wrong_revoked_disabled() -> None:
     assert authenticate(raw, lambda p: _stored(make_key())) is None  # wrong secret
     assert authenticate(raw, lambda p: _stored(key, revoked=True)) is None
     assert authenticate(raw, lambda p: _stored(key, agent_active=False)) is None
+
+
+# --- agent-ownership: AgentScope and the summary fields (AC-3, AC-5) ---------------
+
+
+def test_the_everything_scope_carries_no_owner() -> None:
+    from newsdock_api.domain.agents import ALL
+
+    assert ALL.everything and ALL.owner_id is None
+
+
+def test_agent_summary_owner_fields_default_to_no_owner() -> None:
+    from newsdock_api.domain.agents import AgentSummary
+
+    summary = AgentSummary(agent_id="a", name="n", status="active", keys=[])
+    assert summary.owner_id is None and summary.owner_email is None

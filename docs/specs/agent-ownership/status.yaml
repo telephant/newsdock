@@ -6,12 +6,12 @@ gates: {init: approved, design: approved, plan: approved, implement: in-progress
 acs:
   AC-1: {status: passing}  # TC-1 green (T-01, 2026-10-28)
   AC-2: {status: todo}
-  AC-3: {status: todo}
+  AC-3: {status: in-progress}  # scope_for TC-3 green (T-02); repo/HTTP in T-03/T-04
   AC-4: {status: todo}
-  AC-5: {status: todo}
+  AC-5: {status: in-progress}  # scope_for TC-3 green (T-02); repo/HTTP in T-03/T-04
   AC-6: {status: todo}
   AC-7: {status: todo}
   AC-8: {status: in-progress}  # TC-2 (DB level) green in T-01; HTTP part TC-11 in T-04
-  AC-9: {status: todo}
-  AC-10: {status: todo}
+  AC-9: {status: in-progress}  # permission table TC-4 green (T-02); HTTP TC-9 in T-04
+  AC-10: {status: in-progress}  # permission table TC-4 green (T-02); TC-13/TC-14 later
   AC-11: {status: todo}
