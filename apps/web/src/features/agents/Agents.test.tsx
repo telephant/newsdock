@@ -8,6 +8,9 @@ import {
   within,
 } from "@testing-library/react";
 import { afterEach, expect, test, vi } from "vitest";
+import { ConfigProvider } from "@/components/ConfigProvider";
+import { DEFAULT_CONFIG } from "@/lib/config/types";
+import { SessionProvider } from "../auth/SessionProvider";
 import { Agents } from "./Agents";
 
 afterEach(() => {
@@ -315,8 +318,45 @@ test("while loading a skeleton is shown", () => {
 test("an empty registry shows an empty state next to the create form", async () => {
   stub({ "GET /api/admin/agents": () => json([]) });
   render(<Agents />);
-  expect(await screen.findByText("No agents yet")).toBeTruthy();
+  expect(await screen.findByText("You have no agents yet.")).toBeTruthy();
   expect(screen.getByLabelText("Agent name")).toBeTruthy();
+});
+
+// TC-15 (AC-11): the owner role also sees whose each agent is; everyone else, who
+// only ever receives their own agents, gets no creator line
+function renderAs(role: string, agents: object[]) {
+  stub({
+    "GET /api/auth/me": () =>
+      json({ id: "u1", email: `${role}@x.io`, role }, 200),
+    "GET /api/admin/agents": () => json(agents),
+  });
+  return render(
+    <ConfigProvider value={DEFAULT_CONFIG}>
+      <SessionProvider>
+        <Agents />
+      </SessionProvider>
+    </ConfigProvider>,
+  );
+}
+
+test("a viewer sees the returned agents and no creator", async () => {
+  renderAs("viewer", [agent({ owner_id: "u1", owner_email: "viewer@x.io" })]);
+  expect(await screen.findByText("alpha")).toBeTruthy();
+  expect(screen.queryByText(/created by/i)).toBeNull();
+});
+
+test("the owner role sees the creator, or 'no owner' for an unowned agent", async () => {
+  renderAs("owner", [
+    agent({ owner_id: "u2", owner_email: "ann@x.io" }),
+    agent({
+      agent_id: "a2",
+      name: "legacy",
+      owner_id: null,
+      owner_email: null,
+    }),
+  ]);
+  expect(await screen.findByText("ann@x.io")).toBeTruthy();
+  expect(screen.getByText("no owner")).toBeTruthy();
 });
 
 test("the default revoke confirmation is a dialog", async () => {

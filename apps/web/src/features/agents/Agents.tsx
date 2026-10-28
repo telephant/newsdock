@@ -1,5 +1,6 @@
 "use client";
-// Agents and API keys (AC-11, admin and owner). A key secret is shown exactly once,
+// Agents and API keys (AC-11): every signed-in user sees and manages their own agents
+// (the owner role sees all, with the creator, ADR-0023). A key secret is shown exactly once,
 // right after it is issued: it lives only in this component's state, never in the
 // list (the API does not return it again), and is dropped on dismiss, on the next
 // issued key and when the page unmounts. All text is escaped by React.
@@ -26,6 +27,7 @@ import type { components } from "@/lib/api/types";
 import { apiRequest } from "@/lib/client/api";
 import { agentActionMessage, formatTime } from "../admin/messages";
 import { useRemote } from "../admin/useRemote";
+import { useSession } from "../auth/SessionProvider";
 
 type AgentSummary = components["schemas"]["AgentSummary"];
 type IssuedAgent = components["schemas"]["IssuedAgent"];
@@ -44,6 +46,10 @@ export function Agents({
   const { confirm, dialog } = useConfirm(answer);
   const nameId = useId();
   const { remote, reload } = useRemote<AgentSummary[]>("/api/admin/agents");
+  const session = useSession();
+  // only the owner role receives other users' agents, so only it needs a creator
+  const showCreator =
+    session.status === "user" && session.user.role === "owner";
   const [name, setName] = useState("");
   const [shown, setShown] = useState<Shown | null>(null);
   const [copied, setCopied] = useState(false);
@@ -184,7 +190,7 @@ export function Agents({
 
       {remote.data.length === 0 ? (
         <EmptyState
-          title="No agents yet"
+          title="You have no agents yet."
           description="Create the first agent above to get an API key."
         />
       ) : (
@@ -194,6 +200,14 @@ export function Agents({
               <Card>
                 <CardHeader className="flex flex-wrap items-center gap-2">
                   <CardTitle className="break-all">{agent.name}</CardTitle>
+                  {showCreator ? (
+                    <p className="text-sm text-muted-foreground">
+                      Created by{" "}
+                      <span className="break-all">
+                        {agent.owner_email ?? "no owner"}
+                      </span>
+                    </p>
+                  ) : null}
                   <Badge
                     variant={
                       agent.status === "active" ? "default" : "secondary"

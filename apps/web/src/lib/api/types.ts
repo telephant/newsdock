@@ -399,6 +399,10 @@ export interface components {
       status: string;
       /** Keys */
       keys: components["schemas"]["KeySummary"][];
+      /** Owner Id */
+      owner_id?: string | null;
+      /** Owner Email */
+      owner_email?: string | null;
     };
     /** AnalysisRecord */
     AnalysisRecord: {

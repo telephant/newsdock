@@ -8,8 +8,10 @@ export function asRole(value: string): Role | null {
     : null; // an unknown role unlocks nothing
 }
 
+// Every signed-in user manages their own agents and subscriptions; the API limits
+// each list to what the caller may see (the owner role sees all, ADR-0023).
 export function canManageAgents(role: Role | null): boolean {
-  return role === "owner" || role === "admin";
+  return role !== null;
 }
 
 export function canManageUsers(role: Role | null): boolean {

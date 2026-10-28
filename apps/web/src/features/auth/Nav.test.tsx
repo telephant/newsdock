@@ -44,10 +44,10 @@ const me = (role: string) =>
 
 const names = () => screen.getAllByRole("link").map((link) => link.textContent);
 
-test("a viewer sees the feed and the live page, nothing administrative", async () => {
+test("a viewer sees the feed, the live page and their own agents and subscriptions", async () => {
   setup(() => me("viewer"));
   await screen.findByText("viewer@x.io");
-  expect(names()).toEqual(["Feed", "Live"]);
+  expect(names()).toEqual(["Feed", "Live", "Agents", "Subscriptions"]);
 });
 
 test("an admin also sees agents and subscriptions", async () => {
