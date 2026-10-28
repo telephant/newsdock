@@ -11,3 +11,4 @@ Priority: P1 next, P2 soon, P3 later.
 - **Embedding model comparison (P3):** run the AC-14 eval across models (and a hosted one, M6).
 - **Similar articles for an article id (P3):** `similar_to(article_id)` MCP tool, no query embedding needed.
 - **Embed `article_sources` copies (P3):** only if source-level search is needed.
+- **Harder search eval (P2, found at T-08):** the 40-title, 8-topic set scores 1.000 recall@5 and MRR for vector and hybrid, so it cannot pick the prefix setting, `semantic_rrf_k` or `semantic_candidates`. Build a set with confusable topics (for example central-bank vs government-bond news, several wildfires, several elections), real GDELT titles from the 7-day window, and queries written by someone other than the label author.

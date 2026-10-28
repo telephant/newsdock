@@ -93,7 +93,7 @@ SCENE ?=
 SCENE_db       := packages/db
 SCENE_kafka    := apps/ingester/tests/integration apps/processor/tests/integration
 SCENE_sink     := apps/sink/tests/integration
-SCENE_api      := apps/api/tests/integration
+SCENE_api      := apps/api/tests/integration apps/api/tests/eval
 SCENE_embedder := apps/embedder/tests/integration
 SCENE_pipeline := infra/scripts/tests/test_reingest.py infra/scripts/tests/test_story_agent.py
 SCENE_e2e      := infra/scripts/tests/test_agent_isolation.py
@@ -107,6 +107,9 @@ else
 	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api embedder pipeline e2e stack images)" >&2; exit 2; }
 	uv run pytest -m docker $(SCENE_$(SCENE))
 endif
+
+eval-search: ## Search recall@5 and MRR for keyword, vector and hybrid, real model (needs Docker, Ollama with nomic-embed-text)
+	uv run pytest -m "docker and ollama" apps/api/tests/eval -s
 
 up: ## Start Kafka and Postgres, wait until healthy (needs .env)
 	@test -f .env || { echo "missing .env: copy .env.example to .env (cp .env.example .env)" >&2; exit 1; }
