@@ -47,6 +47,7 @@ mypy_path = [
     "packages/core/src",
     "packages/config/src",
     "packages/db/src",
+    "packages/embedding/src",
     "infra/scripts",
 ]
 
@@ -55,6 +56,7 @@ root_packages = [
     "newsdock_core",
     "newsdock_config",
     "newsdock_db",
+    "newsdock_embedding",
     "newsdock_ingester",
     "newsdock_processor",
     "newsdock_sink",
@@ -81,6 +83,7 @@ source_modules = ["newsdock_core"]
 forbidden_modules = [
     "newsdock_config",
     "newsdock_db",
+    "newsdock_embedding",
     "newsdock_ingester",
     "newsdock_processor",
     "newsdock_sink",
@@ -112,6 +115,7 @@ forbidden_modules = [
     "newsdock_agent.adapters",
     "newsdock_config",
     "newsdock_db",
+    "newsdock_embedding",
     "confluent_kafka",
     "psycopg",
     "sqlalchemy",
@@ -126,6 +130,21 @@ type = "forbidden"
 source_modules = ["newsdock_config"]
 forbidden_modules = [
     "newsdock_core",
+    "newsdock_db",
+    "newsdock_ingester",
+    "newsdock_processor",
+    "newsdock_sink",
+    "newsdock_api",
+    "newsdock_agent",
+]
+
+[[tool.importlinter.contracts]]
+name = "ADR-0024 embedding imports no app, core, config or db"
+type = "forbidden"
+source_modules = ["newsdock_embedding"]
+forbidden_modules = [
+    "newsdock_core",
+    "newsdock_config",
     "newsdock_db",
     "newsdock_ingester",
     "newsdock_processor",

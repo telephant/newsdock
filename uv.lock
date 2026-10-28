@@ -15,6 +15,7 @@ members = [
     "newsdock-config",
     "newsdock-core",
     "newsdock-db",
+    "newsdock-embedding",
     "newsdock-ingester",
     "newsdock-processor",
     "newsdock-sink",
@@ -1171,6 +1172,17 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.1" },
 ]
 provides-extras = ["migrate"]
+
+[[package]]
+name = "newsdock-embedding"
+version = "0.0.0"
+source = { editable = "packages/embedding" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.28" }]
 
 [[package]]
 name = "newsdock-ingester"
