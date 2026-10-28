@@ -10,11 +10,13 @@ COPY apps/api/pyproject.toml apps/api/pyproject.toml
 COPY packages/config/pyproject.toml packages/config/pyproject.toml
 COPY packages/core/pyproject.toml packages/core/pyproject.toml
 COPY packages/db/pyproject.toml packages/db/pyproject.toml
+COPY packages/embedding/pyproject.toml packages/embedding/pyproject.toml
 RUN uv sync --frozen --no-dev --no-install-workspace --package newsdock-api
 # Layer 2: sources
 COPY packages/config/src packages/config/src
 COPY packages/core/src packages/core/src
 COPY packages/db/src packages/db/src
+COPY packages/embedding/src packages/embedding/src
 COPY apps/api/src apps/api/src
 RUN uv sync --frozen --no-dev --no-editable --package newsdock-api
 

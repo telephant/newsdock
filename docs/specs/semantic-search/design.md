@@ -10,7 +10,7 @@ Status: **approved on defaults** · 2026-10-28 · Spec: [spec.md](spec.md) · De
 |---|---|---|---|
 | C-35 | Embedder worker (`apps/embedder`) | **new app** | Polls Postgres for canonical articles with no embedding for the configured model, embeds titles in batches through Ollama, writes vector + model name. No Kafka, no API calls (ADR-0024) |
 | C-36 | Embedding package (`packages/embedding`, `newsdock_embedding`) | **new package** | The one Ollama `/api/embed` client, the document/query text prefixes, and vector validation (length, finite). Used by C-35 and C-37 so both embed identically |
-| C-37 | Semantic query (`domain/ranking.py`, `adapters/semantic_repo.py` in the API) | **new** | Vector leg (HNSW, cosine), keyword leg (Postgres full-text), pure RRF fusion, shared filters |
+| C-37 | Semantic query (`domain/ranking.py`, `domain/semantic.py`, `adapters/semantic_repo.py`, `adapters/query_embedder.py` in the API) | **new** | Vector leg (HNSW, cosine), keyword leg (Postgres full-text), pure RRF fusion, shared filters |
 | C-38 | MCP tool `semantic_search` (in `adapters/http.py`) | **new tool** | Inherits the existing auth and rate-limit path of `/mcp`; maps errors to `embedding_unavailable` / degraded results |
 | C-39 | Migration `0008_article_embeddings` | **new** | `articles.embedding vector(768)`, `articles.embedding_model`, HNSW cosine index, GIN index on `to_tsvector('english', title)` |
 | C-40 | Search eval (`apps/api/tests/eval/`, `make eval-search`) | **new** | Fixture corpus + labelled queries; prints recall@5 for keyword, vector, hybrid |

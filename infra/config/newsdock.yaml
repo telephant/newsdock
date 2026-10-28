@@ -21,6 +21,7 @@ common:
   embedding_model: nomic-embed-text
   embedding_dimension: 768               # fixed by migration 0008 (vector(768))
   embedding_document_prefix: "search_document: "
+  embedding_query_prefix: "search_query: "
   embedding_ollama_url: http://127.0.0.1:11434   # compose sets OLLAMA_URL (host.docker.internal)
 
 ingester:
@@ -33,6 +34,11 @@ ingester:
 processor: {}
 sink: {}
 api:
+  semantic_candidates: 50             # hits taken from each search leg before fusing
+  semantic_rrf_k: 60                  # reciprocal-rank constant: score = 1 / (k + rank)
+  semantic_query_max_length: 500      # characters of a semantic_search query
+  semantic_ef_search: 100             # HNSW candidate list size per query
+  semantic_ollama_timeout_seconds: 10 # embedding the query; then vector mode errors
   auth_required: true           # MCP needs an agent API key (ADR-0016); false = anonymous
   rate_limit_per_minute: 600     # per agent; anonymous traffic shares one bucket; 0 = off
   subscriptions_max_per_agent: 20     # saved filters one agent may hold (409 above)

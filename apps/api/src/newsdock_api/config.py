@@ -64,6 +64,21 @@ class Settings(LayeredSettings):
     sse_keepalive_seconds: int = 15
     sse_fallback_poll_seconds: int = 30
     live_max_streams_per_user: int = 3  # concurrent live-feed streams per user (429)
+    # Semantic search (M3 semantic-search, ADR-0024/0025): candidates fetched per leg,
+    # the reciprocal-rank constant, query length cap, HNSW ef_search, embedding timeout
+    semantic_candidates: int = 50
+    semantic_rrf_k: int = 60
+    semantic_query_max_length: int = 500
+    semantic_ef_search: int = 100
+    semantic_ollama_timeout_seconds: float = 10.0
+    # shared with the embedder through `common:` (model and dimension must agree)
+    embedding_model: str = "nomic-embed-text"
+    embedding_dimension: int = 768
+    embedding_query_prefix: str = "search_query: "
+    embedding_ollama_url: str = Field(
+        default="http://127.0.0.1:11434",
+        validation_alias=AliasChoices("OLLAMA_URL", "NEWSDOCK_EMBEDDING_OLLAMA_URL"),
+    )
     uvicorn_workers: int = 1
     uvicorn_log_level: str = "info"
 
