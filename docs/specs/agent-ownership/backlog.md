@@ -13,5 +13,5 @@ Priority: P1 next, P2 soon, P3 later.
 - **Adopt an ownerless agent from the UI (P3):** today only the `owner` role and the admin token can manage orphans, and nobody can give one an owner (D-4).
 - **`OWNER=<email>` on `make agent-create` (P3):** CLI agents are ownerless by default (D-3).
 - **Share an agent with another user (P3):** read-only or manage access to one agent.
-- **Per-user agent quota (P3).**
+- ~~**Per-user agent quota (P3).**~~ Done by M2e `signup-rate-limit` (2026-10-28, `agents_max_per_user`, 409 `too_many_agents`).
 - **Audit log of who created/revoked what (P3, from the ui-login backlog).**
