@@ -1,6 +1,6 @@
 # signup-rate-limit — Spec (M2e: limit account sign-ups, cap agents per user)
 
-Status: init approved 2026-10-28 · design approved 2026-10-28 (no ADR needed)
+Status: init approved 2026-10-28 · design approved 2026-10-28 (no ADR needed) · implemented and verified 2026-10-28 (pass with follow-ups, see [verify.md](verify.md))
 
 ## 0. Review guide
 
