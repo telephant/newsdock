@@ -217,7 +217,7 @@ class Live:
 def test_anonymous_and_non_user_callers_are_refused(base: str, clean: Engine) -> None:
     join(base, "owner@x.io")
     key = make_key()
-    SqlAgentsRepo(clean).create_agent("alpha", key)
+    SqlAgentsRepo(clean).create_agent("alpha", key, None)
     assert Live(base).status == 401
     assert Live(base, {"cookie": "newsdock_session=forged"}).status == 401
     assert Live(base, {"authorization": f"Bearer {key.raw}"}).status == 403

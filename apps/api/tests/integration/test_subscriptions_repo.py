@@ -1,6 +1,5 @@
 """TC-19 (trigger), persistence half of TC-1, key_usable (Docker)."""
 
-import subprocess
 import time
 from collections.abc import Iterator
 from datetime import UTC, datetime
@@ -12,54 +11,23 @@ from alembic import command
 from alembic.config import Config
 from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
-from newsdock_api.domain.agents import make_key
+from newsdock_api.domain.agents import ALL, make_key
 from newsdock_db.engine import make_engine
 from sqlalchemy import Engine, text
 
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-push-test"
 NOW = datetime(2026, 10, 14, 12, 0, 0, tzinfo=UTC)
 NO_SUCH_UUID = "00000000-0000-0000-0000-000000000000"
 
 
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-
-
 @pytest.fixture(scope="module")
-def db() -> Iterator[tuple[Engine, str]]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    port = env.get("POSTGRES_PORT", "5433")
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{port}/{env['POSTGRES_DB']}"
-    )
-    dsn = (
-        f"host=127.0.0.1 port={port} user={env['POSTGRES_USER']} "
-        f"password={env['POSTGRES_PASSWORD']} dbname={env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+def db(side_db: tuple[str, str]) -> Iterator[tuple[Engine, str]]:
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
-    engine = make_engine(url)
-    yield engine, dsn
+    engine = make_engine(side_db[0])
+    yield engine, side_db[1]
     engine.dispose()
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 @pytest.fixture()
@@ -73,7 +41,7 @@ def repos(
 
 
 def _agent(agents: SqlAgentsRepo, name: str) -> str:
-    return agents.create_agent(name, make_key()).id
+    return agents.create_agent(name, make_key(), None).id
 
 
 # ---- persistence (TC-1, persistence half) ------------------------------------
@@ -106,25 +74,25 @@ def test_ids_that_are_not_uuids_look_absent_not_broken(
     assert not subs.delete_own(alpha, "not-a-uuid")
     assert not subs.exists("not-a-uuid")
     assert not subs.exists(NO_SUCH_UUID)
-    assert not agents.set_status("not-a-uuid", "disabled")  # agent-platform guard
+    assert not agents.set_status("not-a-uuid", "disabled", ALL)  # agent-platform guard
     assert not agents.key_usable("not-a-uuid")
 
 
-def test_list_all_carries_agent_names_and_cascade_on_agent_delete(
+def test_list_visible_carries_agent_names_and_cascade_on_agent_delete(
     repos: tuple[SqlAgentsRepo, SqlSubscriptionsRepo], db: tuple[Engine, str]
 ) -> None:
     agents, subs = repos
     alpha, beta = _agent(agents, "alpha"), _agent(agents, "beta")
     subs.create(alpha, {"domain": "a.org"})
     subs.create(beta, {"text": "fed"})
-    assert sorted((s.agent_name, s.filter) for s in subs.list_all()) == [
+    assert sorted((s.agent_name, s.filter) for s in subs.list_visible(ALL)) == [
         ("alpha", {"domain": "a.org"}),
         ("beta", {"text": "fed"}),
     ]
     engine, _ = db
     with engine.begin() as conn:
         conn.execute(text("DELETE FROM agents WHERE name = 'alpha'"))
-    assert [s.agent_name for s in subs.list_all()] == ["beta"]
+    assert [s.agent_name for s in subs.list_visible(ALL)] == ["beta"]
 
 
 def test_exists_follows_delete(
@@ -143,13 +111,13 @@ def test_key_usable_follows_revocation_and_agent_status(
     repos: tuple[SqlAgentsRepo, SqlSubscriptionsRepo],
 ) -> None:
     agents, _ = repos
-    agent = agents.create_agent("alpha", make_key())
+    agent = agents.create_agent("alpha", make_key(), None)
     assert agents.key_usable(agent.key_id)
-    agents.set_status(agent.id, "disabled")
+    agents.set_status(agent.id, "disabled", ALL)
     assert not agents.key_usable(agent.key_id)
-    agents.set_status(agent.id, "active")
+    agents.set_status(agent.id, "active", ALL)
     assert agents.key_usable(agent.key_id)
-    agents.revoke_key(agent.id, agent.key_id)
+    agents.revoke_key(agent.id, agent.key_id, ALL)
     assert not agents.key_usable(agent.key_id)
     assert not agents.key_usable(NO_SUCH_UUID)
 

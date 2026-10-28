@@ -7,7 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 from newsdock_api.adapters.http import create_app
 from newsdock_api.config import Settings
-from newsdock_api.domain.agents import GeneratedKey, StoredKey, make_key
+from newsdock_api.domain.agents import AgentScope, GeneratedKey, StoredKey, make_key
 from newsdock_api.domain.subscriptions import AdminSubscription, SubscriptionRecord
 
 ADMIN = "admin-token-for-tests"
@@ -72,10 +72,10 @@ class FakeStore:
     def exists(self, sub_id: str) -> bool:
         return sub_id in self.rows
 
-    def delete_any(self, sub_id: str) -> bool:
+    def delete_visible(self, sub_id: str, scope: AgentScope) -> bool:
         return self.rows.pop(sub_id, None) is not None
 
-    def list_all(self) -> list[AdminSubscription]:
+    def list_visible(self, scope: AgentScope) -> list[AdminSubscription]:
         return [
             AdminSubscription(**r.model_dump(), agent_name=self.owner_names[r.id])
             for r in self.rows.values()
@@ -86,10 +86,11 @@ class FakeRegistry:
     """The admin routes need a registry object; subscriptions tests do not use it."""
 
     def create_agent(self, *a: Any, **k: Any) -> Any: ...
+    def agent_visible(self, *a: Any, **k: Any) -> Any: ...
     def add_key(self, *a: Any, **k: Any) -> Any: ...
     def revoke_key(self, *a: Any, **k: Any) -> Any: ...
     def set_status(self, *a: Any, **k: Any) -> Any: ...
-    def list_agents(self) -> list[Any]:
+    def list_agents(self, *a: Any, **k: Any) -> list[Any]:
         return []
 
 

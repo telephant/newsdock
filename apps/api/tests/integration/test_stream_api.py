@@ -19,7 +19,7 @@ from alembic.config import Config
 from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
 from newsdock_api.config import Settings
-from newsdock_api.domain.agents import make_key
+from newsdock_api.domain.agents import ALL, make_key
 from newsdock_api.domain.service import encode_cursor
 from newsdock_db.engine import make_engine
 from sqlalchemy import Engine, text
@@ -122,7 +122,7 @@ class Agent:
         self.repo = SqlAgentsRepo(engine)
         self.subs = SqlSubscriptionsRepo(engine)
         key = make_key()
-        registered = self.repo.create_agent(name, key)
+        registered = self.repo.create_agent(name, key, None)
         self.id, self.key_id, self.raw = registered.id, registered.key_id, key.raw
 
     @property
@@ -202,7 +202,7 @@ def test_stream_needs_a_valid_key(base: str, engine: Engine) -> None:
     assert httpx.get(url, headers={"Authorization": "Bearer junk"}).status_code == 401
     unknown = {"Authorization": f"Bearer {make_key().raw}"}
     assert httpx.get(url, headers=unknown).status_code == 401
-    owner.repo.revoke_key(owner.id, owner.key_id)
+    owner.repo.revoke_key(owner.id, owner.key_id, ALL)
     assert httpx.get(url, headers=owner.headers).status_code == 401
 
 

@@ -5,12 +5,12 @@ decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided
 gates: {init: approved, design: approved, plan: approved, implement: in-progress, verify: pending}
 acs:
   AC-1: {status: passing}  # TC-1 green (T-01, 2026-10-28)
-  AC-2: {status: todo}
-  AC-3: {status: in-progress}  # scope_for TC-3 green (T-02); repo/HTTP in T-03/T-04
-  AC-4: {status: todo}
-  AC-5: {status: in-progress}  # scope_for TC-3 green (T-02); repo/HTTP in T-03/T-04
+  AC-2: {status: in-progress}  # TC-5 green (T-03); HTTP in T-04
+  AC-3: {status: in-progress}  # TC-3, TC-5 green (T-02, T-03); HTTP TC-10 in T-04
+  AC-4: {status: in-progress}  # TC-6 green (T-03); HTTP in T-04
+  AC-5: {status: in-progress}  # TC-3, TC-5, TC-6 green; HTTP TC-10 in T-04
   AC-6: {status: todo}
-  AC-7: {status: todo}
+  AC-7: {status: in-progress}  # TC-7 green (T-03); HTTP in T-04
   AC-8: {status: in-progress}  # TC-2 (DB level) green in T-01; HTTP part TC-11 in T-04
   AC-9: {status: in-progress}  # permission table TC-4 green (T-02); HTTP TC-9 in T-04
   AC-10: {status: in-progress}  # permission table TC-4 green (T-02); TC-13/TC-14 later

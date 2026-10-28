@@ -22,7 +22,7 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.config import Settings
-from newsdock_api.domain.agents import make_key
+from newsdock_api.domain.agents import ALL, make_key
 from newsdock_db.engine import make_engine
 from newsdock_db.models import Article
 from sqlalchemy import Engine, text
@@ -124,7 +124,7 @@ def keys(engine: Engine) -> dict[str, str]:
     out: dict[str, str] = {}
     for name in ("alpha", "beta", "gamma", "delta"):
         key = make_key()
-        repo.create_agent(name, key)
+        repo.create_agent(name, key, None)
         out[name] = key.raw
     return out
 
@@ -194,18 +194,18 @@ def test_valid_key_can_search(secured: str, keys: dict[str, str]) -> None:
 def test_revoked_and_disabled(secured: str, engine: Engine) -> None:
     repo = SqlAgentsRepo(engine)
     key = make_key()
-    agent = repo.create_agent("zeta", key)
+    agent = repo.create_agent("zeta", key, None)
     header = f"Bearer {key.raw}"
     assert _raw_post(secured, header).status_code != 401
 
-    repo.set_status(agent.id, "disabled")
+    repo.set_status(agent.id, "disabled", ALL)
     assert _raw_post(secured, header).status_code == 401
-    repo.set_status(agent.id, "active")
+    repo.set_status(agent.id, "active", ALL)
     assert _raw_post(secured, header).status_code != 401
 
-    repo.revoke_key(agent.id, agent.key_id)
+    repo.revoke_key(agent.id, agent.key_id, ALL)
     assert _raw_post(secured, header).status_code == 401
-    repo.set_status(agent.id, "active")
+    repo.set_status(agent.id, "active", ALL)
     assert _raw_post(secured, header).status_code == 401  # revoked stays revoked
 
 
@@ -270,7 +270,7 @@ def test_secrets_are_not_logged(
 
 def _new_agent(engine: Engine, name: str) -> str:
     key = make_key()
-    SqlAgentsRepo(engine).create_agent(name, key)
+    SqlAgentsRepo(engine).create_agent(name, key, None)
     return key.raw
 
 

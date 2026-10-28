@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 from newsdock_api.adapters.agents_repo import DuplicateAgentError
 from newsdock_api.domain.accounts import Principal
 from newsdock_api.domain.agents import (
+    ALL,
     AgentRegistry,
     AgentSummary,
     make_key,
@@ -50,7 +51,7 @@ def build_admin_router(
     def create_agent(body: NewAgent) -> IssuedAgent:
         key = make_key()
         try:
-            agent = registry.create_agent(body.name, key)
+            agent = registry.create_agent(body.name, key, None)  # T-04: the creator
         except DuplicateAgentError as exc:
             raise HTTPException(status_code=409, detail="name_taken") from exc
         return IssuedAgent(
@@ -59,28 +60,29 @@ def build_admin_router(
 
     @router.get("/agents")
     def list_agents() -> list[AgentSummary]:
-        return registry.list_agents()
+        return registry.list_agents(ALL)  # T-04: the caller's scope
 
     @router.get("/subscriptions")
     def list_subscriptions() -> list[AdminSubscription]:
-        return subscriptions.list_all() if subscriptions else []
+        return subscriptions.list_visible(ALL) if subscriptions else []
 
     @router.delete("/subscriptions/{sub_id}", status_code=204)
     def delete_subscription(sub_id: str) -> Response:
-        if subscriptions is None or not subscriptions.delete_any(sub_id):
+        if subscriptions is None or not subscriptions.delete_visible(sub_id, ALL):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 
     @router.post("/agents/{agent_id}/keys", status_code=201)
     def issue_key(agent_id: str) -> IssuedKey:
         key = make_key()
-        if not any(a.agent_id == agent_id for a in registry.list_agents()):
+        key_id = registry.add_key(agent_id, key, ALL)
+        if key_id is None:
             raise HTTPException(status_code=404, detail="not_found")
-        return IssuedKey(key_id=registry.add_key(agent_id, key), api_key=key.raw)
+        return IssuedKey(key_id=key_id, api_key=key.raw)
 
     @router.delete("/agents/{agent_id}/keys/{key_id}", status_code=204)
     def revoke_key(agent_id: str, key_id: str) -> Response:
-        if not registry.revoke_key(agent_id, key_id):
+        if not registry.revoke_key(agent_id, key_id, ALL):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 
@@ -93,7 +95,7 @@ def build_admin_router(
         return _set_status(agent_id, "active")
 
     def _set_status(agent_id: str, status: str) -> Response:
-        if not registry.set_status(agent_id, status):
+        if not registry.set_status(agent_id, status, ALL):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 

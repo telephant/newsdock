@@ -3,14 +3,16 @@
 from datetime import datetime, timedelta
 
 from newsdock_db.models import Agent as AgentRow
-from newsdock_db.models import AgentCursor, ApiKey
+from newsdock_db.models import AgentCursor, ApiKey, User
 from sqlalchemy import Engine, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from newsdock_api.adapters.agent_scope import visible
 from newsdock_api.adapters.ids import as_uuid
 from newsdock_api.domain.agents import (
+    AgentScope,
     AgentSummary,
     GeneratedKey,
     KeySummary,
@@ -29,9 +31,12 @@ class SqlAgentsRepo:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
-    def create_agent(self, name: str, key: GeneratedKey) -> RegisteredAgent:
+    def create_agent(
+        self, name: str, key: GeneratedKey, owner_id: str | None
+    ) -> RegisteredAgent:
+        """`owner_id` is the creating user, or None for CLI/admin-token agents."""
         with Session(self._engine) as session:
-            agent = AgentRow(name=name)
+            agent = AgentRow(name=name, owner_id=owner_id)
             session.add(agent)
             try:
                 session.flush()
@@ -46,14 +51,35 @@ class SqlAgentsRepo:
                 id=str(agent.id), name=agent.name, key_id=str(key_row.id)
             )
 
-    def add_key(self, agent_id: str, key: GeneratedKey) -> str:
+    def agent_visible(self, agent_id: str, scope: AgentScope) -> bool:
+        if as_uuid(agent_id) is None:
+            return False
         with Session(self._engine) as session:
+            return (
+                session.scalar(
+                    select(AgentRow.id).where(AgentRow.id == agent_id, visible(scope))
+                )
+                is not None
+            )
+
+    def add_key(
+        self, agent_id: str, key: GeneratedKey, scope: AgentScope
+    ) -> str | None:
+        """The new key's id, or None when the agent is not visible to `scope`."""
+        if as_uuid(agent_id) is None:
+            return None
+        with Session(self._engine) as session:
+            found = session.scalar(
+                select(AgentRow.id).where(AgentRow.id == agent_id, visible(scope))
+            )
+            if found is None:
+                return None
             row = ApiKey(agent_id=agent_id, prefix=key.prefix, key_hash=key.key_hash)
             session.add(row)
             session.commit()
             return str(row.id)
 
-    def revoke_key(self, agent_id: str, key_id: str) -> bool:
+    def revoke_key(self, agent_id: str, key_id: str, scope: AgentScope) -> bool:
         if as_uuid(agent_id) is None or as_uuid(key_id) is None:
             return False
         with Session(self._engine) as session:
@@ -61,25 +87,44 @@ class SqlAgentsRepo:
                 update(ApiKey)
                 .where(ApiKey.id == key_id, ApiKey.agent_id == agent_id)
                 .where(ApiKey.revoked_at.is_(None))
+                .where(
+                    ApiKey.agent_id.in_(
+                        select(AgentRow.id).where(
+                            AgentRow.id == agent_id, visible(scope)
+                        )
+                    )
+                )
                 .values(revoked_at=func.now())
             )
             session.commit()
             return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
-    def set_status(self, agent_id: str, status: str) -> bool:
+    def set_status(self, agent_id: str, status: str, scope: AgentScope) -> bool:
         if as_uuid(agent_id) is None:
             return False
         with Session(self._engine) as session:
             result = session.execute(
-                update(AgentRow).where(AgentRow.id == agent_id).values(status=status)
+                update(AgentRow)
+                .where(AgentRow.id == agent_id, visible(scope))
+                .values(status=status)
             )
             session.commit()
             return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
-    def list_agents(self) -> list[AgentSummary]:
+    def list_agents(self, scope: AgentScope) -> list[AgentSummary]:
         with Session(self._engine) as session:
-            agents = session.scalars(select(AgentRow).order_by(AgentRow.created_at))
-            keys = session.scalars(select(ApiKey).order_by(ApiKey.created_at)).all()
+            rows = session.execute(
+                select(AgentRow, User.email)
+                .outerjoin(User, User.id == AgentRow.owner_id)
+                .where(visible(scope))
+                .order_by(AgentRow.created_at)
+            ).all()
+            ids = [a.id for a, _ in rows]
+            keys = session.scalars(
+                select(ApiKey)
+                .where(ApiKey.agent_id.in_(ids))
+                .order_by(ApiKey.created_at)
+            ).all()
             by_agent: dict[str, list[KeySummary]] = {}
             for k in keys:
                 by_agent.setdefault(str(k.agent_id), []).append(
@@ -97,8 +142,10 @@ class SqlAgentsRepo:
                     name=a.name,
                     status=a.status,
                     keys=by_agent.get(str(a.id), []),
+                    owner_id=str(a.owner_id) if a.owner_id else None,
+                    owner_email=email,
                 )
-                for a in agents
+                for a, email in rows
             ]
 
     def find_key(self, prefix: str) -> StoredKey | None:

@@ -128,7 +128,7 @@ def test_agent_keys_and_anonymous_callers_on_management_routes(
 ) -> None:
     w = world(auth_required=auth_required)
     key = make_key()
-    SqlAgentsRepo(engine).create_agent("alpha", key)
+    SqlAgentsRepo(engine).create_agent("alpha", key, None)
     c = w.fresh()
     bearer = {"authorization": f"Bearer {key.raw}"}
     for path in ("/api/admin/agents", "/api/users"):
@@ -253,8 +253,8 @@ def test_admin_lists_and_deletes_subscriptions(
     w = world()
     agents, subs = SqlAgentsRepo(engine), SqlSubscriptionsRepo(engine)
     alpha_key, beta_key = make_key(), make_key()
-    alpha = agents.create_agent("alpha", alpha_key)
-    beta = agents.create_agent("beta", beta_key)
+    alpha = agents.create_agent("alpha", alpha_key, None)
+    beta = agents.create_agent("beta", beta_key, None)
     keep = subs.create(beta.id, {"domain": "other.org"})
     drop = subs.create(alpha.id, {"theme": "ECON_*"})
     c = w.fresh()
@@ -299,7 +299,7 @@ def test_the_admin_token_can_delete_a_subscription_too(
     world: Callable[..., World], engine: Engine
 ) -> None:
     w = world()
-    agent = SqlAgentsRepo(engine).create_agent("alpha", make_key())
+    agent = SqlAgentsRepo(engine).create_agent("alpha", make_key(), None)
     sub = SqlSubscriptionsRepo(engine).create(agent.id, {})
     response = w.fresh().delete(
         f"/api/admin/subscriptions/{sub.id}",
@@ -312,7 +312,7 @@ def test_the_admin_token_can_delete_a_subscription_too(
 def test_admin_token_matrix(world: Callable[..., World], engine: Engine) -> None:
     w = world()
     key = make_key()
-    SqlAgentsRepo(engine).create_agent("alpha", key)
+    SqlAgentsRepo(engine).create_agent("alpha", key, None)
     c = w.fresh()
     token = {"authorization": f"Bearer {ADMIN}"}
     assert c.get("/api/admin/agents", headers=token).status_code == 200

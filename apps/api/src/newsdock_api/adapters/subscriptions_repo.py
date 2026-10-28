@@ -5,7 +5,9 @@ from newsdock_db.models import Subscription
 from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.orm import Session
 
+from newsdock_api.adapters.agent_scope import visible
 from newsdock_api.adapters.ids import as_uuid
+from newsdock_api.domain.agents import AgentScope
 from newsdock_api.domain.subscriptions import AdminSubscription, SubscriptionRecord
 
 
@@ -64,12 +66,20 @@ class SqlSubscriptionsRepo:
             session.commit()
             return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
-    def delete_any(self, sub_id: str) -> bool:
+    def delete_visible(self, sub_id: str, scope: AgentScope) -> bool:
+        """Delete a subscription of any agent the scope may see (ADR-0023)."""
         key = as_uuid(sub_id)
         if key is None:
             return False
         with Session(self._engine) as session:
-            result = session.execute(delete(Subscription).where(Subscription.id == key))
+            result = session.execute(
+                delete(Subscription).where(
+                    Subscription.id == key,
+                    Subscription.agent_id.in_(
+                        select(AgentRow.id).where(visible(scope))
+                    ),
+                )
+            )
             session.commit()
             return result.rowcount > 0  # type: ignore[attr-defined, no-any-return]
 
@@ -94,11 +104,12 @@ class SqlSubscriptionsRepo:
                 is not None
             )
 
-    def list_all(self) -> list[AdminSubscription]:
+    def list_visible(self, scope: AgentScope) -> list[AdminSubscription]:
         with Session(self._engine) as session:
             rows = session.execute(
                 select(Subscription, AgentRow.name)
                 .join(AgentRow, AgentRow.id == Subscription.agent_id)
+                .where(visible(scope))
                 .order_by(Subscription.created_at, Subscription.id)
             ).all()
             return [

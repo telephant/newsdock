@@ -1,8 +1,6 @@
 """TC-1 (AC-1) and TC-2 (AC-8): migration 0007 and the owner FK (Docker)."""
 
 import json
-import subprocess
-import tempfile
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -20,17 +18,6 @@ from sqlalchemy import Engine, text
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-owner-migration-test"
-TEST_PORT = "55433"  # not 5433, so a running dev stack is left alone
-ENV_FILE = Path(tempfile.mkdtemp()) / "env"
-
-
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", str(ENV_FILE),
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
 
 
 def _config() -> Config:
@@ -38,34 +25,10 @@ def _config() -> Config:
 
 
 @pytest.fixture(scope="module")
-def engine() -> Iterator[Engine]:
-    lines = (ROOT / ".env.example").read_text().splitlines()
-    ENV_FILE.write_text(
-        "\n".join(
-            f"POSTGRES_PORT={TEST_PORT}" if x.startswith("POSTGRES_PORT=") else x
-            for x in lines
-        )
-    )
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{TEST_PORT}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
-    eng = make_engine(url)
+def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
+    eng = make_engine(side_db[0])
     yield eng
     eng.dispose()
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 def _insert_agent(engine: Engine, name: str, owner_id: str | None = None) -> str:

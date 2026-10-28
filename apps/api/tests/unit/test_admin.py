@@ -8,6 +8,7 @@ from newsdock_api.adapters.agents_repo import DuplicateAgentError
 from newsdock_api.adapters.http import create_app
 from newsdock_api.config import Settings
 from newsdock_api.domain.agents import (
+    AgentScope,
     AgentSummary,
     GeneratedKey,
     KeySummary,
@@ -25,7 +26,9 @@ class FakeRegistry:
     def __init__(self) -> None:
         self.agents: dict[str, dict[str, object]] = {}
 
-    def create_agent(self, name: str, key: GeneratedKey) -> RegisteredAgent:
+    def create_agent(
+        self, name: str, key: GeneratedKey, owner_id: str | None
+    ) -> RegisteredAgent:
         if any(a["name"] == name for a in self.agents.values()):
             raise DuplicateAgentError(name)
         agent_id = f"a{len(self.agents) + 1}"
@@ -37,13 +40,20 @@ class FakeRegistry:
         }
         return RegisteredAgent(id=agent_id, name=name, key_id=key_id)
 
-    def add_key(self, agent_id: str, key: GeneratedKey) -> str:
+    def agent_visible(self, agent_id: str, scope: AgentScope) -> bool:
+        return agent_id in self.agents
+
+    def add_key(
+        self, agent_id: str, key: GeneratedKey, scope: AgentScope
+    ) -> str | None:
+        if agent_id not in self.agents:
+            return None
         keys: dict[str, list[object]] = self.agents[agent_id]["keys"]  # type: ignore[assignment]
         key_id = f"{agent_id}-k{len(keys) + 1}"
         keys[key_id] = [key.prefix, False]
         return key_id
 
-    def revoke_key(self, agent_id: str, key_id: str) -> bool:
+    def revoke_key(self, agent_id: str, key_id: str, scope: AgentScope) -> bool:
         agent = self.agents.get(agent_id)
         keys: dict[str, list[object]] = agent["keys"] if agent else {}  # type: ignore[assignment]
         if key_id not in keys or keys[key_id][1]:
@@ -51,13 +61,13 @@ class FakeRegistry:
         keys[key_id][1] = True
         return True
 
-    def set_status(self, agent_id: str, status: str) -> bool:
+    def set_status(self, agent_id: str, status: str, scope: AgentScope) -> bool:
         if agent_id not in self.agents:
             return False
         self.agents[agent_id]["status"] = status
         return True
 
-    def list_agents(self) -> list[AgentSummary]:
+    def list_agents(self, scope: AgentScope) -> list[AgentSummary]:
         return [
             AgentSummary(
                 agent_id=agent_id,

@@ -12,6 +12,8 @@ from typing import Any, Protocol
 from pydantic import BaseModel, ConfigDict, StrictStr, ValidationError, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
+from newsdock_api.domain.agents import AgentScope
+
 PREFIX_MARK = "*"
 
 
@@ -108,8 +110,9 @@ class SubscriptionStore(Protocol):
 
     def exists(self, sub_id: str) -> bool: ...
 
-    def delete_any(self, sub_id: str) -> bool:
-        """Admin delete of any agent's subscription; False if absent."""
+    def delete_visible(self, sub_id: str, scope: AgentScope) -> bool:
+        """Delete a subscription of an agent the scope may see; False if absent
+        or not visible (ADR-0023)."""
         ...
 
-    def list_all(self) -> list[AdminSubscription]: ...
+    def list_visible(self, scope: AgentScope) -> list[AdminSubscription]: ...

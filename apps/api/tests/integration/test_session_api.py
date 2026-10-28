@@ -13,7 +13,7 @@ from newsdock_api.adapters.agents_repo import SqlAgentsRepo
 from newsdock_api.adapters.http import create_app
 from newsdock_api.config import Settings
 from newsdock_api.domain.accounts import hash_token
-from newsdock_api.domain.agents import make_key
+from newsdock_api.domain.agents import ALL, make_key
 from newsdock_db.engine import make_engine
 from sqlalchemy import Engine, text
 
@@ -215,10 +215,10 @@ def test_article_reads_need_a_session_or_an_agent_key(
     cookie = _with_cookie(_viewer(client))
     agents = SqlAgentsRepo(engine)
     good = make_key()
-    agents.create_agent("alpha", good)
+    agents.create_agent("alpha", good, None)
     revoked = make_key()
-    created = agents.create_agent("beta", revoked)
-    agents.revoke_key(created.id, created.key_id)
+    created = agents.create_agent("beta", revoked, None)
+    agents.revoke_key(created.id, created.key_id, ALL)
 
     anon = make_client()
     for path in ("/api/articles", f"/api/articles/{ARTICLE}"):
@@ -240,8 +240,8 @@ def test_a_bad_key_does_not_fall_back_to_a_valid_cookie(
     cookie = _viewer(client)
     agents = SqlAgentsRepo(engine)
     key = make_key()
-    created = agents.create_agent("beta", key)
-    agents.revoke_key(created.id, created.key_id)
+    created = agents.create_agent("beta", key, None)
+    agents.revoke_key(created.id, created.key_id, ALL)
     headers = {**_with_cookie(cookie), "authorization": f"Bearer {key.raw}"}
     assert make_client().get("/api/articles", headers=headers).status_code == 401
 

@@ -153,7 +153,7 @@ def test_agent_keys_and_anonymous_callers_are_refused(
     s = setup()
     s.join("owner@x.io")
     key = make_key()
-    SqlAgentsRepo(engine).create_agent("alpha", key)
+    SqlAgentsRepo(engine).create_agent("alpha", key, None)
     assert reset(s, "owner@x.io", headers={"authorization": f"Bearer {key.raw}"}) == 403
     assert reset(s, "owner@x.io", headers={"authorization": "Bearer wrong"}) == 401
     anon = s.other().post(RESET, json={"email": "owner@x.io", "password": NEW})
