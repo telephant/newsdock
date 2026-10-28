@@ -194,7 +194,7 @@ AC-14 Agent evaluation
   Verify: auto
 
 AC-15 End-to-end on live data
-  Given a clean clone with `docker compose up`
+  Given a clean clone with `make up`
   When  one real poll cycle on the live feed completes
   Then  all services report healthy and the UI lists at least one real article
   Verify: manual
