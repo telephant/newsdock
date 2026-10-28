@@ -118,6 +118,7 @@ jobs:
       - uses: pnpm/action-setup@v6
         with:
           package_json_file: apps/web/package.json
+      - uses: astral-sh/setup-uv@v10.2.0
       - run: make setup-web
       - run: make check-web
 
