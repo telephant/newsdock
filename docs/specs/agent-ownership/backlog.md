@@ -2,7 +2,7 @@
 
 Priority: P1 next, P2 soon, P3 later.
 
-- **Smoke the change on the dev stack (P1, from verify F-1):** rebuild the `api` and `web` images, `make migrate`, `make up`, sign in and check that `demo-financial` and `push-live` show as "no owner" for the owner role only.
+- ~~**Smoke the change on the dev stack (P1, from verify F-1):** rebuild the `api` and `web` images, `make migrate`, `make up`, sign in and check that `demo-financial` and `push-live` show as "no owner" for the owner role only.~~ Done 2026-10-28 (API and database level; see the verify report).
 - **Run the `make test-infra` scenes (P2, from verify F-2):** `db`, `api`, `stack` and the rest need ports 5433 and 29092 free; `test_stack.py` expects head `0007`.
 - **Older Docker tests onto the `side_db` fixture (P3, from verify F-5):** so they run beside a dev stack.
 - **Rename `/api/admin/*` (P3, verify F-6):** ordinary users call these routes now; kept on purpose (ADR-0023) to avoid churn.

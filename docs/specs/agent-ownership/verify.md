@@ -44,9 +44,20 @@ Checked and consistent: names in code and docs (`owner_id`, `owner_email`, `Agen
 
 Scope: nothing from `backlog.md` leaked in (no workspaces, transfer, role merge or path rename). Additions outside the spec are test infrastructure only: `apps/api/tests/integration/conftest.py` (side-port Postgres) and `adapters/agent_scope.py` (the one SQL predicate behind the design's `_visible`).
 
+## Live check on the dev stack (2026-10-28)
+
+Done at the user's request ("do it") on the running compose stack, after a safety backup of `users`, `sessions`, `agents`, `api_keys`, `agent_cursors` and `subscriptions` to `~/newsdock-backups/pre-0007-accounts-agents.sql` (delete it when no longer needed). Steps: rebuilt `api`, `web` and `migrate`, ran the additive migration (`0006` → `0007`), recreated only `api` and `web`; the other services were not touched.
+
+- After the migration both legacy agents have `owner_id` NULL, are `active` and keep their 3 keys each; the admin token lists them with `owner_id` and `owner_email` null.
+- The demo agent kept working with its existing key (`POST /mcp` answered 200 after the API was recreated). Its "Network is unreachable" warnings (343 before the change) come from its route to the model on the host and are unrelated.
+- A throwaway viewer created 10 agents and saw only those 10, not `demo-financial` or `push-live`.
+- Not checked by a human in the browser: the owner role's "Created by … / no owner" lines on the Agents page.
+
+Throwaway `smoke-*` accounts and agents were deleted afterwards. The users table is back to 1 user and the agents table to `demo-financial` and `push-live`.
+
 ## Follow-ups (moved to `backlog.md`)
 
-- **F-1 (P1, needs the developer):** smoke the change on the running dev stack: `make build APP=api` (and `APP=web`), `make migrate`, `make up`, then sign in as the first account and check that the Agents page lists `demo-financial` and `push-live` as "no owner" for the owner role and not for another user. The agent keeps working (its key is untouched). This changes the developer's own database (additive), so it was not run unasked.
+- ~~**F-1 (P1, needs the developer):** smoke the change on the running dev stack: `make build APP=api` (and `APP=web`), `make migrate`, `make up`, then sign in as the first account and check that the Agents page lists `demo-financial` and `push-live` as "no owner" for the owner role and not for another user. The agent keeps working (its key is untouched).~~ Done 2026-10-28 (see "Live check on the dev stack" above); only the owner's browser view remains for you to glance at.
 - **F-2 (P2):** the `make test-infra` scenes (`db`, `kafka`, `sink`, `api`, `pipeline`, `e2e`, `stack`, `images`) were not run because they need ports 5433 and 29092, held by the dev stack; `test_stack.py` expects head `0007` and is unverified until then.
 - **F-3 (P2):** open sign-up now lets any visitor create agents and keys (spec risk 2); the sign-up rate limit from the ui-login backlog matters more now.
 - **F-4 (P2):** `admin` and `viewer` have identical permissions (spec D-7); merge them into one role.

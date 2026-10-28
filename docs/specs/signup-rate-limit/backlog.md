@@ -2,7 +2,7 @@
 
 Priority: P1 next, P2 soon, P3 later.
 
-- **Smoke on the dev stack (P1, verify F-1):** rebuild `api` and `web`, `make up`, sign up more than five accounts from the browser, check the 429 message, and raise `auth_signup_max_per_address` if five per hour is too tight locally.
+- ~~**Smoke on the dev stack (P1, verify F-1):** rebuild `api` and `web`, `make up`, sign up more than five accounts from the browser, check the 429 message, and raise `auth_signup_max_per_address` if five per hour is too tight locally.~~ Done 2026-10-28 (API level; see the verify report). Left to you: raise `auth_signup_max_per_address` if five per hour is too tight on your machine.
 - **Run the `make test-infra` scenes (P2, verify F-2):** they need ports 5433 and 29092 free.
 
 - **Trusted-proxy setting (P2):** honour `X-Forwarded-For` only from configured proxy addresses, so the limiter sees real clients behind a reverse proxy (D-6).

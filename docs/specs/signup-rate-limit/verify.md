@@ -49,9 +49,20 @@ Checked and consistent: names in code and docs (`SignupLimiter.attempt`, `tracke
 
 Scope: nothing from `backlog.md` leaked in (no trusted-proxy handling, persistence, CAPTCHA, invites or agent deletion). The only change outside the spec's file list is the `test_live_api.py` settings.
 
+## Live check on the dev stack (2026-10-28)
+
+Done at the user's request ("do it") on the running compose stack, after a safety backup of `users`, `sessions`, `agents`, `api_keys`, `agent_cursors` and `subscriptions` to `~/newsdock-backups/pre-0007-accounts-agents.sql` (delete it when no longer needed). Steps: rebuilt `api`, `web` and `migrate`, ran the additive migration (`0006` → `0007`), recreated only `api` and `web`; the other services were not touched.
+
+- Five sign-ups from the host were accepted; the sixth answered 429 `too_many_signups` with `Retry-After: 3600`. This confirms that the per-address limit (5 per hour) is in effect the total for browsers on this machine, since all of them arrive as the Docker gateway address.
+- A throwaway viewer created 10 agents; the eleventh answered 409 `too_many_agents`.
+- The API restarted healthy (`/api/health` 200) and the web app serves `/login` (200).
+- Not checked by a human in the browser: the wording of the "Too many sign-ups" message on the sign-up form (covered by the web tests).
+
+Throwaway `smoke-*` accounts and agents were deleted afterwards and the API was restarted so the in-memory sign-up counters did not block real sign-ups. The users table is back to 1 user and the agents table to `demo-financial` and `push-live`.
+
 ## Follow-ups (moved to `backlog.md`)
 
-- **F-1 (P1, needs the developer):** smoke the change on the running dev stack: rebuild `api` and `web`, `make up`, then try to sign up more than five accounts from the browser; expect the sixth to show the "Too many sign-ups" message with a wait, and note whether 5 per hour is too tight for your own use (raise `auth_signup_max_per_address` in `infra/config/newsdock.yaml` if so). Not run unasked because it needs the rebuilt images.
+- ~~**F-1 (P1, needs the developer):** smoke the change on the running dev stack: rebuild `api` and `web`, `make up`, then try to sign up more than five accounts from the browser; expect the sixth to show the "Too many sign-ups" message with a wait, and note whether 5 per hour is too tight for your own use (raise `auth_signup_max_per_address` in `infra/config/newsdock.yaml` if so).~~ Done 2026-10-28 (see "Live check on the dev stack" above). Still open from it: decide whether 5 sign-ups per hour per machine is enough for you; raise `auth_signup_max_per_address` if not.
 - **F-2 (P2):** `make test-infra` scenes were not run (ports 5433 and 29092 held by the dev stack).
 - **F-3 (P2):** trusted-proxy setting so a deployment behind a reverse proxy sees real client addresses (already in this spec's backlog).
 - **F-4 (P2):** deleting an agent; until then the quota is a hard stop (already in the backlog).
