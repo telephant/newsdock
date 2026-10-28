@@ -297,7 +297,7 @@ def test_idle_streams_get_keepalive_pings(base: str, engine: Engine) -> None:
 def test_revoking_the_key_ends_the_stream(base: str, engine: Engine) -> None:
     agent = Agent(engine, "s-revoke")
     sub = agent.subscribe({"domain": "silent.invalid"})
-    start_later(1.0, agent.repo.revoke_key, agent.id, agent.key_id)
+    start_later(1.0, agent.repo.revoke_key, agent.id, agent.key_id, ALL)
     t0 = time.time()
     with httpx.stream(
         "GET", f"{base}/api/subscriptions/{sub}/stream", headers=agent.headers,
@@ -332,7 +332,7 @@ def test_revocation_is_noticed_under_constant_traffic(
 
     noise = threading.Thread(target=traffic, daemon=True)
     noise.start()
-    start_later(1.0, agent.repo.revoke_key, agent.id, agent.key_id)
+    start_later(1.0, agent.repo.revoke_key, agent.id, agent.key_id, ALL)
     t0 = time.time()
     try:
         with httpx.stream(

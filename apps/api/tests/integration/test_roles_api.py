@@ -111,8 +111,9 @@ def test_role_matrix_on_agent_and_user_management(
     world: Callable[..., World], engine: Engine
 ) -> None:
     w = world()
+    # agent-ownership (ADR-0023): every role manages its own agents; users: owner only
     expected = {
-        "viewer": (403, 403),
+        "viewer": (200, 403),
         "admin": (200, 403),
         "owner": (200, 200),
     }
@@ -141,16 +142,17 @@ def test_a_role_change_applies_to_the_open_session_at_once(
 ) -> None:
     w = world()
     c = w.fresh()
-    assert c.get("/api/admin/agents", headers=w.cookie["viewer"]).status_code == 403
+    # user management is the owner-only probe (agent routes are open to every role)
+    assert c.get("/api/users", headers=w.cookie["viewer"]).status_code == 403
     assert (
         c.patch(
             f"/api/users/{w.ids['viewer']}",
-            json={"role": "admin"},
+            json={"role": "owner"},
             headers=w.cookie["owner"],
         ).status_code
         == 200
     )
-    assert c.get("/api/admin/agents", headers=w.cookie["viewer"]).status_code == 200
+    assert c.get("/api/users", headers=w.cookie["viewer"]).status_code == 200
 
 
 def test_the_users_list_never_carries_a_hash(world: Callable[..., World]) -> None:
@@ -258,7 +260,8 @@ def test_admin_lists_and_deletes_subscriptions(
     keep = subs.create(beta.id, {"domain": "other.org"})
     drop = subs.create(alpha.id, {"theme": "ECON_*"})
     c = w.fresh()
-    admin = w.cookie["admin"]
+    # these agents have no owner, so only the owner role reaches them (ADR-0023)
+    admin = w.cookie["owner"]
 
     listed = c.get("/api/admin/subscriptions", headers=admin).json()
     assert {(r["agent_name"], r["id"]) for r in listed} == {
@@ -269,7 +272,7 @@ def test_admin_lists_and_deletes_subscriptions(
         c.delete(
             f"/api/admin/subscriptions/{drop.id}", headers=w.cookie["viewer"]
         ).status_code
-        == 403
+        == 404
     )
     assert (
         c.delete(f"/api/admin/subscriptions/{NO_SUCH_UUID}", headers=admin).status_code

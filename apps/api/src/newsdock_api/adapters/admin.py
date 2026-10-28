@@ -1,9 +1,11 @@
 """Admin routes under /api/admin: manage agents, their keys and subscriptions.
 
-Guarded by `require_admin` (adapters/principal.py): the admin token (CLI) or a
-session whose role may manage agents (admin, owner). An agent key is a different
-credential and gets 403; no credential gets 401. Plaintext keys appear in a
-response exactly once, when issued.
+Guarded by `require_admin` (adapters/principal.py): the admin token (CLI) or any
+signed-in user. An agent key is a different credential and gets 403; no credential
+gets 401. What a caller sees and changes is limited by an `AgentScope` (ADR-0023):
+the owner role and the token reach every agent, other users only the ones they
+created; a foreign, ownerless (to them) or unknown id is a plain 404. Plaintext
+keys appear in a response exactly once, when issued.
 """
 
 from collections.abc import Callable
@@ -12,10 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from newsdock_api.adapters.agents_repo import DuplicateAgentError
-from newsdock_api.domain.accounts import Principal
+from newsdock_api.domain.accounts import (
+    AdminTokenPrincipal,
+    Principal,
+    UserPrincipal,
+    scope_for,
+)
 from newsdock_api.domain.agents import (
-    ALL,
     AgentRegistry,
+    AgentScope,
     AgentSummary,
     make_key,
 )
@@ -45,13 +52,25 @@ def build_admin_router(
     subscriptions: SubscriptionStore | None,
     require_admin: Callable[[Request], Principal],
 ) -> APIRouter:
-    router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
+    router = APIRouter(prefix="/api/admin")
+
+    def caller(request: Request) -> UserPrincipal | AdminTokenPrincipal:
+        who = require_admin(request)  # 401/403 for everyone else
+        if isinstance(who, UserPrincipal | AdminTokenPrincipal):
+            return who
+        raise HTTPException(status_code=403, detail="forbidden")
+
+    def scope(who: UserPrincipal | AdminTokenPrincipal = Depends(caller)) -> AgentScope:
+        return scope_for(who)
 
     @router.post("/agents", status_code=201)
-    def create_agent(body: NewAgent) -> IssuedAgent:
+    def create_agent(
+        body: NewAgent, who: UserPrincipal | AdminTokenPrincipal = Depends(caller)
+    ) -> IssuedAgent:
         key = make_key()
+        owner_id = who.user_id if isinstance(who, UserPrincipal) else None
         try:
-            agent = registry.create_agent(body.name, key, None)  # T-04: the creator
+            agent = registry.create_agent(body.name, key, owner_id)
         except DuplicateAgentError as exc:
             raise HTTPException(status_code=409, detail="name_taken") from exc
         return IssuedAgent(
@@ -59,43 +78,49 @@ def build_admin_router(
         )
 
     @router.get("/agents")
-    def list_agents() -> list[AgentSummary]:
-        return registry.list_agents(ALL)  # T-04: the caller's scope
+    def list_agents(scope: AgentScope = Depends(scope)) -> list[AgentSummary]:
+        return registry.list_agents(scope)
 
     @router.get("/subscriptions")
-    def list_subscriptions() -> list[AdminSubscription]:
-        return subscriptions.list_visible(ALL) if subscriptions else []
+    def list_subscriptions(
+        scope: AgentScope = Depends(scope),
+    ) -> list[AdminSubscription]:
+        return subscriptions.list_visible(scope) if subscriptions else []
 
     @router.delete("/subscriptions/{sub_id}", status_code=204)
-    def delete_subscription(sub_id: str) -> Response:
-        if subscriptions is None or not subscriptions.delete_visible(sub_id, ALL):
+    def delete_subscription(
+        sub_id: str, scope: AgentScope = Depends(scope)
+    ) -> Response:
+        if subscriptions is None or not subscriptions.delete_visible(sub_id, scope):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 
     @router.post("/agents/{agent_id}/keys", status_code=201)
-    def issue_key(agent_id: str) -> IssuedKey:
+    def issue_key(agent_id: str, scope: AgentScope = Depends(scope)) -> IssuedKey:
         key = make_key()
-        key_id = registry.add_key(agent_id, key, ALL)
+        key_id = registry.add_key(agent_id, key, scope)
         if key_id is None:
             raise HTTPException(status_code=404, detail="not_found")
         return IssuedKey(key_id=key_id, api_key=key.raw)
 
     @router.delete("/agents/{agent_id}/keys/{key_id}", status_code=204)
-    def revoke_key(agent_id: str, key_id: str) -> Response:
-        if not registry.revoke_key(agent_id, key_id, ALL):
+    def revoke_key(
+        agent_id: str, key_id: str, scope: AgentScope = Depends(scope)
+    ) -> Response:
+        if not registry.revoke_key(agent_id, key_id, scope):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 
     @router.post("/agents/{agent_id}/disable", status_code=204)
-    def disable(agent_id: str) -> Response:
-        return _set_status(agent_id, "disabled")
+    def disable(agent_id: str, scope: AgentScope = Depends(scope)) -> Response:
+        return _set_status(agent_id, "disabled", scope)
 
     @router.post("/agents/{agent_id}/enable", status_code=204)
-    def enable(agent_id: str) -> Response:
-        return _set_status(agent_id, "active")
+    def enable(agent_id: str, scope: AgentScope = Depends(scope)) -> Response:
+        return _set_status(agent_id, "active", scope)
 
-    def _set_status(agent_id: str, status: str) -> Response:
-        if not registry.set_status(agent_id, status, ALL):
+    def _set_status(agent_id: str, status: str, scope: AgentScope) -> Response:
+        if not registry.set_status(agent_id, status, scope):
             raise HTTPException(status_code=404, detail="not_found")
         return Response(status_code=204)
 

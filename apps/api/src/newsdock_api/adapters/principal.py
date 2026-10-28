@@ -106,7 +106,9 @@ class Guards(NamedTuple):
     read: Callable[[Request], None]  # a user or an agent (open when auth is off)
     user: Callable[[Request], UserPrincipal]  # a logged-in human, always
     write: Callable[[Request], None]  # app-wide: Origin allowlist + JSON bodies
-    admin: Callable[[Request], Principal]  # admin token, or admin/owner session
+    # agent routes: the admin token or any user session whose role holds
+    # `manage_agents` (every role since ADR-0023); the route limits it by scope
+    admin: Callable[[Request], Principal]
     manage_users: Callable[[Request], UserPrincipal]  # owner session only
     admin_token_only: Callable[[Request], None]  # the CLI token, nothing else
     live: Callable[
