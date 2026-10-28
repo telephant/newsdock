@@ -118,7 +118,8 @@ def _run(coro: Any) -> Any:
     return asyncio.new_event_loop().run_until_complete(coro)
 
 
-# TC-15: the client sees exactly the designed tools (+ack_cursor, M2 ADR-0017)
+# TC-15: the client sees exactly the designed tools (+ack_cursor, M2 ADR-0017;
+# +semantic_search, M3 semantic-search)
 def test_tool_list(base_url: str) -> None:
     async def go() -> list[str]:
         async with Client(f"{base_url}/mcp") as client:
@@ -127,7 +128,7 @@ def test_tool_list(base_url: str) -> None:
 
     assert _run(go()) == [
         "ack_cursor", "get_article", "list_new_articles",
-        "search_articles", "submit_analysis",
+        "search_articles", "semantic_search", "submit_analysis",
     ]  # fmt: skip
 
 

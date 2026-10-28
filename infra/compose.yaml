@@ -188,6 +188,7 @@ services:
       <<: [*db-env, *config-file]
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       NEWSDOCK_PORT: 8000  # pinned: the published mapping above targets 8000
+      OLLAMA_URL: http://host.docker.internal:11434  # semantic_search embeds the query
       NEWSDOCK_ADMIN_TOKEN: ${NEWSDOCK_ADMIN_TOKEN:-}  # secret (.env); empty = admin routes off
     volumes:
       - *config-volume

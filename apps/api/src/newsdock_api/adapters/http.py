@@ -5,6 +5,7 @@ Spike-verified pattern (spike.md §1): mount `mcp.streamable_http_app()` and run
 """
 
 import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -32,7 +33,9 @@ from newsdock_api.adapters.listener import NotifyListener, listen_dsn
 from newsdock_api.adapters.live import build_live_router
 from newsdock_api.adapters.passwords import Argon2Hasher, make_dummy_hash
 from newsdock_api.adapters.principal import PrincipalResolver, build_guards
+from newsdock_api.adapters.query_embedder import OllamaQueryEmbedder
 from newsdock_api.adapters.repo import SqlArticleRepo
+from newsdock_api.adapters.semantic_repo import SqlSemanticRepo
 from newsdock_api.adapters.sse import build_stream_router
 from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
@@ -53,6 +56,12 @@ from newsdock_api.domain.records import (
     HealthStatus,
     NewArticlesPage,
 )
+from newsdock_api.domain.semantic import (
+    EmbeddingUnavailable,
+    InvalidQuery,
+    QueryEmbedder,
+    SemanticService,
+)
 from newsdock_api.domain.service import (
     ArticleService,
     NotFoundError,
@@ -65,6 +74,8 @@ from newsdock_api.domain.signuplimit import SignupLimiter
 from newsdock_api.domain.streams import StreamLimiter, WakeHub
 from newsdock_api.domain.subscriptions import SubscriptionStore
 
+logger = logging.getLogger(__name__)
+
 
 def create_app(
     settings: Settings | None = None,
@@ -75,6 +86,7 @@ def create_app(
     hasher: PasswordHasher | None = None,
     login_limiter: LoginLimiter | None = None,
     signup_limiter: SignupLimiter | None = None,
+    query_embedder: QueryEmbedder | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(DbSettings())
@@ -99,6 +111,23 @@ def create_app(
         return ANONYMOUS
 
     service = ArticleService(repo, limits=settings.limits())
+    semantic = SemanticService(
+        SqlSemanticRepo(engine, ef_search=settings.semantic_ef_search),
+        query_embedder
+        or OllamaQueryEmbedder(
+            url=settings.embedding_ollama_url,
+            model=settings.embedding_model,
+            dimension=settings.embedding_dimension,
+            prefix=settings.embedding_query_prefix,
+            timeout=settings.semantic_ollama_timeout_seconds,
+        ),
+        model=settings.embedding_model,
+        candidates=settings.semantic_candidates,
+        rrf_k=settings.semantic_rrf_k,
+        max_query_length=settings.semantic_query_max_length,
+        default_limit=settings.search_page_default,
+        max_limit=settings.search_page_max,
+    )
 
     mcp = MCPServer("newsdock")
 
@@ -117,6 +146,40 @@ def create_app(
             domain=domain, text=text, limit=limit,
         )  # fmt: skip
         return {"articles": [a.model_dump(mode="json") for a in articles]}
+
+    @mcp.tool()
+    def semantic_search(
+        query: str,
+        mode: str = "hybrid",
+        time_from: datetime | None = None,
+        time_to: datetime | None = None,
+        theme: str | None = None,
+        domain: str | None = None,
+        limit: int | None = None,
+    ) -> dict[str, Any]:
+        """Search article titles by meaning, not only by words.
+
+        `query` is plain language ("interest rate hike" finds "Central bank lifts
+        borrowing costs"). `mode` is "hybrid" (default: meaning plus words, fused) or
+        "vector" (meaning only). Filters work as in search_articles. Each result has
+        a `score` and `matched_by`. If the embedding service is down, "hybrid" falls
+        back to word matching and sets `degraded`; "vector" returns the error
+        `embedding_unavailable`.
+        """
+        try:
+            result = semantic.search(
+                query, mode=mode, time_from=time_from, time_to=time_to,
+                theme=theme, domain=domain, limit=limit,
+            )  # fmt: skip
+        except InvalidQuery as exc:
+            raise ToolError(f"invalid_query: {exc}") from exc
+        except EmbeddingUnavailable as exc:
+            logger.warning("semantic_search: query could not be embedded: %s", exc)
+            raise ToolError(
+                "embedding_unavailable: the query could not be embedded; "
+                "use mode 'hybrid' or search_articles"
+            ) from exc
+        return result.model_dump(mode="json")
 
     @mcp.tool(name="get_article")
     def get_article_tool(article_id: str) -> dict[str, Any]:

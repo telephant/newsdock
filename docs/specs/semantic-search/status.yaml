@@ -10,13 +10,13 @@ acs:
   AC-3: {status: passing}  # TC-3 (T-05), 2026-10-28
   AC-4: {status: passing}  # TC-4, TC-18, TC-19 (T-02, T-05), 2026-10-28
   AC-5: {status: passing}  # TC-5 (T-05), 2026-10-28
-  AC-6: {status: in-progress}  # TC-6 repo level, TC-20 (T-06) green; through the tool in T-07
-  AC-7: {status: in-progress}  # TC-7 with the real model at repo level (T-06); through the tool in T-07
-  AC-8: {status: in-progress}  # TC-8 (T-04) green; hybrid end-to-end TC-9 in T-07
-  AC-9: {status: in-progress}  # TC-10 repo level (T-06) green; through the tool in T-07
-  AC-10: {status: in-progress}  # T-02 errors done; tool in T-07
-  AC-11: {status: in-progress}  # worker half TC-12 (T-05) and query half (T-06) green; combined through the tool in T-07
-  AC-12: {status: todo}
+  AC-6: {status: passing}  # TC-6, TC-20 (T-06, T-07), 2026-10-28
+  AC-7: {status: passing}  # TC-7 real model through the live MCP tool (T-06, T-07), 2026-10-28
+  AC-8: {status: passing}  # TC-8, TC-9 (T-04, T-07), 2026-10-28
+  AC-9: {status: passing}  # TC-10 (T-06, T-07), 2026-10-28
+  AC-10: {status: passing}  # TC-11, TC-18 (T-02, T-07), 2026-10-28
+  AC-11: {status: passing}  # TC-12 worker (T-05) and query (T-06, T-07), 2026-10-28
+  AC-12: {status: passing}  # TC-13 (T-07), 2026-10-28
   AC-13: {status: passing}  # TC-14 (T-03), 2026-10-28
   AC-14: {status: todo}
-  AC-15: {status: in-progress}  # TC-17 worker and API settings green (T-05, T-06); the tool reads them in T-07
+  AC-15: {status: passing}  # TC-17 worker and API, make config-python (T-05, T-06, T-07), 2026-10-28

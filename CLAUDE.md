@@ -40,7 +40,7 @@ News "dock" for AI agents: ingests the GDELT GKG feed every 15 min, cleans it wi
 - Flink was deliberately dropped (ADR-0001). Do not reintroduce stateful stream engines in the MVP.
 
 ## Fixed names (do not rename without updating all docs)
-- MCP tools: `search_articles`, `get_article`, `list_new_articles`, `submit_analysis`, `ack_cursor` (M2 agent-platform, ADR-0017).
+- MCP tools: `search_articles`, `get_article`, `list_new_articles`, `submit_analysis`, `ack_cursor` (M2 agent-platform, ADR-0017), `semantic_search` (M3 semantic-search: `query`, `mode` = `hybrid`|`vector`, the `search_articles` filters, `limit`; result `{articles (with score, matched_by), mode, degraded}`; errors `invalid_query`, `embedding_unavailable`).
 - Public article id is `url_hash` (sha256 of the normalized URL). `seq` (bigserial) drives the cursor, never expose it raw: the cursor is opaque base64.
 - Tables: `articles` (canonicals; `story_key` NULL = pre-M2a row), `analyses`, `ingest_slot`, `article_sources` (copies; PK `url_hash`, FK → canonical, CASCADE), `users` (unique lower-cased email, role `owner|admin|viewer`, argon2id hash), `sessions` (sha256 of the cookie value, FK → users CASCADE), `agents` (`owner_id` nullable FK → users, `ON DELETE SET NULL`: NULL = no owner, ADR-0023). Slot format: `YYYYMMDDHHMMSS`.
 - Dead-letter reasons: `missing_url`, `missing_title`, `bad_column_count`, `bad_field`.
