@@ -9,18 +9,20 @@ agents.owner_id  uuid  NULL  REFERENCES users(id) ON DELETE SET NULL   -- fk_age
 index ix_agents_owner_id (owner_id)
 ```
 
-- Existing rows stay NULL. Downgrade drops the index, the FK and the column.
+- Existing rows stay NULL. Forward-only (DR-11): the downgrade is a documented no-op, like 0006.
 - Model: `Agent.owner_id: Mapped[str | None] = mapped_column(Uuid(as_uuid=False), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)`.
 - `packages/db/tests/integration/test_schema.py` gets the new column and FK; `test_stack.py` expected head becomes `0007`.
 
 ## 2. Scope (C-20, `domain/agents.py`, pure)
 
 ```python
-class AgentScope(BaseModel):          # frozen
+class AgentScope(BaseModel):  # frozen
     everything: bool
-    owner_id: str | None = None       # set when everything is False
+    owner_id: str | None = None  # set when everything is False
+
 
 ALL = AgentScope(everything=True)
+
 
 def scope_for(principal: UserPrincipal | AdminTokenPrincipal) -> AgentScope:
     if isinstance(principal, AdminTokenPrincipal) or principal.role is Role.OWNER:
@@ -59,8 +61,8 @@ Protocols `AgentRegistry` and `SubscriptionStore` change accordingly; the fakes 
 `build_admin_router` keeps its signature plus the `Principal` dependency result:
 
 ```python
-principal = Depends(require_admin)          # already returns the principal
-scope = scope_for(principal)                # token or user; agents cannot pass the guard
+principal = Depends(require_admin)  # already returns the principal
+scope = scope_for(principal)  # token or user; agents cannot pass the guard
 ```
 
 | Route | Change |

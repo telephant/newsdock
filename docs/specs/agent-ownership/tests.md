@@ -13,7 +13,7 @@ Spec: [spec.md](spec.md) §6 · Design: [design.md](design.md). Every AC has at 
 
 | TC | AC | Level | Case |
 |---|---|---|---|
-| TC-1 | AC-1 | integration | Given a DB at `0006` with `demo-financial`, `push-live` and their keys, When `0007` runs, Then `agents.owner_id` exists and is NULL for both, both keys still authenticate (`find_key`), and downgrade drops the column |
+| TC-1 | AC-1 | integration | Given a DB at `0006` with `demo-financial`, `push-live` and their keys, When `0007` runs, Then `agents.owner_id` exists and is NULL for both, both keys still authenticate (`find_key`) |
 | TC-2 | AC-8 | integration | Given an agent with a key, a cursor and a subscription owned by user A, When A's user row is deleted, Then the agent's `owner_id` is NULL and the key, cursor and subscription rows remain |
 | TC-3 | AC-3, AC-5 | unit | `scope_for`: admin token → everything; `owner` role → everything; `admin` and `viewer` → only their `user_id`; the scope object is frozen |
 | TC-4 | AC-9, AC-10 | unit | Permission table: `manage_agents` held by owner, admin, viewer; `manage_users` by owner only; `can()` unknown permission still raises |

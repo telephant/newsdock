@@ -150,6 +150,14 @@ class Agent(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    # The creating user (agent-ownership, ADR-0023); NULL = no owner: CLI/admin-token
+    # agents, agents from before 0007, and agents whose creator was deleted.
+    owner_id: Mapped[str | None] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
 
 class ApiKey(Base):

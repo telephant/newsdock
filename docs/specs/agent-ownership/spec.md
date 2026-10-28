@@ -100,7 +100,7 @@ Learning goal: authorization by resource ownership (row-level filtering, 404-not
 AC-1  Migration adds ownership without touching data
   Given a database at revision 0006 with agents demo-financial and push-live and existing keys
   When  migration 0007 runs
-  Then  agents.owner_id exists and is NULL for both agents, their keys still authenticate, and the downgrade removes the column
+  Then  agents.owner_id exists and is NULL for both agents, and their keys still authenticate
   Verify: auto
 
 AC-2  A session-created agent records its creator
