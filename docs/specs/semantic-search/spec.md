@@ -28,6 +28,7 @@ flowchart LR
 | D-5 | Hybrid ranking = reciprocal-rank fusion (RRF) of the keyword and vector result lists | Decided: default (2026-10-28) |
 | D-6 | Surface: one new MCP tool `semantic_search`; no REST route and no UI in this milestone | Decided: default (2026-10-28) |
 | D-7 | Index: HNSW with cosine distance on the `embedding` column | Decided: default (2026-10-28) |
+| D-8 | The keyword side of hybrid is Postgres full-text search (`english`) on the title with a GIN index, not `ILIKE` (found at /spec-design: a natural-language query is almost never a title substring); amends AC-1 | Decided: default (2026-10-28) |
 
 **All seven decisions were taken as recommended defaults, not answered one by one:** the user asked for the whole of M3 to be driven through `/spec-*` and had interrupted the question flow earlier. Any of them can be changed before `/spec-design`; D-1 and D-4 are the ones most worth a second look.
 
@@ -62,7 +63,7 @@ flowchart LR
 ## 4. Scope (walking skeleton)
 
 **In**
-- Migration: `articles.embedding vector(768)` (nullable), `articles.embedding_model text` (nullable), HNSW cosine index.
+- Migration: `articles.embedding vector(768)` (nullable), `articles.embedding_model text` (nullable), HNSW cosine index, GIN full-text index on the title (D-8).
 - Embed worker: finds canonical rows with no embedding for the configured model, embeds titles in batches through Ollama, writes the vector and model name; idempotent; retries when Ollama is down.
 - Backfill of rows already in the window (the same loop covers them).
 - MCP tool `semantic_search(query, mode, limit, time_from, time_to, theme, domain)`, `mode` = `vector` or `hybrid` (default `hybrid`).
@@ -89,7 +90,7 @@ flowchart LR
 AC-1  Schema
   Given a database at the previous migration head with articles in it
   When  the new migration runs
-  Then  articles has nullable embedding (vector 768) and embedding_model columns and an HNSW cosine index, and every existing row and its other columns are unchanged
+  Then  articles has nullable embedding (vector 768) and embedding_model columns, an HNSW cosine index and a GIN full-text index on the title, and every existing row and its other columns are unchanged
   Verify: auto
 
 AC-2  New article gets embedded
