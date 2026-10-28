@@ -12,7 +12,7 @@ acs:
   AC-5: {status: todo}
   AC-6: {status: todo}
   AC-7: {status: todo}
-  AC-8: {status: todo}
+  AC-8: {status: in-progress}  # TC-8 (T-04) green; hybrid end-to-end TC-9 in T-07
   AC-9: {status: todo}
   AC-10: {status: in-progress}  # T-02 errors done; tool in T-07
   AC-11: {status: todo}
