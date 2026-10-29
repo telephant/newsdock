@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>forgot-password — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>forgot-password — M2f diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s1">2 Request and send</a><a href="#s2">3 Reset</a><a href="#e">4 Data model</a><a href="#t">5 Code lifecycle</a><a href="#d">6 Deployment</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  WEB["C-47 web screens"] --> RT["C-43 reset routes"]
+  RT --> LIM["C-45 request limiter"]
+  RT --> RULES["C-41 reset rules"]
+  RT --> STORE["C-42 reset store"]
+  RT --> MAIL["C-44 mailer"]
+  STORE --> DB[("C-46 password_resets, users, sessions")]
+  MAIL -->|"SMTP over TLS"| SMTP["free provider, e.g. Brevo"]
+  CFG["C-48 settings and secrets"] -.-> RT
+  CFG -.-> MAIL
+  OPS["make user-reset-password (C-17)"] -.->|"unchanged"| DB
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the mailer the only component that talks to the outside world?</li>
+<li>Do the rules (C-41) do no I/O, so they can be tested without a database or SMTP?</li>
+<li>Is the operator path left exactly as it is?</li>
+<li>Do both secrets come only from the environment?</li></ul></div></section>
+
+<section id="s1"><h2>2 Request a code, send it after the response (F-21, F-22, F-24)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User (web)
+  participant A as API (C-43)
+  participant L as Limiter (C-45)
+  participant B as Background job
+  participant D as Postgres (C-42)
+  participant M as Mailer (C-44)
+  U->>A: GET /api/auth/options
+  A-->>U: password_reset_enabled
+  U->>A: POST forgot-password {email}
+  A->>L: attempt(address, email)
+  alt over a limit
+    A-->>U: 429 + Retry-After
+  else allowed
+    A-)B: schedule issue_and_send(email)
+    A-->>U: 202 {"ok": true}
+    B->>D: find user by email
+    alt unknown email
+      B->>B: stop (nothing stored, nothing sent)
+    else known
+      B->>D: upsert code hash, delete expired
+      B->>M: send(code)
+      M--xB: MailError (SMTP down)
+      B->>D: discard the unsent code, log
+    end
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does the foreground (everything before the 202) do the same work for known and unknown emails (AC-3)?</li>
+<li>Is the 202 sent before any database write or SMTP call (AC-1)?</li>
+<li>Does a failed send leave no usable code behind (AC-14)?</li>
+<li>Are unknown emails counted by the limiter like known ones (AC-11)?</li></ul></div></section>
+
+<section id="s2"><h2>3 Reset with the code (F-23)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant U as User (web)
+  participant A as API (C-43)
+  participant R as Rules (C-41)
+  participant D as Postgres (C-42)
+  U->>A: POST reset-password {email, code, password}
+  A->>A: email format, password policy (422)
+  A->>A: per-address attempt limit (429)
+  A->>D: claim_attempt: attempts+1 where open, unexpired, below cap
+  D-->>A: stored hash, or nothing
+  A->>R: constant-time compare with the keyed hash
+  alt nothing, wrong or malformed
+    A-->>U: 400 invalid_or_expired_code
+  else match
+    A->>D: one transaction: delete code, set password, delete sessions
+    A->>A: clear the login lockout
+    A-->>U: 204
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the password policy checked before an attempt is counted (AC-10), and the address limit before any code is looked at (AC-17)?</li>
+<li>Is every refusal the same 400, including unknown emails (AC-5, AC-6, AC-7)?</li>
+<li>Can two parallel correct requests both succeed? (They must not: AC-5.)</li>
+<li>Are all three effects of success in one transaction (AC-4, AC-9)?</li></ul></div></section>
+
+<section id="e"><h2>4 Data model (new table)</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  USERS ||--o| PASSWORD_RESETS : "at most one open code"
+  USERS ||--o{ SESSIONS : "ended by a reset"
+  USERS {
+    uuid id PK
+    text email
+    text password_hash
+  }
+  PASSWORD_RESETS {
+    uuid user_id PK
+    text code_hash "keyed HMAC, never the code"
+    timestamptz expires_at
+    int attempts
+    timestamptz created_at
+  }
+  SESSIONS {
+    uuid user_id FK
+    text token_hash
+  }
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does the primary key on <code>user_id</code> make "a newer request replaces the older" a plain upsert (AC-8)?</li>
+<li>Is there nothing in the table that is the code itself (AC-2)?</li>
+<li>Does deleting a user remove the open code (cascade)?</li></ul></div></section>
+
+<section id="t"><h2>5 Lifecycle of a code (F-25)</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Open: request for a known email
+  Open --> Open: wrong code (attempts + 1)
+  Open --> Used: correct code (row deleted)
+  Open --> Locked: attempts reach the cap
+  Open --> Expired: lifetime passes
+  Open --> Replaced: newer request (upsert)
+  Replaced --> Open
+  Locked --> Replaced: newer request
+  Expired --> Replaced: newer request
+  Used --> [*]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Can a Locked or Expired code ever be used again? (It must not.)</li>
+<li>Does a newer request always give a fresh attempt budget (attempts back to 0)?</li>
+<li>Is the only way out of Open on success the deletion of the row (AC-5)?</li></ul></div></section>
+
+<section id="d"><h2>6 Deployment</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  ENV[".env: SMTP password, reset-code secret"] --> API
+  YAML["newsdock.yaml: host, port, security, from"] --> API
+  subgraph compose["docker compose (networks data + agent)"]
+    API["api container"] --> PG[("postgres")]
+  end
+  API -->|"outbound TLS, port 587 or 465"| PROV["SMTP provider (Brevo free plan: 300/day)"]
+  USERMAIL["user's mailbox"] <--|"delivers the code"| PROV
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does the api container have outbound internet access on 587/465 in the local compose setup? (assumed, to be tried by the owner)</li>
+<li>Are the two secrets absent from the YAML and the repo?</li>
+<li>Does the demo agent keep having no route to the database or the internet it did not have before?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

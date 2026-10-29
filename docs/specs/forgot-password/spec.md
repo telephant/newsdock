@@ -31,19 +31,20 @@ sequenceDiagram
 | D-4 | No account enumeration: requesting a code answers the same for known and unknown emails, and a failed reset gives one uniform error | Decided: default (2026-10-29) |
 | D-5 | The feature is off until SMTP is configured (routes answer 503, the web hides the link); there is no "print the code in the log" mode | Decided: default (2026-10-29) |
 | D-6 | A successful reset ends all of the user's sessions and does not log them in; they log in with the new password | Decided: default (2026-10-29) |
-| D-7 | A code is random (CSPRNG), stored only as a hash, valid once, for a short time, with a capped number of wrong attempts; a newer request replaces the older code. The numbers are provisional config values (§6) | Decided: default (2026-10-29) |
-| D-8 | The mail is sent after the HTTP response, so the response time does not depend on whether an account exists or how slow the provider is | Decided: default (2026-10-29) |
+| D-7 | A code is random (CSPRNG), stored only as a keyed hash (ADR-0026, user 2026-10-29), valid once, for a short time, with a capped number of wrong attempts; a newer request replaces the older code. The numbers are provisional config values (§6) | Decided: default (2026-10-29) |
+| D-8 | The mail is sent after the HTTP response, so the response time does not depend on whether an account exists or how slow the provider is | Decided: after the response (user, 2026-10-29, ADR-0027) |
+| D-9 | `reset-password` calls are also limited per client address, so one client cannot try many accounts' codes in a row (added at /spec-design; new AC-17) | Decided: add the limit (user, 2026-10-29) |
 
-D-3 to D-8 are conventional defaults recorded for review, not answered one by one; say so if you want any changed before `/spec-design`.
+D-1, D-2, D-7 (keyed hash), D-8 and D-9 were answered by the user; D-3 to D-6 are conventional defaults recorded for review.
 
 **Risks:**
 1. **Unverified email addresses.** Sign-up does not verify the address (ui-login non-goal), so someone can register `victim@example.com` first. Resetting by email then hands that account to whoever controls the mailbox, which is the victim: acceptable, but the account's first password came from the squatter. Email verification stays in the backlog.
 2. **Mailbox compromise equals account takeover**, including the `owner` role. The operator path `make user-reset-password` stays as the recovery of last resort and is unchanged.
-3. **Mail abuse.** The endpoint makes the server send mail to arbitrary addresses, so it needs per-address and per-client limits (AC-11, AC-12). The existing limiters are in memory and per worker; limits on codes themselves are stored in the database.
+3. **Mail abuse and guessing.** The request endpoint makes the server send mail to arbitrary addresses, so it needs per-email and per-client-address limits (AC-11, AC-12); the confirm endpoint is limited per client address too (AC-17). The existing limiters are in memory and per worker; limits on codes themselves are stored in the database.
 4. **Deliverability.** Free providers with a single verified sender can land in spam, and Brevo's free plan caps at 300 mails a day **[verified: Brevo]**. This is a learning/small-scale feature, not a mail platform.
 5. **Stacked branch.** This work sits on the `semantic-search` branch (`worktree-p2-delivery`, migrations up to 0009), so its migration will be 0010; merge that branch first.
 
-**Prerequisites the user owns:** a free Brevo account (or another SMTP provider), a verified sender address, and an SMTP key; they go in `.env` (`NEWSDOCK_SMTP_PASSWORD`, never in the repo). Automated tests never send real mail; one optional live send is a manual check (AC-1 note).
+**Prerequisites the user owns:** a free Brevo account (or another SMTP provider), a verified sender address, and an SMTP key; plus a random secret for hashing the codes (added by the design, ADR-0026: `openssl rand -hex 32`). The key and the secret go in `.env` (`NEWSDOCK_SMTP_PASSWORD`, `NEWSDOCK_RESET_CODE_SECRET`, never in the repo). Automated tests never send real mail; one optional live send is a manual check (AC-1 note).
 
 ## 1. Problem
 
@@ -54,7 +55,7 @@ A user who forgets their password has no way back in: the only recovery is the o
 | Goal | Measure |
 |---|---|
 | A locked-out user can set a new password themselves | AC-3, AC-15, AC-16 |
-| The flow cannot be used to find out who has an account or to take one over | AC-3 (unknown email), AC-5, AC-6, AC-10, AC-11 |
+| The flow cannot be used to find out who has an account or to take one over | AC-3 (unknown email), AC-5, AC-6, AC-10, AC-11, AC-17 |
 | The provider is a setting, not code | AC-1 and AC-2 pass against a local SMTP server; the same settings point at Brevo |
 | Learning: one-time codes, hashing short secrets, rate limits with two keys, sending mail without blocking a request | the pieces above exist and are tested |
 
@@ -76,7 +77,7 @@ A user who forgets their password has no way back in: the only recovery is the o
 - Table for open reset codes (migration 0010): user, hash of the code, expiry, wrong-attempt count, created time.
 - Two API routes: `POST /api/auth/forgot-password` (email → 202) and `POST /api/auth/reset-password` (email, code, new password → 204), both outside the login requirement, with the existing origin and JSON guards.
 - A mailer port with an SMTP adapter (STARTTLS or implicit TLS, timeout) and a fake for tests; settings `smtp_*`, `mail_from`, the secret password from the environment only.
-- Rate limits: per email and per client address on requests; attempts per code.
+- Rate limits: per email and per client address on code requests; per client address on reset attempts; wrong attempts per code.
 - Web: a "Forgot password?" link on the login page (only when the feature is on), an email screen, a code-and-new-password screen, success and error messages.
 - README: how to set up Brevo (and the same settings for other providers).
 
@@ -167,7 +168,7 @@ AC-12  Requests are limited per client address
   Verify: auto
 
 AC-13  Without SMTP the feature is off
-  Given no SMTP host configured
+  Given no SMTP host, sender address or code secret configured
   When  forgot-password and reset-password are called
   Then  both answer 503 password_reset_unavailable, nothing is stored and nothing is sent
   Verify: auto
@@ -189,13 +190,19 @@ AC-16  The web flow works end to end
   When  a user submits their email, then the code and a new password
   Then  they see the generic confirmation after the first step, "Password changed" with a link to log in after the second, and the uniform error text for a wrong or expired code
   Verify: auto
+
+AC-17  Reset attempts are limited per client address
+  Given a limit of J reset-password calls per client address per window
+  When  J+1 calls with well-formed input are made from one address, for any emails and codes
+  Then  the last is refused with 429 too_many_reset_attempts and Retry-After before any code is checked, and the same call from another address is not refused
+  Verify: auto
 ```
 
-Provisional targets (config values with these defaults; measure or reconsider before treating them as requirements): code length 6 digits, lifetime 15 minutes, 5 wrong attempts per code, 3 requests per email per hour, 20 requests per client address per hour, SMTP timeout 10 seconds.
+Provisional targets (config values with these defaults; measure or reconsider before treating them as requirements): code length 6 digits, lifetime 15 minutes, 5 wrong attempts per code, 3 requests per email per hour, 20 requests per client address per hour, 20 reset attempts per client address per hour, SMTP timeout 10 seconds.
 
 ## 7. Non-functional requirements
 
-- **Secrets:** the SMTP password only in the environment (the config loader already rejects secret-looking keys in the file); the code is never logged, never returned by the API, never stored in clear.
+- **Secrets:** the SMTP password and the code-hash secret only in the environment (the config loader already rejects secret-looking keys in the file); the code is never logged, never returned by the API, never stored in clear.
 - **Randomness and comparison:** codes come from `secrets`; comparison is constant-time.
 - **Layering:** the mailer is a port in `domain/`, SMTP and the fake are in `adapters/`; SQL only in adapters; env read only in `config.py`.
 - **Transport security:** SMTP authenticates only over STARTTLS or implicit TLS; plain SMTP is allowed only for a local test server.
