@@ -2,7 +2,7 @@
 
 Reference only; not required reading for approval. Overview: [design.md](design.md).
 
-## 1. Schema (migration `0008_article_embeddings`, head after `0007`)
+## 1. Schema (migrations `0008_article_embeddings` after `0007`, then `0009_unembedded_queue_index`)
 
 ```sql
 ALTER TABLE articles ADD COLUMN embedding vector(768);
@@ -11,6 +11,8 @@ CREATE INDEX ix_articles_embedding_hnsw ON articles
   USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX ix_articles_title_fts ON articles
   USING gin (to_tsvector('english', title));
+-- 0009: the embedder's queue, only the rows still waiting for a vector
+CREATE INDEX ix_articles_unembedded ON articles (seq) WHERE embedding IS NULL;
 ```
 
 - Both columns nullable, so the migration is metadata-only and every existing row is unchanged (AC-1). Forward-only (DR-11): there is no downgrade.
@@ -21,9 +23,12 @@ CREATE INDEX ix_articles_title_fts ON articles
 ## 2. Embedder loop (C-35)
 
 ```
+start (once, retried while the database is down):
+  UPDATE articles SET embedding=NULL, embedding_model=NULL            # AC-11
+   WHERE embedding IS NOT NULL AND embedding_model IS DISTINCT FROM :model
 loop:
   rows = SELECT url_hash, title FROM articles
-         WHERE embedding IS NULL OR embedding_model IS DISTINCT FROM :model
+         WHERE embedding IS NULL                  # partial index ix_articles_unembedded
          ORDER BY seq DESC LIMIT :batch
   if no rows: heartbeat; sleep poll_interval_seconds; continue  # AC-3: no request sent
   try: vectors = embed_documents([title...])                    # C-36, one /api/embed call
@@ -31,7 +36,7 @@ loop:
   for (hash, vec) in zip(rows, vectors):
      if len(vec) != dimension or not finite: log; skip
      UPDATE articles SET embedding=:v, embedding_model=:model
-      WHERE url_hash=:h AND (embedding IS NULL OR embedding_model IS DISTINCT FROM :model)
+      WHERE url_hash=:h AND embedding IS NULL
   heartbeat
 ```
 
@@ -56,7 +61,7 @@ SET LOCAL hnsw.iterative_scan = relaxed_order;
 SET LOCAL hnsw.ef_search = :ef;
 SELECT url_hash, 1 - (embedding <=> :q) AS similarity
 FROM articles
-WHERE embedding_model = :model AND <_apply_filters>
+WHERE embedding_model = :model AND <apply_filters>
 ORDER BY embedding <=> :q
 LIMIT :candidates;
 ```
@@ -68,7 +73,7 @@ Keyword leg:
 ```sql
 SELECT url_hash, ts_rank(to_tsvector('english', title), q) AS rank
 FROM articles, websearch_to_tsquery('english', :query) q
-WHERE to_tsvector('english', title) @@ q AND <_apply_filters>
+WHERE to_tsvector('english', title) @@ q AND <apply_filters>
 ORDER BY rank DESC, published_at DESC, url_hash
 LIMIT :candidates;
 ```

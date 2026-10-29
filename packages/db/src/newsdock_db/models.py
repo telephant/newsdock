@@ -91,6 +91,10 @@ class Article(Base):
             text("to_tsvector('english', title)"),
             postgresql_using="gin",
         ),
+        # the embedder's queue: rows still waiting for a vector (migration 0009)
+        Index(
+            "ix_articles_unembedded", "seq", postgresql_where=text("embedding IS NULL")
+        ),
     )
 
 

@@ -13,7 +13,7 @@ Every canonical article title must get an embedding (spec `semantic-search`, D-3
 ## Decision
 Option 2.
 - The sink stays a fast, Kafka-to-Postgres writer; a slow or absent Ollama cannot slow or fail ingestion (AC-4).
-- Polling the table (`embedding IS NULL OR embedding_model <> :model`) needs no new state: it backfills existing rows, re-embeds after a model change and is idempotent by construction. A Kafka consumer would need a second path for backfill and model changes.
+- Polling the table (`embedding IS NULL`, served by the partial index `ix_articles_unembedded`, migration 0009) needs no new state: it backfills existing rows and is idempotent by construction; after a model change the worker clears the other model's vectors once at start and they flow through the same queue. (The first version filtered `embedding IS NULL OR embedding_model <> :model` over `ORDER BY seq DESC`, which made every pass and every idle poll walk past all embedded rows: 78 ms per idle poll at 67,000 rows, found at verify.) A Kafka consumer would need a second path for backfill and model changes.
 - One package keeps the document/query prefixes, the endpoint and the vector validation in one place; the worker and the API cannot drift apart (AC-7, AC-11).
 - `packages/embedding` is an I/O package like `packages/db`; `newsdock_core` stays free of I/O.
 

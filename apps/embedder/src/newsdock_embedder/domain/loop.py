@@ -1,8 +1,10 @@
 """The worker pass and the loop around it (spec semantic-search D-3, AC-2..AC-5, AC-11).
 
 Pure: the database and Ollama are ports, implemented in `adapters/`. A pass takes
-one batch of canonical articles that still need an embedding for the configured
-model (newest first), embeds their titles in one request and stores each vector.
+one batch of canonical articles that have no vector yet (newest first), embeds their
+titles in one request and stores each vector. Vectors written by another model are
+cleared once, at the start, so they join that same queue; the queue is a partial
+index, so finding work costs the same however many rows are already embedded.
 Nothing here can fail an ingest: the worker only reads committed rows.
 """
 
@@ -40,8 +42,12 @@ class PassResult:
 
 
 class EmbedRepo(Protocol):
-    def next_batch(self, model: str, limit: int, exclude: frozenset[str]) -> list[Row]:
-        """Canonical rows with no embedding, or one from another model; newest first."""
+    def invalidate_stale(self, model: str) -> int:
+        """Clear vectors written by a model other than `model`; return how many."""
+        ...
+
+    def next_batch(self, limit: int, exclude: frozenset[str]) -> list[Row]:
+        """Canonical rows with no vector yet, newest first."""
         ...
 
     def store(self, url_hash: str, vector: list[float], model: str) -> bool:
@@ -70,12 +76,19 @@ class EmbedWorker:
         self._model = model
         self._batch_size = batch_size
         self._skip = skip
+        self._prepared = False
 
     def run_pass(self) -> PassResult:
         try:
-            rows = self._repo.next_batch(
-                self._model, self._batch_size, self._skip.excluded()
-            )
+            if not self._prepared:  # once; retried while the database is down
+                cleared = self._repo.invalidate_stale(self._model)
+                self._prepared = True
+                if cleared:
+                    logger.info(
+                        "cleared %d vectors of another model; re-embedding them",
+                        cleared,
+                    )
+            rows = self._repo.next_batch(self._batch_size, self._skip.excluded())
             if not rows:
                 return PassResult("idle")  # nothing to embed: no request to Ollama
             vectors = self._embedder.embed_documents([r.title for r in rows])

@@ -1,9 +1,9 @@
 feature: semantic-search
-stage: implement
-updated: 2026-10-28
-decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided}
+stage: done
+updated: 2026-10-29
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided}
 # init, design and plan approved on the user's instruction "finish M3 by using /spec-*"; decisions and ADR-0024/0025 are recommended defaults, not answered one by one
-gates: {init: approved, design: approved, plan: approved, implement: approved, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}  # verify: pass with follow-ups, see verify.md
 acs:
   AC-1: {status: passing}  # TC-1 (T-03), 2026-10-28
   AC-2: {status: passing}  # TC-2, TC-18 (T-02, T-05), 2026-10-28

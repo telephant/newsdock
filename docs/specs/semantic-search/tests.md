@@ -5,7 +5,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 ## Test data
 
 - **Hand-made vectors.** Ranking, filter, model-mix and retention tests insert articles with explicit 768-dimension vectors (unit axes and small mixes), so distances are known and no model is needed. Helper `make_vec(*components)` pads to 768 with zeros. Lives in `newsdock_db.testing` (`make_vec`, `article`; a package module, because apps may not import each other's tests and pytest's importlib mode does not share sibling test modules), next to `newsdock_embedding.testing.FakeOllama`.
-- **Fake Ollama.** A tiny in-process HTTP stub (`httpx.MockTransport` for unit tests, a `ThreadingHTTPServer` for integration) answering `POST /api/embed` with deterministic vectors derived from a hash of the text, a switch to fail (connection refused / HTTP 500 / wrong length / NaN) and a request counter. Lives in `packages/embedding/tests/fakes.py` and is re-exported by a test-only helper in each app that needs it.
+- **Fake Ollama.** `newsdock_embedding.testing.FakeOllama` behind an `httpx.MockTransport`, used by the unit tests and by the Docker tests alike (no real HTTP server was needed): it answers `POST /api/embed` with deterministic vectors derived from a hash of the text, has a switch to fail (connection refused, timeout, HTTP 500, model missing, bad JSON, wrong length, NaN) and records its requests.
 - **Real model.** TC-7 and TC-16 need Ollama with `nomic-embed-text` and are marked `ollama` (not part of `make check`; run with `make eval-search`). Skipped with a clear message when Ollama is unreachable.
 - **Eval corpus.** `apps/api/tests/eval/corpus.json` (about 40 hand-written, realistic news titles across 8 topics, some paraphrase pairs) and `queries.json` (about 12 natural-language queries with the ids that should match). Written by hand; no GDELT row is copied.
 - **Docker Postgres.** Integration tests use the existing `side_db` fixture (pgvector image, own port) so they run beside a dev stack.
@@ -14,7 +14,7 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 
 | TC | AC | Level | Case |
 |---|---|---|---|
-| TC-1 | AC-1 | integration | Given a database at head `0007` with articles, When `0008` is applied, Then `articles` has nullable `embedding` (vector 768) and `embedding_model`, an HNSW cosine index and a GIN index on `to_tsvector('english', title)`, and all earlier columns and rows are identical; the role `embedder_rw` may update only the two embedding columns; the ORM metadata matches the migration (no downgrade: migrations are forward-only, DR-11) |
+| TC-1 | AC-1 | integration | Given a database at head `0007` with articles, When `0008` is applied, Then `articles` has nullable `embedding` (vector 768) and `embedding_model`, an HNSW cosine index and a GIN index on `to_tsvector('english', title)`, migration 0009 adds the partial index `ix_articles_unembedded` (`WHERE embedding IS NULL`), and all earlier columns and rows are identical; the role `embedder_rw` may update only the two embedding columns; the ORM metadata matches the migration (no downgrade: migrations are forward-only, DR-11) |
 | TC-2 | AC-2 | integration | Given a fake Ollama and one canonical article with no embedding, When the worker runs one pass, Then the row has a 768-dimension vector and `embedding_model` = the configured model |
 | TC-3 | AC-3 | unit | Given a repo where nothing needs embedding and a counting embedder, When a pass runs, Then the embedder is called 0 times and no UPDATE is issued; a second pass over embedded rows behaves the same |
 | TC-4 | AC-4 | integration | Given Ollama refusing connections, When the sink-style insert adds articles and the worker runs, Then the inserts exist, their embeddings stay NULL, a failure is logged, and after Ollama recovers the next pass embeds them |
@@ -34,10 +34,12 @@ Spec: [spec.md](spec.md) · Design: [design.md](design.md) · Plan: [plan.md](pl
 | TC-18 | AC-2, AC-4, AC-10 | unit | Given an `httpx.MockTransport`, When the embedding client calls `/api/embed`, Then it sends `{"model", "input": [...]}` with the document or query prefix, parses `embeddings`, and maps connection error / timeout / HTTP 5xx / missing model to `OllamaUnavailable` and a short or non-finite vector to `BadEmbedding` |
 | TC-19 | AC-4 | unit | Given a worker whose embedder always fails, When several passes run, Then the heartbeat file is refreshed every pass (alive, not stuck) and the backoff grows to its cap |
 | TC-20 | AC-6 | unit | Given the tool's input handling, When `query` is empty, whitespace or longer than `semantic_query_max_length`, Then the tool raises `invalid_query` before any embedding call; `mode` outside {vector, hybrid} is rejected |
+| TC-21 | AC-5 | integration | Given 30,000 articles of which the newest 29,900 already have a vector, When the batch query of the embedder runs, Then its plan uses `ix_articles_unembedded` and no sequential scan (finding work does not depend on how many rows are embedded) |
+| TC-22 | AC-11 | integration | Given rows embedded by model X and a worker configured for model Y, When the worker starts (even if Ollama is down), Then the rows' vectors and model names are cleared; rows already embedded by Y are left alone and cause no request |
 
 ## Coverage
 
-Every AC has at least one test: AC-1 TC-1 · AC-2 TC-2, TC-18 · AC-3 TC-3 · AC-4 TC-4, TC-18, TC-19 · AC-5 TC-5 · AC-6 TC-6, TC-20 · AC-7 TC-7 · AC-8 TC-8, TC-9 · AC-9 TC-10 · AC-10 TC-11, TC-18 · AC-11 TC-12 · AC-12 TC-13 · AC-13 TC-14 · AC-14 TC-15, TC-16 · AC-15 TC-17.
+Every AC has at least one test: AC-1 TC-1 · AC-2 TC-2, TC-18 · AC-3 TC-3 · AC-4 TC-4, TC-18, TC-19 · AC-5 TC-5, TC-21 · AC-6 TC-6, TC-20 · AC-7 TC-7 · AC-8 TC-8, TC-9 · AC-9 TC-10 · AC-10 TC-11, TC-18 · AC-11 TC-12, TC-22 · AC-12 TC-13 · AC-13 TC-14 · AC-14 TC-15, TC-16 · AC-15 TC-17.
 
 ## Manual checklist (TC-7, TC-16; need Ollama with `nomic-embed-text`)
 

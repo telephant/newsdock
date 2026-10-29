@@ -12,21 +12,21 @@ Status: **approved on defaults** · 2026-10-28 · Spec: [spec.md](spec.md) · De
 | C-36 | Embedding package (`packages/embedding`, `newsdock_embedding`) | **new package** | The one Ollama `/api/embed` client, the document/query text prefixes, and vector validation (length, finite). Used by C-35 and C-37 so both embed identically |
 | C-37 | Semantic query (`domain/ranking.py`, `domain/semantic.py`, `adapters/semantic_repo.py`, `adapters/query_embedder.py` in the API) | **new** | Vector leg (HNSW, cosine), keyword leg (Postgres full-text), pure RRF fusion, shared filters |
 | C-38 | MCP tool `semantic_search` (in `adapters/http.py`) | **new tool** | Inherits the existing auth and rate-limit path of `/mcp`; maps errors to `embedding_unavailable` / degraded results |
-| C-39 | Migration `0008_article_embeddings` | **new** | `articles.embedding vector(768)`, `articles.embedding_model`, HNSW cosine index, GIN index on `to_tsvector('english', title)` |
+| C-39 | Migrations `0008_article_embeddings` and `0009_unembedded_queue_index` | **new** | `articles.embedding vector(768)`, `articles.embedding_model`, HNSW cosine index, GIN index on `to_tsvector('english', title)`; 0009 (found at verify, D-9): partial index `ix_articles_unembedded (seq) WHERE embedding IS NULL`, the worker's queue |
 | C-40 | Search eval (`apps/api/tests/eval/`, `make eval-search`) | **new** | Fixture corpus + labelled queries; prints recall@5 for keyword, vector, hybrid |
 | C-4 | Sink retention | unchanged | The embedding lives on the article row, so the existing 7-day `DELETE` removes it (AC-13) |
 | C-5 | PostgreSQL | **changed** | New columns and two indexes (C-39) |
-| C-6 | API repo/service | **changed** | `_apply_filters` is reused by the vector and keyword legs, so filters have one implementation |
+| C-6 | API repo/service | **changed** | `apply_filters` (public since T-06) is reused by the vector and keyword legs, so filters have one implementation |
 
 Ingester, processor, sink, demo agent and web: unchanged.
 
 ## 2. Key flows
 
-- **F-16 Embed:** C-35 selects up to `batch_size` canonical rows where `embedding IS NULL OR embedding_model <> :model`, newest first → C-36 embeds `"<doc prefix><title>"` → one UPDATE per row, guarded so a concurrent change is not overwritten. (Sequence 1)
+- **F-16 Embed:** C-35 first clears vectors of any other model (once, at worker start), then selects up to `batch_size` canonical rows where `embedding IS NULL` (served by the partial index, so the cost does not grow with the rows already embedded), newest first → C-36 embeds `"<doc prefix><title>"` → one UPDATE per row, guarded so a concurrent change is not overwritten. (Sequence 1)
 - **F-17 Backfill:** the same loop; rows from before the migration have `embedding IS NULL` and are picked up newest first until nothing is left. (Sequence 1)
 - **F-18 Query:** agent → `/mcp` (key, rate limit) → C-38 → C-36 embeds `"<query prefix><query>"` → C-37 runs the vector leg and the keyword leg with the same filters → RRF → summaries with `score`. (Sequence 2)
 - **F-19 Degraded:** Ollama unreachable at query time → `vector` mode returns tool error `embedding_unavailable`; `hybrid` returns the keyword leg with `degraded: true`. (Sequence 2)
-- **F-20 Model change:** the configured model differs from a row's `embedding_model` → vector leg ignores the row, C-35 re-embeds it. (State diagram 4)
+- **F-20 Model change:** the configured model differs from a row's `embedding_model` → the vector leg ignores the row at once, and C-35 clears its vector at the next worker start and re-embeds it through the normal queue. (State diagram 4)
 
 ## 3. Contracts
 

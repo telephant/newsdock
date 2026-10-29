@@ -131,3 +131,19 @@ def test_model_matches_migration(engine: Engine) -> None:
     with engine.connect() as conn:
         diff = compare_metadata(MigrationContext.configure(conn), metadata)
     assert diff == [], f"schema drift between models and migrations: {diff}"
+
+
+def test_migration_0009_adds_the_partial_queue_index(engine: Engine) -> None:
+    command.upgrade(_config(), "head")
+    with engine.connect() as conn:
+        definition = conn.execute(
+            text(
+                "SELECT indexdef FROM pg_indexes WHERE tablename = 'articles' "
+                "AND indexname = 'ix_articles_unembedded'"
+            )
+        ).scalar_one()
+        version = conn.execute(
+            text("SELECT version_num FROM alembic_version")
+        ).scalar_one()
+    assert "(seq)" in definition and "WHERE (embedding IS NULL)" in definition
+    assert version == "0009"

@@ -25,8 +25,20 @@ class FakeRepo:
         self.exclude_seen: list[frozenset[str]] = []
         self.fail_db = False
         self.refuse_store: set[str] = set()
+        self.events: list[str] = []  # order of invalidate / next_batch calls
+        self.invalidated: list[str] = []
+        self.cleared = 0
+        self.fail_invalidate = False
 
-    def next_batch(self, model: str, limit: int, exclude: frozenset[str]) -> list[Row]:
+    def invalidate_stale(self, model: str) -> int:
+        self.events.append("invalidate")
+        if self.fail_invalidate:
+            raise DbUnavailable("db down")
+        self.invalidated.append(model)
+        return self.cleared
+
+    def next_batch(self, limit: int, exclude: frozenset[str]) -> list[Row]:
+        self.events.append("next_batch")
         if self.fail_db:
             raise DbUnavailable("db down")
         self.exclude_seen.append(exclude)
@@ -139,6 +151,30 @@ def test_a_guarded_store_that_matches_no_row_is_not_counted() -> None:
     repo.refuse_store = {"h1"}  # changed by someone else meanwhile
     result = worker(repo, FakeEmbedder()).run_pass()
     assert result == PassResult("embedded", embedded=1)
+
+
+# F-1 (found at verify): vectors of another model are cleared once, at the start,
+# so the "no vector yet" queue (a partial index) finds them without scanning
+def test_other_model_vectors_are_cleared_once_before_the_first_batch() -> None:
+    repo, embedder = FakeRepo({"h1": "one"}), FakeEmbedder()
+    repo.cleared = 5
+    w = worker(repo, embedder)
+    w.run_pass()
+    w.run_pass()
+    assert repo.invalidated == [MODEL]  # once, with the configured model
+    assert repo.events[:2] == ["invalidate", "next_batch"]
+    assert repo.events.count("invalidate") == 1
+
+
+def test_the_clearing_is_retried_while_the_database_is_down() -> None:
+    repo, embedder = FakeRepo({"h1": "one"}), FakeEmbedder()
+    repo.fail_invalidate = True
+    w = worker(repo, embedder)
+    assert w.run_pass() == PassResult("db_unavailable")
+    assert "next_batch" not in repo.events  # no work before the clearing succeeded
+    repo.fail_invalidate = False
+    assert w.run_pass() == PassResult("embedded", embedded=1)
+    assert repo.invalidated == [MODEL]
 
 
 # TC-19: the loop keeps its heartbeat while Ollama is down and backs off to a cap

@@ -7,6 +7,7 @@ database is a real pgvector Postgres on a side port.
 import json
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -18,7 +19,7 @@ from newsdock_embedder.adapters.ollama import OllamaDocumentEmbedder
 from newsdock_embedder.domain.loop import EmbedWorker
 from newsdock_embedder.domain.selection import SkipList
 from newsdock_embedding.testing import FakeOllama
-from sqlalchemy import Engine, text
+from sqlalchemy import Engine, event, text
 
 pytestmark = pytest.mark.docker
 
@@ -157,3 +158,84 @@ def test_wrong_length_vectors_are_not_stored(engine: Engine) -> None:
     result = make_worker(engine, FakeOllama(dimension=10)).run_pass()
     assert (result.embedded, result.skipped) == (0, 2)
     assert state(engine) == [("h0000", None, None), ("h0001", None, None)]
+
+
+# F-1 (found at verify): vectors of another model are cleared when the worker starts
+def test_other_model_vectors_are_cleared_at_the_start_even_if_ollama_is_down(
+    engine: Engine,
+) -> None:
+    insert(engine, 4)
+    make_worker(engine, FakeOllama(), model="old-model").run_pass()
+    assert {m for _, _, m in state(engine)} == {"old-model"}
+
+    down = FakeOllama(mode="refuse")
+    result = make_worker(engine, down, model="new-model").run_pass()
+    assert result.outcome == "unavailable"
+    # cleared in the first pass, so no row keeps a vector the search would skip
+    assert state(engine) == [(f"h000{i}", None, None) for i in range(4)]
+
+
+def test_the_clearing_leaves_rows_of_the_configured_model_alone(engine: Engine) -> None:
+    insert(engine, 3)
+    make_worker(engine, FakeOllama(), model=MODEL).run_pass()
+    fake = FakeOllama()
+    make_worker(engine, fake, model=MODEL).run_pass()  # a restart with the same model
+    assert fake.requests == []  # nothing cleared, nothing to embed
+    assert {m for _, _, m in state(engine)} == {MODEL}
+
+
+# F-1 (found at verify): finding work must not depend on how many rows are embedded
+def test_the_batch_query_uses_the_partial_index_with_most_rows_embedded(
+    engine: Engine,
+) -> None:
+    rows = 30_000
+    with engine.begin() as conn:
+        conn.execute(text("DROP INDEX ix_articles_embedding_hnsw"))  # setup speed only
+        conn.execute(
+            text(
+                "INSERT INTO articles (url_hash, gkg_record_id, slot, url, title, "
+                "published_at, ingested_at) SELECT 'g' || g, 'r', '20261028120000', "
+                "'https://e.com/' || g, 'Title ' || g, now(), now() "
+                "FROM generate_series(1, :n) g"
+            ),
+            {"n": rows},
+        )
+        # the newest rows are the embedded ones, the oldest 100 are still waiting
+        conn.execute(
+            text(
+                "UPDATE articles SET embedding = cast(:v as vector), "
+                "embedding_model = :m WHERE seq > (SELECT min(seq) + 100 FROM articles)"
+            ),
+            {"v": "[" + ",".join(["0.01"] * 768) + "]", "m": MODEL},
+        )
+        conn.execute(text("ANALYZE articles"))
+    captured: list[tuple[str, Any]] = []
+
+    @event.listens_for(engine, "before_cursor_execute")
+    def grab(conn: Any, cursor: Any, statement: str, params: Any, *rest: Any) -> None:
+        if "FROM articles" in statement and "ORDER BY articles.seq DESC" in statement:
+            captured.append((statement, params))
+
+    try:
+        batch = SqlEmbedRepo(engine).next_batch(32, frozenset())
+        assert len(batch) == 32 and captured
+        statement, params = captured[-1]
+        with engine.connect() as conn:
+            plan = "\n".join(
+                r[0]
+                for r in conn.exec_driver_sql(
+                    "EXPLAIN (ANALYZE, BUFFERS) " + statement, params
+                )
+            )
+        assert "ix_articles_unembedded" in plan, plan
+        assert "Seq Scan" not in plan, plan
+    finally:
+        event.remove(engine, "before_cursor_execute", grab)
+        with engine.begin() as conn:
+            conn.execute(text("TRUNCATE articles CASCADE"))
+            conn.execute(
+                text(
+                    "CREATE INDEX ix_articles_embedding_hnsw ON articles USING hnsw "
+                    "(embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
+                )
+            )
