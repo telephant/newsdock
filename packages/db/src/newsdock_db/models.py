@@ -291,3 +291,31 @@ class UserSession(Base):
         Index("ix_sessions_user_id", "user_id"),
         Index("ix_sessions_expires_at", "expires_at"),
     )
+
+
+class PasswordReset(Base):
+    """The open password reset code of a user (M2f forgot-password, ADR-0026).
+
+    One row per user: a newer request replaces the older code. `code_hash` is a keyed
+    HMAC of the six-digit code, never the code.
+    """
+
+    __tablename__ = "password_resets"
+
+    user_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (Index("ix_password_resets_expires_at", "expires_at"),)

@@ -9,11 +9,11 @@ acs:
   AC-2: {status: in-progress}  # hash and mail text (T-02); store, mailer, routes in T-03/04/06
   AC-3: {status: todo}
   AC-4: {status: todo}
-  AC-5: {status: todo}
-  AC-6: {status: todo}
+  AC-5: {status: in-progress}  # store level (T-04); route in T-06
+  AC-6: {status: in-progress}  # store level (T-04); route in T-06
   AC-7: {status: todo}
-  AC-8: {status: todo}
-  AC-9: {status: todo}
+  AC-8: {status: in-progress}  # store level (T-04); route in T-06
+  AC-9: {status: in-progress}  # store level (T-04); route in T-06
   AC-10: {status: todo}
   AC-11: {status: in-progress}  # limiter (T-02); route in T-06
   AC-12: {status: in-progress}  # limiter (T-02); route in T-06

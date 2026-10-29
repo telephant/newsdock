@@ -166,7 +166,7 @@ def test_migrate_twice_keeps_one_revision_and_the_extension(
     assert make("up").returncode == 0  # includes the first migrate run
     second = make("migrate")
     assert second.returncode == 0, second.stdout + second.stderr
-    assert psql("select version_num from alembic_version") == "0009"  # M3 head
+    assert psql("select version_num from alembic_version") == "0010"  # M2f head
     assert psql("select extname from pg_extension where extname='vector'") == "vector"
 
 
