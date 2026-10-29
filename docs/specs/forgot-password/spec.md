@@ -227,3 +227,6 @@ Provisional targets (config values with these defaults; measure or reconsider be
 | CSPRNG | A random generator safe for secrets (`secrets` in Python) |
 | Brevo | An email service whose free plan includes an SMTP relay (300 mails a day) |
 | Mailer port | The interface the domain uses to send mail, implemented by SMTP or a test fake |
+| HMAC | A hash computed with a secret key: without the key nobody can recompute or check it, which is why a stolen table of hashed 6-digit codes is useless |
+| Upsert | Insert a row, or update it if one already exists; here it makes a new code replace the old one |
+| Background task | Work the server does after it has already sent the HTTP response |
