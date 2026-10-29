@@ -79,6 +79,19 @@ The UI needs a login. Open **http://127.0.0.1:3000** (the compose default; `http
 - **Reads are no longer open:** `GET /api/articles*` accepts a browser session or an agent key. `api.auth_required: false` (with `web.login_required: false`) switches login off for local experiments.
 - Passwords are hashed with argon2id; sessions are server-side (12 h idle, 7 days absolute, both in the config file); five wrong passwords for one account lock it for 15 minutes.
 
+## Password reset by email (M2f)
+
+A user who forgot their password can ask for a 6-digit code by email on `/forgot-password`, then set a new one on `/reset-password`. The code works once, for `auth_reset_code_minutes` (15), and dies after `auth_reset_max_attempts` (5) wrong tries. A reset ends all of that user's sessions and lifts a login lockout. **The feature is off until you configure mail**: without it the routes answer 503 `password_reset_unavailable` and the login page shows no link (`GET /api/auth/options` says `password_reset_enabled: false`). The operator path `make user-reset-password` is unchanged.
+
+Any SMTP server works; the provider is only settings. With a free [Brevo](https://www.brevo.com) account (values below are from secondary sources, not checked against Brevo's current pages):
+
+1. Create the account, verify one sender address, and create an SMTP key (Brevo: SMTP & API).
+2. In `infra/config/newsdock.yaml`, section `api:`: `smtp_host: smtp-relay.brevo.com`, `smtp_port: 587`, `smtp_security: starttls`, `smtp_user: <your SMTP login>`, `mail_from: <the verified sender>`.
+3. In `.env` (never in the file): `NEWSDOCK_SMTP_PASSWORD=<the SMTP key>` and `NEWSDOCK_RESET_CODE_SECRET=$(openssl rand -hex 32)` (at least 32 characters; it keys the stored code hash, so changing it voids open codes).
+4. `docker compose --env-file .env -f infra/compose.yaml up -d api`, then check `curl http://127.0.0.1:8000/api/auth/options`.
+
+The same settings fit Gmail with an app password (`smtp.gmail.com`, 587, `starttls`) or Resend's SMTP. `smtp_security: ssl` is for port 465; `none` is accepted only for a loopback host (a local test server) and never with a login. Notes: mail is sent after the HTTP response, so a known and an unknown address answer the same way and at the same speed; the request limits (`auth_reset_max_per_email` 3, `auth_reset_max_per_address` 20, `auth_reset_max_tries_per_address` 20 per `auth_reset_window_minutes` 60) are in memory in the one API process; the code is never logged. Migration `0010` creates the `password_resets` table (`make migrate`). Details: [spec](docs/specs/forgot-password/spec.md), [ADR-0026](docs/adr/0026-reset-codes-keyed-hash-single-row.md), [ADR-0027](docs/adr/0027-reset-mail-over-smtp-after-the-response.md); a manual check with a real account is listed in [tests.md](docs/specs/forgot-password/tests.md).
+
 ## Agents and API keys (M2)
 
 MCP (`/mcp`) needs an agent API key; `api.auth_required` in the config file (default `true`) turns that off for local experiments. Agents are registered by a signed-in user (in the UI at `/admin/agents`) or by the operator with the admin token below. **Each agent belongs to the user who created it:** a user sees and manages only their own agents, keys and subscriptions, and the `owner` role sees all of them. Agents made with the admin token (`make agent-create`), agents from before ownership existed (for example `demo-financial`) and agents whose creator was deleted have **no owner**: they keep working, but only the `owner` role (in the UI) and the admin token can manage them.
