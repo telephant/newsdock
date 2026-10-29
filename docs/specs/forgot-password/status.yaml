@@ -19,6 +19,6 @@ acs:
   AC-12: {status: passing}
   AC-13: {status: in-progress}  # routes and settings pass (T-05, T-06); README in T-08
   AC-14: {status: passing}
-  AC-15: {status: todo}
-  AC-16: {status: todo}
+  AC-15: {status: passing}
+  AC-16: {status: passing}
   AC-17: {status: passing}

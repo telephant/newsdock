@@ -41,7 +41,9 @@ test("a good login posts the credentials and goes to the page asked for", async 
   );
   submit();
   await vi.waitFor(() => expect(navigate).toHaveBeenCalledWith("/live"));
-  const [url, init] = fetchMock.mock.calls[0];
+  const [url, init] = fetchMock.mock.calls.filter(
+    ([u]) => !u.endsWith("/api/auth/options"),
+  )[0];
   expect(url).toBe("http://127.0.0.1:8000/api/auth/login");
   expect(init?.method).toBe("POST");
   expect(init?.credentials).toBe("include");
@@ -130,7 +132,9 @@ test("the button is disabled while a login is in flight (no double submit)", asy
     expect((button as HTMLButtonElement).disabled).toBe(true),
   );
   fireEvent.click(button);
-  expect(fetchMock).toHaveBeenCalledTimes(1);
+  expect(
+    fetchMock.mock.calls.filter(([u]) => u.endsWith("/api/auth/login")),
+  ).toHaveLength(1);
   release(json({ detail: "invalid_credentials" }, 401));
   await screen.findByRole("alert");
 });
@@ -160,6 +164,38 @@ test("the error is inside the form and marks both fields invalid", async () => {
     expect(field.getAttribute("aria-invalid")).toBe("true");
     expect(field.getAttribute("aria-describedby")).toBe(alert.id);
   }
+});
+
+// TC-16 (AC-15): the link shows only when the server says the feature is on.
+function withOptions(answer: () => Response | Promise<Response>) {
+  const fetchMock = vi.fn(async (url: string) =>
+    String(url).endsWith("/api/auth/options") ? answer() : json({}),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  render(<LoginForm next="/" navigate={vi.fn()} />);
+  return fetchMock;
+}
+
+test("the forgot-password link appears when the options say enabled", async () => {
+  withOptions(() => json({ password_reset_enabled: true }));
+  const link = await screen.findByRole("link", { name: /forgot password/i });
+  expect(link.getAttribute("href")).toBe("/forgot-password");
+});
+
+test.each([
+  ["disabled", () => json({ password_reset_enabled: false })],
+  ["an error", () => json({ detail: "x" }, 500)],
+  [
+    "no answer",
+    () => {
+      throw new TypeError("Failed to fetch");
+    },
+  ],
+])("no forgot-password link when the options give %s", async (_n, answer) => {
+  const fetchMock = withOptions(answer);
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  await new Promise((r) => setTimeout(r, 0));
+  expect(screen.queryByRole("link", { name: /forgot password/i })).toBeNull();
 });
 
 test("while in flight the button reads 'Logging in…' and the form is busy", async () => {

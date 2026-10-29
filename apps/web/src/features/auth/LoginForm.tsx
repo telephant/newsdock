@@ -3,7 +3,7 @@
 // the session state and the gate start fresh. Errors are shown as text, one generic
 // message for wrong credentials (the API gives the same answer for unknown emails).
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRuntimeConfig } from "@/components/ConfigProvider";
 import { apiRequest } from "@/lib/client/api";
 import { CredentialForm, footerLink } from "./CredentialForm";
@@ -21,6 +21,23 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [resetOffered, setResetOffered] = useState(false);
+
+  // The link shows only when the server has the feature on; any failure means no link.
+  useEffect(() => {
+    let live = true;
+    apiRequest<{ password_reset_enabled: boolean }>(
+      { apiBaseUrl },
+      "/api/auth/options",
+    ).then((result) => {
+      if (live && result.kind === "ok") {
+        setResetOffered(result.data.password_reset_enabled === true);
+      }
+    });
+    return () => {
+      live = false;
+    };
+  }, [apiBaseUrl]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -59,6 +76,14 @@ export function LoginForm({
           <Link href="/signup" className={footerLink}>
             Sign up
           </Link>
+          {resetOffered ? (
+            <>
+              {" · "}
+              <Link href="/forgot-password" className={footerLink}>
+                Forgot password?
+              </Link>
+            </>
+          ) : null}
         </>
       }
     />
