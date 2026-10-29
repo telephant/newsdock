@@ -190,6 +190,8 @@ services:
       NEWSDOCK_PORT: 8000  # pinned: the published mapping above targets 8000
       OLLAMA_URL: http://host.docker.internal:11434  # semantic_search embeds the query
       NEWSDOCK_ADMIN_TOKEN: ${NEWSDOCK_ADMIN_TOKEN:-}  # secret (.env); empty = admin routes off
+      NEWSDOCK_SMTP_PASSWORD: ${NEWSDOCK_SMTP_PASSWORD:-}  # secret (.env); empty = no SMTP login
+      NEWSDOCK_RESET_CODE_SECRET: ${NEWSDOCK_RESET_CODE_SECRET:-}  # secret (.env), >= 32 chars; empty = password reset off
     volumes:
       - *config-volume
     depends_on:

@@ -59,6 +59,18 @@ api:
   auth_signup_max_total: 50           # counted sign-ups from all addresses per window (429 above); 0 = off
   auth_signup_window_minutes: 60      # length of both sign-up windows
   agents_max_per_user: 10             # agents one non-owner user may own (409 above); 0 = off
+  smtp_host: ""                       # empty = password reset by email is off (forgot-password)
+  smtp_port: 587
+  smtp_security: starttls             # starttls | ssl | none (none: loopback hosts only)
+  smtp_user: ""                       # empty = no login (a relay); the password is env only
+  mail_from: ""                       # sender address of the reset mail
+  smtp_timeout_seconds: 10
+  auth_reset_code_minutes: 15         # how long a reset code works
+  auth_reset_max_attempts: 5          # wrong codes before the code is dead
+  auth_reset_max_per_email: 3         # code requests per mailbox per window (silent above)
+  auth_reset_max_per_address: 20      # code requests per client address per window (429 above)
+  auth_reset_max_tries_per_address: 20  # code submissions per client address per window (429 above)
+  auth_reset_window_minutes: 60
   cors_allow_cookies: true        # the web UI sends the session cookie (ADR-0021)
   cors_allow_methods: GET,POST,PATCH,DELETE
   cors_allow_headers: Content-Type,Last-Event-ID   # explicit: no wildcard with cookies

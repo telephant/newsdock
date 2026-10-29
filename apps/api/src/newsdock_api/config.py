@@ -3,10 +3,12 @@
 from datetime import timedelta
 
 from newsdock_config import LayeredSettings
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from newsdock_api.domain.service import ServiceLimits
+
+LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 class Settings(LayeredSettings):
@@ -79,8 +81,61 @@ class Settings(LayeredSettings):
         default="http://127.0.0.1:11434",
         validation_alias=AliasChoices("OLLAMA_URL", "NEWSDOCK_EMBEDDING_OLLAMA_URL"),
     )
+    # Password reset by email (forgot-password, ADR-0026/0027). The two secrets come
+    # from the environment only; the feature is off until host, sender and a secret.
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_security: str = "starttls"  # starttls | ssl | none (none: loopback hosts only)
+    smtp_user: str = ""
+    mail_from: str = ""
+    smtp_timeout_seconds: float = 10
+    auth_reset_code_minutes: int = 15
+    auth_reset_max_attempts: int = 5  # wrong codes per issued code
+    auth_reset_max_per_email: int = 3  # code requests per mailbox per window
+    auth_reset_max_per_address: int = 20  # code requests per client address per window
+    auth_reset_max_tries_per_address: int = 20  # code submissions per client address
+    auth_reset_window_minutes: int = 60
+    smtp_password: SecretStr | None = None
+    reset_code_secret: SecretStr | None = None
     uvicorn_workers: int = 1
     uvicorn_log_level: str = "info"
+
+    @field_validator("smtp_password", "reset_code_secret", mode="before")
+    @classmethod
+    def _blank_secret_is_unset(cls, value: object) -> object:
+        # compose passes `${VAR:-}`, an empty string when the variable is unset
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @model_validator(mode="after")
+    def _check_reset_settings(self) -> "Settings":
+        if self.smtp_security not in ("starttls", "ssl", "none"):
+            raise ValueError("smtp_security must be starttls, ssl or none")
+        if self.reset_code_secret is not None and (
+            len(self.reset_code_secret.get_secret_value()) < 32
+        ):
+            raise ValueError("reset_code_secret must be at least 32 characters")
+        if self.smtp_security == "none":
+            if self.smtp_host.strip() and self.smtp_host.strip() not in LOOPBACK_HOSTS:
+                raise ValueError(
+                    "smtp_security none is allowed for loopback hosts only"
+                )
+            if self.smtp_user or self.smtp_password is not None:
+                raise ValueError(
+                    "credentials are never sent over plain smtp_security none"
+                )
+        return self
+
+    @property
+    def password_reset_enabled(self) -> bool:
+        return bool(
+            self.smtp_host.strip() and self.mail_from.strip() and self.reset_code_secret
+        )
+
+    @property
+    def reset_window_seconds(self) -> int:
+        return self.auth_reset_window_minutes * 60
 
     def limits(self) -> ServiceLimits:
         return ServiceLimits(
