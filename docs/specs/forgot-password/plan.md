@@ -64,4 +64,4 @@ Tests written first and green · `make check-python` (and `make check-web` for T
 
 ## Progress
 
-(filled by `/spec-implement`)
+- T-01 ✅ 2026-10-29 — spike, findings in [spike.md](spike.md); no production code. Verified: a standard-library SMTP stub (EHLO, MAIL FROM, RCPT TO, DATA, QUIT) accepts `smtplib.send_message` with headers and a dot-leading body line intact, and `login` against a server without AUTH raises `SMTPNotSupportedError` (the adapter must skip login when no user is set); under uvicorn a sync route returns in 28 ms while its `BackgroundTasks` job is still blocked (R-1 retired, ADR-0027 stands), whereas `TestClient` waits for the job (1,007 ms), so only AC-1 needs the live-server test; `SignupLimiter(M, 0, window)` is a per-key counter (refuses call M+1, independent keys, retry-after > 0, 0 = off); `request.client.host` is the socket peer under uvicorn and settable in `TestClient`. No change to spec, design or ADRs. Not verified by design: a real provider.
