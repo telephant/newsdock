@@ -1,0 +1,23 @@
+feature: what-happen
+stage: done
+updated: 2026-10-30
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided, D-7: decided, D-8: decided, D-9: decided}
+# D-1, D-2, D-3 answered by the user (2026-10-30); D-4…D-9 are conventional defaults recorded for review
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}
+acs:
+  AC-1: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-2: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-3: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-4: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-5: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-6: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-7: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-8: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-9: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-10: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-11: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-12: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-13: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-14: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-15: {status: passing}  # verified 2026-10-30, see verify.md
+  AC-16: {status: manual-ok}  # verified 2026-10-30; the owner's browser link check is follow-up F-1 in verify.md
