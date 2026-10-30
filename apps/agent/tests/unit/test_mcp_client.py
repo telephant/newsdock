@@ -42,6 +42,27 @@ def test_other_failures_pass_through(monkeypatch: pytest.MonkeyPatch) -> None:
         client.list_new_articles(10)
 
 
+def test_tc3_list_sends_the_cursor_only_when_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake(self: McpApiClient, tool: str, arguments: dict[str, Any]) -> Any:
+        calls.append((tool, arguments))
+        return {"articles": [{"article_id": "a"}], "next_cursor": "c2"}
+
+    monkeypatch.setattr(McpApiClient, "_raw_call", fake)
+    client = McpApiClient("http://api/mcp", api_key=None)
+    assert client.list_new_articles(200) == ([{"article_id": "a"}], "c2")
+    client.list_new_articles(200, cursor="c2")
+    client.list_new_articles(200, cursor=None)
+    assert calls == [
+        ("list_new_articles", {"limit": 200}),
+        ("list_new_articles", {"limit": 200, "cursor": "c2"}),
+        ("list_new_articles", {"limit": 200}),
+    ]
+
+
 def test_list_has_no_cursor_argument_and_ack_calls_the_tool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

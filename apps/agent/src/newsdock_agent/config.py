@@ -40,6 +40,25 @@ class Settings(LayeredSettings):
     export_limit: int = 100
     export_timeout_seconds: float = 30.0
 
+    # M2g what-happen (the hourly digest, `python -m newsdock_agent.digest`); the
+    # digest service has its own API key, so its cursor is separate (ADR-0028).
+    digest_interval_seconds: int = 3600
+    digest_dir: str = "infra/digests"  # compose mounts it at /digests
+    digest_state_file: str = "infra/digests/digest-baseline.json"
+    digest_model: str = "qwen3:4b-instruct"
+    digest_max_themes: int = 8
+    digest_stories_per_theme: int = 3
+    digest_prompt_titles: int = 3  # = stories shown, so a summary can be checked
+    digest_min_theme_count: int = 5
+    digest_skip_theme_prefixes: str = (
+        "TAX_,WB_,EPU_,CRISISLEX_,USPEC_,UNGP_,GENERAL_,MEDIA_,SOC_,LEADER,AFFECT"
+    )
+    digest_max_articles: int = 20000
+    digest_baseline_hours: int = 24
+    digest_baseline_min_entries: int = 3
+    digest_baseline_themes_kept: int = 2000
+    digest_summary_max_chars: int = 300
+
     @model_validator(mode="after")
     def _derive_heartbeat_max_age(self) -> "Settings":
         if self.heartbeat_max_age_seconds <= 0:
@@ -49,3 +68,15 @@ class Settings(LayeredSettings):
     @property
     def prefixes(self) -> tuple[str, ...]:
         return tuple(p for p in self.theme_prefixes.split(",") if p)
+
+    @property
+    def digest_skip_prefixes(self) -> tuple[str, ...]:
+        return tuple(p for p in self.digest_skip_theme_prefixes.split(",") if p)
+
+    @property
+    def digest_heartbeat_max_age_seconds(self) -> int:
+        """Twice the interval plus the worst case of one cycle's model calls."""
+        return int(
+            2 * self.digest_interval_seconds
+            + self.ollama_timeout_seconds * self.digest_max_themes
+        )

@@ -146,3 +146,76 @@ def test_api_key_default_and_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_cursor_file_setting_is_gone() -> None:
     assert not hasattr(Settings(), "cursor_file")
+
+
+# M2g what-happen (TC-21): digest settings, defaults from design-detail §1
+DIGEST_DEFAULTS = {
+    "digest_interval_seconds": 3600,
+    "digest_dir": "infra/digests",
+    "digest_state_file": "infra/digests/digest-baseline.json",
+    "digest_model": "qwen3:4b-instruct",
+    "digest_max_themes": 8,
+    "digest_stories_per_theme": 3,
+    "digest_prompt_titles": 3,
+    "digest_min_theme_count": 5,
+    "digest_skip_theme_prefixes": (
+        "TAX_,WB_,EPU_,CRISISLEX_,USPEC_,UNGP_,GENERAL_,MEDIA_,SOC_,LEADER,AFFECT"
+    ),
+    "digest_max_articles": 20000,
+    "digest_baseline_hours": 24,
+    "digest_baseline_min_entries": 3,
+    "digest_baseline_themes_kept": 2000,
+    "digest_summary_max_chars": 300,
+}
+
+
+def test_digest_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    s = Settings()
+    for name, value in DIGEST_DEFAULTS.items():
+        assert getattr(s, name) == value, name
+
+
+def test_digest_file_rows_equal_the_code_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("NEWSDOCK_CONFIG_FILE", str(ROOT / "infra/config/newsdock.yaml"))
+    s = Settings()
+    for name, value in DIGEST_DEFAULTS.items():
+        assert getattr(s, name) == value, name
+
+
+def test_digest_file_value_and_env_override(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, monkeypatch, "agent:\n  digest_max_themes: 5\n  digest_dir: /x\n")
+    assert (Settings().digest_max_themes, Settings().digest_dir) == (5, "/x")
+    monkeypatch.setenv("NEWSDOCK_AGENT_DIGEST_MAX_THEMES", "3")
+    assert Settings().digest_max_themes == 3
+
+
+def test_digest_skip_prefixes_split_and_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert Settings().digest_skip_prefixes[:2] == ("TAX_", "WB_")
+    write(tmp_path, monkeypatch, 'agent:\n  digest_skip_theme_prefixes: ""\n')
+    assert Settings().digest_skip_prefixes == ()
+
+
+def test_digest_heartbeat_age_fits_an_hourly_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    s = Settings()
+    # twice the interval plus the worst-case model time of one cycle
+    assert s.digest_heartbeat_max_age_seconds == 2 * 3600 + 120 * 8
+    # the scoring loop's own age is untouched
+    assert s.heartbeat_max_age_seconds == 120
+    write(tmp_path, monkeypatch, "agent:\n  digest_interval_seconds: 600\n")
+    assert Settings().digest_heartbeat_max_age_seconds == 2 * 600 + 120 * 8
+
+
+def test_digest_settings_still_reject_database_and_kafka(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, monkeypatch, "agent:\n  digest_database_url: x\n")
+    with pytest.raises(ConfigError, match="digest_database_url"):
+        Settings()
