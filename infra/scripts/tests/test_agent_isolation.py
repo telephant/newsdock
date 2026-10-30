@@ -51,6 +51,16 @@ def test_agent_has_no_db_or_kafka_env(stack: None) -> None:
     assert "MCP_URL" in env_text and "OLLAMA_URL" in env_text
 
 
+# what-happen (AC-15): the digest container has the agent's isolation and its own key
+def test_digest_has_no_db_or_kafka_env(stack: None) -> None:
+    result = _exec("digest", "env")
+    assert result.returncode == 0, result.stderr
+    assert "DATABASE_URL" not in result.stdout
+    assert "KAFKA" not in result.stdout
+    assert "POSTGRES" not in result.stdout
+    assert "MCP_URL" in result.stdout and "OLLAMA_URL" in result.stdout
+
+
 PROBE = (
     "import socket,sys\n"
     "try:\n"
@@ -61,29 +71,34 @@ PROBE = (
 )
 
 
+@pytest.mark.parametrize("service", ["agent", "digest"])
 @pytest.mark.parametrize("host,port", [("postgres", 5432), ("kafka", 9092)])
-def test_agent_cannot_reach_data_services(stack: None, host: str, port: int) -> None:
-    probe = _exec("agent", "python", "-c", PROBE.format(host=host, port=port))
-    assert probe.returncode != 0, f"agent reached {host}:{port}"
+def test_agent_cannot_reach_data_services(
+    stack: None, service: str, host: str, port: int
+) -> None:
+    probe = _exec(service, "python", "-c", PROBE.format(host=host, port=port))
+    assert probe.returncode != 0, f"{service} reached {host}:{port}"
 
 
-def test_agent_reaches_the_api(stack: None) -> None:
-    probe = _exec("agent", "python", "-c", PROBE.format(host="api", port=8000))
-    assert probe.returncode == 0, "agent cannot reach the api service"
+@pytest.mark.parametrize("service", ["agent", "digest"])
+def test_agent_reaches_the_api(stack: None, service: str) -> None:
+    probe = _exec(service, "python", "-c", PROBE.format(host="api", port=8000))
+    assert probe.returncode == 0, f"{service} cannot reach the api service"
 
 
 # TC-33 / externalize-config TC-22: the app healthcheck passes on a fresh heartbeat
 # (max age written by the worker itself) and fails on a stale one
 @pytest.mark.parametrize(
-    "service", ["ingester", "processor", "sink", "agent", "embedder"]
+    "service", ["ingester", "processor", "sink", "agent", "digest", "embedder"]
 )
 def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
-    check = f"python -m newsdock_{service}.adapters.healthcheck"
+    app = "agent" if service == "digest" else service  # same image and module
+    check = f"python -m newsdock_{app}.adapters.healthcheck"
     fresh = _exec(service, "sh", "-c", check)
     assert fresh.returncode == 0, f"{service}: heartbeat missing or stale"
     # The worker rewrites /tmp/healthy every loop, so back-dating that file races
     # with it. Point the check at a separate file nobody touches instead.
-    prefix = "NEWSDOCK_AGENT_" if service == "agent" else "NEWSDOCK_"
+    prefix = "NEWSDOCK_AGENT_" if app == "agent" else "NEWSDOCK_"
     stale = _exec(
         service,
         "sh",
@@ -94,7 +109,7 @@ def test_heartbeat_check_fresh_vs_stale(stack: None, service: str) -> None:
     assert stale.returncode != 0, f"{service}: stale heartbeat passed the check"
 
 
-def test_all_nine_services_report_healthy(stack: None) -> None:
+def test_all_ten_services_report_healthy(stack: None) -> None:
     result = _compose("ps", "--format", "json")
     rows = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
     states = {
@@ -104,7 +119,7 @@ def test_all_nine_services_report_healthy(stack: None) -> None:
     }
     assert set(states) == {
         "kafka", "postgres", "ingester", "processor", "sink", "embedder", "api",
-        "agent", "web",
+        "agent", "digest", "web",
     }  # fmt: skip
     unhealthy = {s: h for s, h in states.items() if h != "healthy"}
     assert not unhealthy, f"not healthy: {unhealthy}"

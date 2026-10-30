@@ -226,6 +226,34 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+  digest:  # what-happen (M2g, ADR-0028): same image as `agent`, own command, own key
+    build:
+      context: ..
+      dockerfile: apps/agent/Dockerfile
+    image: newsdock-agent:dev
+    profiles: [apps]
+    restart: unless-stopped
+    command: ["python", "-m", "newsdock_agent.digest"]
+    networks: [agent]  # no route to postgres or kafka (AC-13, AC-15)
+    environment:
+      <<: *config-file
+      MCP_URL: http://api:8000/mcp
+      OLLAMA_URL: http://host.docker.internal:11434
+      NEWSDOCK_AGENT_API_KEY: ${NEWSDOCK_DIGEST_API_KEY:-}  # its own agent: `make agent-create NAME=whathappen`
+      NEWSDOCK_AGENT_DIGEST_DIR: /digests
+      NEWSDOCK_AGENT_DIGEST_STATE_FILE: /data/digest-baseline.json
+    volumes:
+      - *config-volume
+      - ./digests:/digests  # infra/digests on the host (git-ignored): open the files there
+      - digest_state:/data
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "newsdock_agent.adapters.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
   web:
     build:
       context: ..
@@ -255,3 +283,4 @@ networks:
 
 volumes:
   pgdata:
+  digest_state: {}  # the what-happen theme baseline (a cache; losing it means a cold start)

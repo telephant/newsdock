@@ -9,7 +9,7 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/compose.yaml
 .PHONY: doctor help setup setup-python setup-web test lint-python types-python
 .PHONY: imports-python layout-python config-python check-python style-web check-web check test-rules
 .PHONY: build up down topics migrate docs-check test-infra test-rules-python
-.PHONY: user-reset-password
+.PHONY: user-reset-password digest-once
 
 doctor: ## Check the required tools are installed (docker, uv, pnpm, ollama)
 	@bash infra/scripts/doctor.sh
@@ -134,6 +134,14 @@ agent-create: ## Register an agent and print its API key once: make agent-create
 	  curl -fsS -X POST "http://127.0.0.1:$${API_PORT:-8000}/api/admin/agents" \
 	    -H "Authorization: Bearer $$NEWSDOCK_ADMIN_TOKEN" -H "Content-Type: application/json" \
 	    -d '{"name":"$(NAME)"}' && echo
+
+digest-once: ## One what-happen digest cycle on the host, written to infra/digests (needs the api up, Ollama running, NEWSDOCK_DIGEST_API_KEY in .env)
+	@test -f .env || { echo "missing .env: cp .env.example .env" >&2; exit 1; }
+	@set -a; . ./.env; set +a; \
+	  test -n "$$NEWSDOCK_DIGEST_API_KEY" || { echo "set NEWSDOCK_DIGEST_API_KEY in .env first (make agent-create NAME=whathappen)" >&2; exit 1; }; \
+	  mkdir -p infra/digests; \
+	  MCP_URL="http://127.0.0.1:$${API_PORT:-8000}/mcp" NEWSDOCK_AGENT_API_KEY="$$NEWSDOCK_DIGEST_API_KEY" \
+	    uv run --package newsdock-agent python -m newsdock_agent.digest --once
 
 user-reset-password: ## Owner recovery, set a user's password (prompts, never echoed): make user-reset-password EMAIL=<email> (needs NEWSDOCK_ADMIN_TOKEN in .env and the api up)
 	@bash infra/scripts/user_reset_password.sh "$(EMAIL)"
