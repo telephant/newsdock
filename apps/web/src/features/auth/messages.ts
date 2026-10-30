@@ -25,6 +25,41 @@ export function loginMessage(failure: Failure): string {
   return `Something went wrong (${failure.detail}).`;
 }
 
+function waitText(failure: { retryAfter?: number }): string {
+  return failure.retryAfter
+    ? ` in ${formatWait(failure.retryAfter)}`
+    : " later";
+}
+
+export function forgotMessage(failure: Failure): string {
+  if (failure.kind === "unreachable") return UNREACHABLE;
+  if (failure.status === 429)
+    return `Too many requests. Try again${waitText(failure)}.`;
+  if (failure.status === 422) return "Enter a valid email address.";
+  if (failure.status === 503) {
+    return "Password reset is not available on this server. Ask an owner to reset it.";
+  }
+  return `Something went wrong (${failure.detail}).`;
+}
+
+export function resetMessage(failure: Failure): string {
+  if (failure.kind === "unreachable") return UNREACHABLE;
+  if (failure.status === 400) {
+    return "The code is wrong or has expired.";
+  }
+  if (failure.status === 429)
+    return `Too many attempts. Try again${waitText(failure)}.`;
+  if (failure.status === 422) {
+    return failure.detail === "invalid_email"
+      ? "Enter a valid email address."
+      : "The password length is not accepted: use 10 to 128 characters (the minimum is set by the server).";
+  }
+  if (failure.status === 503) {
+    return "Password reset is not available on this server. Ask an owner to reset it.";
+  }
+  return `Something went wrong (${failure.detail}).`;
+}
+
 export function signupMessage(failure: Failure): string {
   if (failure.kind === "unreachable") return UNREACHABLE;
   if (failure.status === 429) {

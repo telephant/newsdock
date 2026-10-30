@@ -1,6 +1,5 @@
 """TC-3 (schema), TC-5 (first owner), repo halves of TC-15 and TC-26 (Docker)."""
 
-import subprocess
 import threading
 from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
@@ -22,43 +21,18 @@ from sqlalchemy.exc import IntegrityError
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-login-test"
 NOW = datetime(2026, 10, 27, 12, 0, 0, tzinfo=UTC)
 IDLE = timedelta(hours=12)
 NO_SUCH_UUID = "00000000-0000-0000-0000-000000000000"
 
 
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-
-
 @pytest.fixture(scope="module")
-def engine() -> Iterator[Engine]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
+    url = side_db[0]
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
     eng = make_engine(url)
     yield eng
     eng.dispose()
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 @pytest.fixture()

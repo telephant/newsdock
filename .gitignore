@@ -4,6 +4,9 @@
 !.env.example
 CLAUDE.local.md
 
+# what-happen digest output and its local state (infra/compose.yaml mounts it)
+infra/digests/
+
 # python
 __pycache__/
 *.pyc

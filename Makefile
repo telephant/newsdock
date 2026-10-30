@@ -1,5 +1,5 @@
 # newsdock command runner. Plain GNU Make 3.81 syntax only (no .ONESHELL, no $(file ...)).
-PYTHON_APPS := ingester processor sink api agent
+PYTHON_APPS := ingester processor sink api agent embedder
 APPS_DIR ?= apps
 WEB := pnpm --dir apps/web
 # Compose reads .env when present, else the placeholder .env.example (enough for build, down).
@@ -9,7 +9,7 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f infra/compose.yaml
 .PHONY: doctor help setup setup-python setup-web test lint-python types-python
 .PHONY: imports-python layout-python config-python check-python style-web check-web check test-rules
 .PHONY: build up down topics migrate docs-check test-infra test-rules-python
-.PHONY: user-reset-password
+.PHONY: user-reset-password digest-once
 
 doctor: ## Check the required tools are installed (docker, uv, pnpm, ollama)
 	@bash infra/scripts/doctor.sh
@@ -84,6 +84,7 @@ build: ## Build app images: make build [APP=<name>] (no .env needed)
 #   kafka     raw publish + processor routing        (Kafka only, ~1 min)
 #   sink      dedup, retention, poison fallback      (Postgres, ~30 s)
 #   api       MCP tools, REST, cursor, CORS          (Postgres, ~30 s)
+#   embedder  embed worker, fake Ollama              (Postgres, ~30 s)
 #   pipeline  ingest -> process -> store re-ingest   (Postgres, ~40 s)
 #   e2e       full 8-service stack, agent isolation  (~2 min, builds images)
 #   stack     M0 make up/down lifecycle              (~2.5 min)
@@ -92,19 +93,23 @@ SCENE ?=
 SCENE_db       := packages/db
 SCENE_kafka    := apps/ingester/tests/integration apps/processor/tests/integration
 SCENE_sink     := apps/sink/tests/integration
-SCENE_api      := apps/api/tests/integration
+SCENE_api      := apps/api/tests/integration apps/api/tests/eval
+SCENE_embedder := apps/embedder/tests/integration
 SCENE_pipeline := infra/scripts/tests/test_reingest.py infra/scripts/tests/test_story_agent.py
 SCENE_e2e      := infra/scripts/tests/test_agent_isolation.py
 SCENE_stack    := infra/scripts/tests/test_stack.py
 SCENE_images   := infra/scripts/tests/test_images.py
 
-test-infra: ## Docker tests; all scenes, or one: make test-infra SCENE=<db|kafka|sink|api|pipeline|e2e|stack|images>
+test-infra: ## Docker tests; all scenes, or one: make test-infra SCENE=<db|kafka|sink|api|embedder|pipeline|e2e|stack|images>
 ifeq ($(SCENE),)
 	uv run pytest -m docker
 else
-	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api pipeline e2e stack images)" >&2; exit 2; }
+	@test -n "$(SCENE_$(SCENE))" || { echo "unknown scene '$(SCENE)' (scenes: db kafka sink api embedder pipeline e2e stack images)" >&2; exit 2; }
 	uv run pytest -m docker $(SCENE_$(SCENE))
 endif
+
+eval-search: ## Search recall@5 and MRR for keyword, vector and hybrid, real model (needs Docker, Ollama with nomic-embed-text)
+	uv run pytest -m "docker and ollama" apps/api/tests/eval -s
 
 up: ## Start Kafka and Postgres, wait until healthy (needs .env)
 	@test -f .env || { echo "missing .env: copy .env.example to .env (cp .env.example .env)" >&2; exit 1; }
@@ -129,6 +134,14 @@ agent-create: ## Register an agent and print its API key once: make agent-create
 	  curl -fsS -X POST "http://127.0.0.1:$${API_PORT:-8000}/api/admin/agents" \
 	    -H "Authorization: Bearer $$NEWSDOCK_ADMIN_TOKEN" -H "Content-Type: application/json" \
 	    -d '{"name":"$(NAME)"}' && echo
+
+digest-once: ## One what-happen digest cycle on the host, written to infra/digests (needs the api up, Ollama running, NEWSDOCK_DIGEST_API_KEY in .env)
+	@test -f .env || { echo "missing .env: cp .env.example .env" >&2; exit 1; }
+	@set -a; . ./.env; set +a; \
+	  test -n "$$NEWSDOCK_DIGEST_API_KEY" || { echo "set NEWSDOCK_DIGEST_API_KEY in .env first (make agent-create NAME=whathappen)" >&2; exit 1; }; \
+	  mkdir -p infra/digests; \
+	  MCP_URL="http://127.0.0.1:$${API_PORT:-8000}/mcp" NEWSDOCK_AGENT_API_KEY="$$NEWSDOCK_DIGEST_API_KEY" \
+	    uv run --package newsdock-agent python -m newsdock_agent.digest --once
 
 user-reset-password: ## Owner recovery, set a user's password (prompts, never echoed): make user-reset-password EMAIL=<email> (needs NEWSDOCK_ADMIN_TOKEN in .env and the api up)
 	@bash infra/scripts/user_reset_password.sh "$(EMAIL)"

@@ -281,6 +281,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/auth/options": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Options */
+    get: operations["options_api_auth_options_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/forgot-password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Forgot Password */
+    post: operations["forgot_password_api_auth_forgot_password_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/reset-password": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reset Password */
+    post: operations["reset_password_api_auth_reset_password_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/subscriptions": {
     parameters: {
       query?: never;
@@ -484,6 +535,11 @@ export interface components {
        */
       source_count: number;
     };
+    /** AuthOptions */
+    AuthOptions: {
+      /** Password Reset Enabled */
+      password_reset_enabled: boolean;
+    };
     /** Credentials */
     Credentials: {
       /** Email */
@@ -500,6 +556,11 @@ export interface components {
       articles: components["schemas"]["ArticleSummary"][];
       /** Next Before */
       next_before: string | null;
+    };
+    /** ForgotBody */
+    ForgotBody: {
+      /** Email */
+      email: string;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -572,6 +633,15 @@ export interface components {
       email: string;
       /** Role */
       role: string;
+    };
+    /** ResetBody */
+    ResetBody: {
+      /** Email */
+      email: string;
+      /** Code */
+      code: string;
+      /** Password */
+      password: string;
     };
     /**
      * Role
@@ -1140,6 +1210,92 @@ export interface operations {
           [name: string]: unknown;
         };
         content?: never;
+      };
+    };
+  };
+  options_api_auth_options_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AuthOptions"];
+        };
+      };
+    };
+  };
+  forgot_password_api_auth_forgot_password_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ForgotBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": {
+            [key: string]: boolean;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  reset_password_api_auth_reset_password_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResetBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
       };
     };
   };

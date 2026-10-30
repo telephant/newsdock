@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>semantic-search — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>semantic-search — Milestone 3 part 1 diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s1">2 Embed and backfill</a><a href="#s2">3 Query</a><a href="#e">4 Data model</a><a href="#t">5 Row lifecycle</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  SINK["sink (writer)"] --> ART[("C-5 articles + embedding")]
+  EMB["C-35 embedder worker"] -->|"SELECT unembedded, UPDATE"| ART
+  EMB --> PKG["C-36 embedding package"]
+  PKG -->|"/api/embed"| OLL["Ollama (host)"]
+  AG["agent (key)"] --> MCP["C-38 semantic_search"]
+  MCP --> PKG
+  MCP --> Q["C-37 vector + keyword legs, RRF"]
+  Q --> ART
+  RET["C-4 retention"] -->|"DELETE old rows"| ART
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the sink untouched, and does the embedder only read committed rows?</li>
+<li>Do the worker and the query side embed through the same package (C-36)?</li>
+<li>Does retention remove vectors without any new code?</li>
+<li>Is Ollama the only new external dependency?</li></ul></div></section>
+
+<section id="s1"><h2>2 Embed and backfill (F-16, F-17)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant W as C-35 worker
+  participant D as Postgres
+  participant O as Ollama
+  loop every poll
+    W->>D: SELECT unembedded rows, newest first, LIMIT batch
+    alt no rows
+      W->>W: heartbeat, sleep idle
+    else rows
+      W->>O: POST /api/embed (titles with doc prefix)
+      alt Ollama down
+        O--xW: error
+        W->>W: log, heartbeat, backoff
+      else ok
+        O-->>W: embeddings
+        W->>D: UPDATE per row, guarded
+        W->>W: heartbeat
+      end
+    end
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>When nothing is left, is no request sent to Ollama (AC-3)?</li>
+<li>When Ollama is down, do the rows stay untouched and the worker stay alive (AC-4)?</li>
+<li>Do fresh rows get embedded before the old backlog?</li></ul></div></section>
+
+<section id="s2"><h2>3 Query (F-18, F-19)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant G as Agent
+  participant M as C-38 tool
+  participant O as Ollama
+  participant D as Postgres
+  G->>M: semantic_search(query, mode, filters)
+  M->>O: embed query (query prefix)
+  alt Ollama down
+    O--xM: error
+    alt mode vector
+      M-->>G: error embedding_unavailable
+    else mode hybrid
+      M->>D: keyword leg only
+      M-->>G: results, degraded true
+    end
+  else ok
+    O-->>M: vector
+    M->>D: vector leg (HNSW, filters, model match)
+    M->>D: keyword leg (full-text, same filters)
+    M->>M: RRF fuse, cut to limit
+    M-->>G: results with score and matched_by
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Do both legs use the same filters from one implementation?</li>
+<li>Is the keyword search still available when Ollama is down (AC-10)?</li>
+<li>Is the fusion a pure function over two id lists?</li></ul></div></section>
+
+<section id="e"><h2>4 Data model (changed table)</h2><div class="card">
+<pre class="mermaid">
+erDiagram
+  ARTICLES {
+    text url_hash PK
+    bigint seq
+    text title
+    text domain
+    timestamptz published_at
+    text_array themes
+    vector768 embedding "NEW, nullable"
+    text embedding_model "NEW, nullable"
+  }
+  ARTICLE_SOURCES }o--|| ARTICLES : "copies, not embedded"
+  ANALYSES }o--|| ARTICLES : "per agent"
+</pre>
+<p>Indexes added: HNSW (cosine) on <code>embedding</code>, GIN on <code>to_tsvector('english', title)</code>.</p></div>
+<div class="check"><b>Check:</b>
+<ul><li>Are both new columns nullable so the migration is safe on a live table?</li>
+<li>Are copies in <code>article_sources</code> left out on purpose (spec D-2)?</li>
+<li>Does one fixed dimension (768) match the configured model?</li></ul></div></section>
+
+<section id="t"><h2>5 Embedding state of a row</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Unembedded: sink inserts
+  Unembedded --> Embedded: worker writes vector and model
+  Embedded --> Stale: configured model changes
+  Stale --> Embedded: worker re-embeds
+  Unembedded --> Unembedded: Ollama down or bad vector
+  Embedded --> [*]: retention deletes the row
+  Unembedded --> [*]: retention deletes the row
+  Stale --> [*]: retention deletes the row
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is a Stale row invisible to vector search until re-embedded (AC-11)?</li>
+<li>Can every state end in retention, so nothing outlives 7 days (AC-13)?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

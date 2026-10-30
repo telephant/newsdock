@@ -2,13 +2,14 @@
 
 A shared "news dock" for AI agents: ingest the GDELT GKG news feed once (clean, dedup, 7-day store) so any custom agent can plug in through an MCP server or REST. Kafka and Postgres run locally in Docker; there is no hosted demo.
 
-**Status:** M1 `mvp` implemented: live GDELT GKG → Kafka → processor → Postgres (7-day retention) → MCP + REST → demo financial-relevance agent (Ollama) → Next.js UI. See the [roadmap](docs/roadmap.md).
+**Status:** M1 `mvp` implemented: live GDELT GKG → Kafka → processor → Postgres (7-day retention) → MCP + REST → demo financial-relevance agent (Ollama) → Next.js UI. M3 part 1 adds semantic search: an embedder fills title embeddings (pgvector) and the MCP tool `semantic_search` finds articles by meaning. See the [roadmap](docs/roadmap.md).
 
 ## Architecture
 
 ```
 GDELT GKG (15-min slots) → ingester → Kafka gkg.raw → processor → gkg.clean / gkg.dlq
                                                             → sink → Postgres (7 days)
+Postgres ← embedder (titles → Ollama, host → vectors)
 Postgres → api (MCP /mcp + REST /api/*) → demo agent (Ollama, host) and web UI (:3000)
 ```
 
@@ -29,7 +30,7 @@ Install these once; the repo documents nothing else as manual:
 | Docker Desktop | `brew install --cask docker-desktop` | Start it and wait until it is running |
 | uv | `brew install uv` | Provisions Python 3.12 automatically |
 | pnpm | `brew install pnpm` | Provisions Node 24 LTS automatically (`devEngines` in `apps/web/package.json`) |
-| Ollama | `brew install --cask ollama-app` | Then `ollama pull <any small model>` (used by the M1 demo agent) |
+| Ollama | `brew install --cask ollama-app` | Then `ollama pull llama3.2:3b` (the demo agent) and `ollama pull nomic-embed-text` (the embedder and `semantic_search`) |
 
 ## Quick start
 
@@ -53,7 +54,7 @@ make down            # stop everything (data volumes are kept)
 | `make test APP=<name>` | Tests of one app: `ingester processor sink api agent web` |
 | `make build [APP=<name>]` | Build images (`newsdock-<app>:dev`, `newsdock-migrate:dev`); no `.env` needed |
 | `make up` / `make down` | Start (and wait for) Kafka and Postgres, create topics, migrate / stop |
-| `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 8 services (pipeline, api :8000, web :3000) |
+| `docker compose --env-file .env -f infra/compose.yaml --profile apps up -d --wait` | Start all 9 services (pipeline, embedder, api :8000, web :3000) |
 | `make topics`, `make migrate` | Create the Kafka topics (configured names), apply Alembic migrations (both idempotent) |
 | `make agent-create NAME=<name>` | Register an agent and print its API key once (needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up) |
 | `make user-reset-password EMAIL=<email>` | Owner recovery: set a user's password (asks twice, never echoed; ends that user's sessions and lifts a login lockout; needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up). Only the admin token can do this; an admin or owner session cannot |
@@ -77,6 +78,19 @@ The UI needs a login. Open **http://127.0.0.1:3000** (the compose default; `http
 - **Locked-out owner:** `make user-reset-password EMAIL=<email>` asks for a new password twice (not echoed), ends that user's sessions and lifts a login lockout. It needs `NEWSDOCK_ADMIN_TOKEN` in `.env` and the api up; a session cannot do this, only the token.
 - **Reads are no longer open:** `GET /api/articles*` accepts a browser session or an agent key. `api.auth_required: false` (with `web.login_required: false`) switches login off for local experiments.
 - Passwords are hashed with argon2id; sessions are server-side (12 h idle, 7 days absolute, both in the config file); five wrong passwords for one account lock it for 15 minutes.
+
+## Password reset by email (M2f)
+
+A user who forgot their password can ask for a 6-digit code by email on `/forgot-password`, then set a new one on `/reset-password`. The code works once, for `auth_reset_code_minutes` (15), and dies after `auth_reset_max_attempts` (5) wrong tries. A reset ends all of that user's sessions and lifts a login lockout. **The feature is off until you configure mail**: without it the routes answer 503 `password_reset_unavailable` and the login page shows no link (`GET /api/auth/options` says `password_reset_enabled: false`). The operator path `make user-reset-password` is unchanged.
+
+Any SMTP server works; the provider is only settings. With a free [Brevo](https://www.brevo.com) account (values below are from secondary sources, not checked against Brevo's current pages):
+
+1. Create the account, verify one sender address, and create an SMTP key (Brevo: SMTP & API).
+2. In `infra/config/newsdock.yaml`, section `api:`: `smtp_host: smtp-relay.brevo.com`, `smtp_port: 587`, `smtp_security: starttls`, `smtp_user: <your SMTP login>`, `mail_from: <the verified sender>`.
+3. In `.env` (never in the file): `NEWSDOCK_SMTP_PASSWORD=<the SMTP key>` and `NEWSDOCK_RESET_CODE_SECRET=$(openssl rand -hex 32)` (at least 32 characters; it keys the stored code hash, so changing it voids open codes).
+4. `docker compose --env-file .env -f infra/compose.yaml up -d api`, then check `curl http://127.0.0.1:8000/api/auth/options`.
+
+The same settings fit Gmail with an app password (`smtp.gmail.com`, 587, `starttls`) or Resend's SMTP. `smtp_security: ssl` is for port 465; `none` is accepted only for a loopback host (a local test server) and never with a login. Notes: mail is sent after the HTTP response, so a known and an unknown address answer the same way and at the same speed; the request limits (`auth_reset_max_per_email` 3, `auth_reset_max_per_address` 20, `auth_reset_max_tries_per_address` 20 per `auth_reset_window_minutes` 60) are in memory in the one API process; the code is never logged. Migration `0010` creates the `password_resets` table (`make migrate`). Details: [spec](docs/specs/forgot-password/spec.md), [ADR-0026](docs/adr/0026-reset-codes-keyed-hash-single-row.md), [ADR-0027](docs/adr/0027-reset-mail-over-smtp-after-the-response.md); a manual check with a real account is listed in [tests.md](docs/specs/forgot-password/tests.md).
 
 ## Agents and API keys (M2)
 
@@ -105,7 +119,7 @@ Each event is `id: <cursor>`, `event: article`, `data: <article summary JSON>`; 
 
 ## Configuration
 
-All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/config/newsdock.yaml): a `common:` section that every service inherits, and one section per service (`ingester`, `processor`, `sink`, `api`, `agent`, `web`). Docker env vars override any key (**env > file > built-in defaults**), and the file's values equal the defaults, so an empty file changes nothing. Nested keys flatten with `_` into the env name, e.g. `sink.retention_days` ↔ `NEWSDOCK_RETENTION_DAYS`, `common.kafka.topics.clean` ↔ `NEWSDOCK_KAFKA_TOPICS_CLEAN` (agent: prefix `NEWSDOCK_AGENT_`).
+All non-secret settings live in one file, [`infra/config/newsdock.yaml`](infra/config/newsdock.yaml): a `common:` section that every service inherits, and one section per service (`ingester`, `processor`, `sink`, `embedder`, `api`, `agent`, `web`). Docker env vars override any key (**env > file > built-in defaults**), and the file's values equal the defaults, so an empty file changes nothing. Nested keys flatten with `_` into the env name, e.g. `sink.retention_days` ↔ `NEWSDOCK_RETENTION_DAYS`, `common.kafka.topics.clean` ↔ `NEWSDOCK_KAFKA_TOPICS_CLEAN` (agent: prefix `NEWSDOCK_AGENT_`).
 
 - **Change a value:** edit the file and `docker compose ... up -d <service>`, or set the env var in `.env` / the compose `environment:`.
 - **Point a service at another file:** `NEWSDOCK_CONFIG_FILE=/path/to/newsdock.yaml` (compose mounts `infra/config` read-only at `/etc/newsdock`).
@@ -146,6 +160,7 @@ The directory and layering rules (`domain/` pure, `adapters/` for I/O, apps neve
 - **Raw `docker compose` complains about missing variables:** pass the env file, e.g. `docker compose --env-file .env -f infra/compose.yaml ps` (compose looks for `.env` next to the compose file otherwise).
 - **Port already in use:** Postgres defaults to host port 5433 (a local Postgres often owns 5432); change `POSTGRES_PORT` in `.env`. Kafka uses 29092.
 - **`ollama list` shows no model:** run `ollama pull llama3.2:3b` (the demo agent's model, chosen in the M1 spike).
+- **Embedder logs `ollama unavailable`, or `semantic_search` answers `embedding_unavailable`:** Ollama is not running on the host or `nomic-embed-text` is not pulled (`ollama pull nomic-embed-text`). Nothing is lost: articles are stored without a vector and the embedder fills them in on a later pass; `hybrid` search falls back to word matching meanwhile.
 - **Agent logs `batch failed`:** usually Ollama is not running on the host (`ollama list` must answer); the agent retries and, because it only acks after a finished batch, re-reads the same batch.
 - **A stream stays silent:** check the subscription's filter (`GET /api/subscriptions`) and that new articles are arriving (GDELT slots land every ~15 min); `: ping` lines mean the connection is healthy. A `429` on connect means the agent already has `api.sse_max_streams_per_agent` open streams.
 - **Agent logs `the API rejected this agent's key (HTTP 401)`:** `NEWSDOCK_AGENT_API_KEY` is empty, wrong or revoked; issue a new key with `make agent-create` (or set `api.auth_required: false` for local experiments).

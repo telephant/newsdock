@@ -17,6 +17,7 @@ ROOT_DIRS = {"apps", "packages", "infra", "docs", ".github"}
 ROOT_FILES = {
     "Makefile",
     "pyproject.toml",
+    "conftest.py",  # loads the pytest plugin that guards fixed-port Docker tests
     "uv.lock",
     ".python-version",
     ".env.example",
@@ -39,7 +40,7 @@ IGNORED = {
     ".DS_Store",
     ".claude",  # Claude Code local state (worktrees, scheduled-task lock)
 }
-PYTHON_APPS = ("ingester", "processor", "sink", "api", "agent")
+PYTHON_APPS = ("ingester", "processor", "sink", "api", "agent", "embedder")
 APP_NAMES = {*PYTHON_APPS, "web"}
 PYTHON_APP_FILES = ("pyproject.toml", "Dockerfile", "README.md")
 WEB_FILES = ("package.json", "Dockerfile", "README.md")

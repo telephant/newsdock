@@ -1,6 +1,5 @@
 """TC-24, TC-26, TC-30, TC-35: roles, users routes, admin by session (Docker)."""
 
-import subprocess
 import threading
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -20,44 +19,21 @@ from sqlalchemy import Engine, text
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-login-test"
 PASSWORD = "correct-horse-battery"
 ADMIN = "admin-token-for-tests"
 NO_SUCH_UUID = "00000000-0000-0000-0000-000000000000"
 
 
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
-
-
 @pytest.fixture(scope="module")
-def engine() -> Iterator[Engine]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
+def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
+    url = side_db[0]
     mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
     mp.setenv("NEWSDOCK_ADMIN_TOKEN", ADMIN)
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
     eng = make_engine(url)
     yield eng
     eng.dispose()
     mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 class World:

@@ -644,6 +644,97 @@
         }
       }
     },
+    "/api/auth/options": {
+      "get": {
+        "summary": "Options",
+        "operationId": "options_api_auth_options_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthOptions"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/forgot-password": {
+      "post": {
+        "summary": "Forgot Password",
+        "operationId": "forgot_password_api_auth_forgot_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForgotBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "boolean"
+                  },
+                  "type": "object",
+                  "title": "Response Forgot Password Api Auth Forgot Password Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/reset-password": {
+      "post": {
+        "summary": "Reset Password",
+        "operationId": "reset_password_api_auth_reset_password_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/subscriptions": {
       "get": {
         "summary": "List Own",
@@ -1229,6 +1320,17 @@
         ],
         "title": "ArticleSummary"
       },
+      "AuthOptions": {
+        "properties": {
+          "password_reset_enabled": {
+            "type": "boolean",
+            "title": "Password Reset Enabled"
+          }
+        },
+        "type": "object",
+        "required": ["password_reset_enabled"],
+        "title": "AuthOptions"
+      },
       "Credentials": {
         "properties": {
           "email": {
@@ -1271,6 +1373,18 @@
         "required": ["articles", "next_before"],
         "title": "FeedPage",
         "description": "REST /api/articles response (keyset pagination via next_before)."
+      },
+      "ForgotBody": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": ["email"],
+        "title": "ForgotBody"
       },
       "HTTPValidationError": {
         "properties": {
@@ -1447,6 +1561,28 @@
         "type": "object",
         "required": ["id", "email", "role"],
         "title": "PublicUser"
+      },
+      "ResetBody": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Email"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Code"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 1024,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": ["email", "code", "password"],
+        "title": "ResetBody"
       },
       "Role": {
         "type": "string",

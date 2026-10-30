@@ -26,6 +26,7 @@ from newsdock_api.config import Settings as ApiSettings
 from newsdock_config.secrets import is_secret_name
 from newsdock_config.source import flatten
 from newsdock_db.config import Settings as DbSettings
+from newsdock_embedder.config import Settings as EmbedderSettings
 from newsdock_ingester.config import Settings as IngesterSettings
 from newsdock_processor.config import Settings as ProcessorSettings
 from newsdock_sink.config import Settings as SinkSettings
@@ -38,6 +39,7 @@ SERVICES: dict[str, type[BaseSettings]] = {
     "sink": SinkSettings,
     "api": ApiSettings,
     "agent": AgentSettings,
+    "embedder": EmbedderSettings,
 }
 # newsdock_db has no section of its own: its pool keys live under `common`.
 COMMON_ONLY: list[type[BaseSettings]] = [DbSettings]

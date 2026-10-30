@@ -2,7 +2,6 @@
 
 import json
 import socket
-import subprocess
 import threading
 import time
 from collections.abc import Iterator
@@ -27,17 +26,8 @@ from sqlalchemy import Engine, text
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-push-test"
 NOW = datetime(2026, 10, 14, 12, 0, 0, tzinfo=UTC)
 CAP = 2
-
-
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
 
 
 @contextmanager
@@ -70,28 +60,12 @@ def _serve(settings: Settings) -> Iterator[str]:
 
 
 @pytest.fixture(scope="module")
-def engine() -> Iterator[Engine]:
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
+    url = side_db[0]
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
     eng = make_engine(url)
     yield eng
     eng.dispose()
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 @pytest.fixture(scope="module")

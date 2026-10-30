@@ -1,0 +1,14 @@
+[
+  {"query": "interest rate hike", "expected": ["r1", "r2", "r3"], "kind": "paraphrase"},
+  {"query": "falling energy prices", "expected": ["o1", "o3"], "kind": "paraphrase"},
+  {"query": "people forced to leave their homes because of fire", "expected": ["w1", "w5"], "kind": "paraphrase"},
+  {"query": "ruling party loses power", "expected": ["e1", "e3"], "kind": "paraphrase"},
+  {"query": "companies laying off workers", "expected": ["j1", "j2", "j4"], "kind": "paraphrase"},
+  {"query": "disease outbreak", "expected": ["h1", "h4"], "kind": "paraphrase"},
+  {"query": "import taxes on metal", "expected": ["t1", "t4"], "kind": "paraphrase"},
+  {"query": "mission to the moon", "expected": ["s1", "s4"], "kind": "paraphrase"},
+  {"query": "wildfire", "expected": ["w1", "w2", "w3"], "kind": "word match"},
+  {"query": "OPEC production cuts", "expected": ["o2"], "kind": "word match"},
+  {"query": "voting problems and disputed results", "expected": ["e2", "e5"], "kind": "mixed"},
+  {"query": "vaccines", "expected": ["h1", "h3"], "kind": "mixed"}
+]

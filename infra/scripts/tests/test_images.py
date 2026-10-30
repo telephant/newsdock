@@ -12,7 +12,7 @@ import pytest
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[3]
-APPS = ["ingester", "processor", "sink", "api", "agent", "web"]
+APPS = ["ingester", "processor", "sink", "api", "agent", "embedder", "web"]
 PYTHON_APPS = [app for app in APPS if app != "web"]
 
 

@@ -11,7 +11,13 @@ export type GateInput = {
 };
 
 const OPEN_EXACT = new Set(["/favicon.ico"]);
-const OPEN_PREFIXES = ["/login", "/signup", "/_next"];
+const OPEN_PREFIXES = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/_next",
+];
 
 function isOpen(pathname: string): boolean {
   if (OPEN_EXACT.has(pathname)) return true;

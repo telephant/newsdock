@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>what-happen — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>what-happen — M2g diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 One cycle</a><a href="#t">3 Loop and baseline</a><a href="#d">4 Deployment</a></nav></header>
+
+<section id="c"><h2>1 Components</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  API["API /mcp (unchanged)"] <-->|"list_new_articles, ack_cursor"| MCP["C-57 MCP client paging"]
+  MCP --> CYC["C-51 DigestCycle"]
+  MAIN["C-50 digest entry + loop"] --> CYC
+  CYC --> RANK["C-52 themes + baseline"]
+  CYC --> PICK["C-53 story picker"]
+  CYC --> REND["C-54 render + prompt"]
+  CYC --> SUM["C-55 summariser"]
+  SUM -->|"/api/chat"| OLL["Ollama (host)"]
+  CYC --> FILES["C-56 files"]
+  FILES --> OUT[("digests/*.md, baseline.json")]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the API untouched, with MCP as the only data route?</li>
+<li>Do C-52, C-53 and C-54 stay pure (no I/O), with C-55, C-56 and C-57 as the only adapters?</li>
+<li>Is the model reached from exactly one place (C-55)?</li>
+<li>Are the two output files the only state?</li></ul></div></section>
+
+<section id="s"><h2>2 One cycle (F-40)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant C as C-51 cycle
+  participant A as API /mcp
+  participant O as Ollama
+  participant F as C-56 files
+  loop pages until short page or cap
+    C->>A: list_new_articles(limit, cursor)
+    A-->>C: articles, next_cursor
+  end
+  alt no articles
+    C->>C: log empty window, stop
+  else articles
+    C->>C: count, rank, pick stories
+    loop each ranked theme
+      C->>O: titles of the theme
+      O-->>C: one sentence (or error: unavailable)
+    end
+    C->>F: write HHMM.md, latest.md
+    C->>A: ack_cursor(last next_cursor)
+    C->>F: save baseline
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the ack strictly after the file write?</li>
+<li>Can one failing Ollama call only affect its own section?</li>
+<li>Does the baseline save come last, so a crash never double-counts a window?</li>
+<li>Is an empty window free of any write or ack?</li></ul></div></section>
+
+<section id="t"><h2>3 Loop and baseline lifecycle (F-41)</h2><div class="card">
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> Cold: no file, corrupt file, or under 3 entries
+  Cold --> Cold: cycle ok, entry added, ranked by volume
+  Cold --> Warm: 3 entries stored
+  Warm --> Warm: cycle ok, oldest of 24 dropped
+  Warm --> Cold: file lost or corrupt
+  Cold --> Sleeping: cycle ends
+  Warm --> Sleeping: cycle ends
+  Sleeping --> Cold: interval over, baseline cold
+  Sleeping --> Warm: interval over, baseline warm
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does every path through a failing cycle still reach Sleeping (the loop never dies)?</li>
+<li>Is losing the file always safe (back to Cold, no crash)?</li>
+<li>Is 3 entries a sensible point to trust "rising"?</li></ul></div></section>
+
+<section id="d"><h2>4 Deployment</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  subgraph agentnet["network: agent"]
+    DIG["digest (newsdock-agent:dev)"]
+    SCORE["agent (same image)"]
+    API["api"]
+  end
+  DIG -->|"MCP + digest key"| API
+  SCORE -->|"MCP + agent key"| API
+  DIG -->|"host.docker.internal:11434"| OLL["Ollama (host)"]
+  DIG --- BIND[("infra/digests (bind)")]
+  DIG --- VOL[("digest_state volume")]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Has the digest service no route to Postgres or Kafka (same network as the agent)?</li>
+<li>Does it use its own key, so the two cursors stay separate?</li>
+<li>Can you open the digests from the host without entering a container?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default", securityLevel: "strict" });
+</script>
+</body>
+</html>

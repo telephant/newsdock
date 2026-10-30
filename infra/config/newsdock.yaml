@@ -16,6 +16,13 @@ common:
       raw: gkg.raw
       clean: gkg.clean
       dlq: gkg.dlq
+  # semantic-search (ADR-0024): shared by the embedder and the API, which must agree.
+  # A model mismatch hides rows from vector search until re-embedded, it never mixes them.
+  embedding_model: nomic-embed-text
+  embedding_dimension: 768               # fixed by migration 0008 (vector(768))
+  embedding_document_prefix: "search_document: "
+  embedding_query_prefix: "search_query: "
+  embedding_ollama_url: http://127.0.0.1:11434   # compose sets OLLAMA_URL (host.docker.internal)
 
 ingester:
   gdelt_base_url: http://data.gdeltproject.org/gdeltv2
@@ -27,6 +34,11 @@ ingester:
 processor: {}
 sink: {}
 api:
+  semantic_candidates: 50             # hits taken from each search leg before fusing
+  semantic_rrf_k: 60                  # reciprocal-rank constant: score = 1 / (k + rank)
+  semantic_query_max_length: 500      # characters of a semantic_search query
+  semantic_ef_search: 100             # HNSW candidate list size per query
+  semantic_ollama_timeout_seconds: 10 # embedding the query; then vector mode errors
   auth_required: true           # MCP needs an agent API key (ADR-0016); false = anonymous
   rate_limit_per_minute: 600     # per agent; anonymous traffic shares one bucket; 0 = off
   subscriptions_max_per_agent: 20     # saved filters one agent may hold (409 above)
@@ -47,10 +59,45 @@ api:
   auth_signup_max_total: 50           # counted sign-ups from all addresses per window (429 above); 0 = off
   auth_signup_window_minutes: 60      # length of both sign-up windows
   agents_max_per_user: 10             # agents one non-owner user may own (409 above); 0 = off
+  smtp_host: ""                       # empty = password reset by email is off (forgot-password)
+  smtp_port: 587
+  smtp_security: starttls             # starttls | ssl | none (none: loopback hosts only)
+  smtp_user: ""                       # empty = no login (a relay); the password is env only
+  mail_from: ""                       # sender address of the reset mail
+  smtp_timeout_seconds: 10
+  auth_reset_code_minutes: 15         # how long a reset code works
+  auth_reset_max_attempts: 5          # wrong codes before the code is dead
+  auth_reset_max_per_email: 3         # code requests per mailbox per window (silent above)
+  auth_reset_max_per_address: 20      # code requests per client address per window (429 above)
+  auth_reset_max_tries_per_address: 20  # code submissions per client address per window (429 above)
+  auth_reset_window_minutes: 60
   cors_allow_cookies: true        # the web UI sends the session cookie (ADR-0021)
   cors_allow_methods: GET,POST,PATCH,DELETE
   cors_allow_headers: Content-Type,Last-Event-ID   # explicit: no wildcard with cookies
-agent: {}
+agent:
+  # what-happen digest (M2g, ADR-0028): `python -m newsdock_agent.digest`, own agent key
+  digest_interval_seconds: 3600       # sleep between cycles
+  digest_dir: infra/digests           # output root (compose mounts it at /digests)
+  digest_state_file: infra/digests/digest-baseline.json  # the rolling theme baseline (compose: /data)
+  digest_model: qwen3:4b-instruct     # Ollama model that writes one line per theme
+  digest_max_themes: 8                # sections per digest
+  digest_stories_per_theme: 3         # linked stories shown per section
+  digest_prompt_titles: 3             # own stories per theme sent to the model; keep = stories shown, so a sentence can be checked against its links
+  digest_min_theme_count: 5           # smallest window count a theme may be listed with
+  digest_skip_theme_prefixes: TAX_,WB_,EPU_,CRISISLEX_,USPEC_,UNGP_,GENERAL_,MEDIA_,SOC_,LEADER,AFFECT
+  digest_max_articles: 20000          # per cycle; above it the next cycle continues
+  digest_baseline_hours: 24           # baseline entries kept
+  digest_baseline_min_entries: 3      # below this the ranking is by volume ("no baseline yet")
+  digest_baseline_themes_kept: 2000   # themes stored per baseline entry
+  digest_summary_max_chars: 300       # a model line is cut at this length
+embedder:
+  batch_size: 32                  # titles per Ollama request
+  poll_interval_seconds: 10       # pause when nothing is left to embed
+  ollama_timeout_seconds: 60
+  backoff_seconds: 5              # first retry delay while Ollama or the database is down
+  backoff_max_seconds: 60         # the delay doubles up to this
+  skip_after_failures: 3          # a title whose vector keeps being rejected is skipped
+  skip_table_max_entries: 1000
 web:                              # read at web server start (ADR-0014); env NEWSDOCK_WEB_* wins
   api_base_url: http://127.0.0.1:8000   # what the BROWSER calls (the host-published API)
   poll_ms: 60000

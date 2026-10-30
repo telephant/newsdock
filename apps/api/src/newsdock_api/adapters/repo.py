@@ -1,7 +1,7 @@
 """Postgres repository (role: api_rw): parameterized ORM queries only (DR-9)."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from newsdock_db.models import Analysis, Article, ArticleSource, IngestSlot
 from sqlalchemy import Engine, Select, func, literal, select, text
@@ -36,15 +36,19 @@ def _summary(
     )
 
 
-def _apply_filters(
-    statement: Select[Article],
+_S = TypeVar("_S", bound=Select[Any])
+
+
+def apply_filters(
+    statement: _S,
     *,
     time_from: datetime | None,
     time_to: datetime | None,
     theme: str | None,
     domain: str | None,
     text_filter: str | None,
-) -> Select[Article]:
+) -> _S:
+    """The one implementation of the search filters (also used by semantic search)."""
     if time_from is not None:
         statement = statement.where(Article.published_at >= time_from)
     if time_to is not None:
@@ -87,7 +91,7 @@ class SqlArticleRepo:
         before: tuple[datetime, str] | None = None,
     ) -> list[ArticleSummary]:
         statement = (
-            _apply_filters(
+            apply_filters(
                 select(Article),
                 time_from=time_from,
                 time_to=time_to,
@@ -117,6 +121,26 @@ class SqlArticleRepo:
                 for r in rows
             ]
 
+    def summaries(self, article_ids: list[str]) -> dict[str, ArticleSummary]:
+        """Summaries (with scores and source counts); unknown ids are absent."""
+        if not article_ids:
+            return {}
+        with Session(self._engine) as session:
+            rows: list[Article] = list(
+                session.scalars(
+                    select(Article).where(Article.url_hash.in_(article_ids))
+                ).all()
+            )
+            ids = [r.url_hash for r in rows]
+            scores = self._scores(session, ids)
+            counts = self._source_counts(session, ids)
+            return {
+                r.url_hash: _summary(
+                    r, scores.get(r.url_hash), counts.get(r.url_hash, 1)
+                )
+                for r in rows
+            }
+
     def latest_seq(self) -> int | None:
         with Session(self._engine) as session:
             newest = session.scalar(select(func.max(Article.seq)))
@@ -132,7 +156,7 @@ class SqlArticleRepo:
         domain: str | None = None,
         text: str | None = None,
     ) -> list[ArticleSummary]:
-        statement = _apply_filters(
+        statement = apply_filters(
             select(Article),
             time_from=None,
             time_to=None,

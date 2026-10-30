@@ -29,6 +29,7 @@ jobs:
               - 'apps/sink/**'
               - 'apps/api/**'
               - 'apps/agent/**'
+              - 'apps/embedder/**'
               - 'packages/**'
               - 'pyproject.toml'
               - 'uv.lock'
@@ -65,6 +66,11 @@ jobs:
               - 'packages/**'
               - 'pyproject.toml'
               - 'uv.lock'
+            embedder:
+              - 'apps/embedder/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
             web:
               - 'apps/web/**'
             migrate:
@@ -79,6 +85,7 @@ jobs:
           SINK: ${{ steps.filter.outputs.sink }}
           API: ${{ steps.filter.outputs.api }}
           AGENT: ${{ steps.filter.outputs.agent }}
+          EMBEDDER: ${{ steps.filter.outputs.embedder }}
           WEB: ${{ steps.filter.outputs.web }}
           MIGRATE: ${{ steps.filter.outputs.migrate }}
         run: |
@@ -88,6 +95,7 @@ jobs:
           [ "$SINK" = true ] && apps+=(sink)
           [ "$API" = true ] && apps+=(api)
           [ "$AGENT" = true ] && apps+=(agent)
+          [ "$EMBEDDER" = true ] && apps+=(embedder)
           [ "$WEB" = true ] && apps+=(web)
           [ "$MIGRATE" = true ] && apps+=(migrate)
           if [ "${#apps[@]}" -eq 0 ]; then

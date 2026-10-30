@@ -2,7 +2,6 @@
 
 import asyncio
 import socket
-import subprocess
 import threading
 import time
 from collections.abc import Iterator
@@ -25,17 +24,8 @@ from sqlalchemy.orm import Session
 pytestmark = pytest.mark.docker
 
 ROOT = Path(__file__).resolve().parents[4]
-PROJECT = "newsdock-apisrc-test"
 NOW = datetime(2026, 10, 5, 12, 0, 0, tzinfo=UTC)
 STORY = "canon1"
-
-
-def _compose(*args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["docker", "compose", "-p", PROJECT, "--env-file", ".env.example",
-         "-f", "infra/compose.yaml", *args],
-        cwd=ROOT, capture_output=True, text=True, check=False,
-    )  # fmt: skip
 
 
 def _article(key: str, **kw: Any) -> Article:
@@ -58,23 +48,9 @@ def _source(key: str, canonical: str, hours: float = 0.0) -> ArticleSource:
 
 
 @pytest.fixture(scope="module")
-def stack_urls() -> Iterator[tuple[str, str]]:
+def stack_urls(side_db: tuple[str, str]) -> Iterator[tuple[str, str]]:
     """Yields (api base url, database url)."""
-    assert _compose("up", "-d", "--wait", "postgres").returncode == 0
-    env = {
-        k.strip(): v.strip()
-        for k, _, v in (
-            line.partition("=")
-            for line in (ROOT / ".env.example").read_text().splitlines()
-            if "=" in line and not line.startswith("#")
-        )
-    }
-    url = (
-        f"postgresql+psycopg://{env['POSTGRES_USER']}:{env['POSTGRES_PASSWORD']}"
-        f"@127.0.0.1:{env.get('POSTGRES_PORT', '5433')}/{env['POSTGRES_DB']}"
-    )
-    mp = pytest.MonkeyPatch()
-    mp.setenv("DATABASE_URL", url)
+    url = side_db[0]
     command.upgrade(Config(str(ROOT / "infra" / "migrations" / "alembic.ini")), "head")
 
     engine = make_engine(url)
@@ -119,8 +95,6 @@ def stack_urls() -> Iterator[tuple[str, str]]:
     yield f"http://127.0.0.1:{port}", url
     server.should_exit = True
     thread.join(timeout=10)
-    mp.undo()
-    _compose("down", "-v", "--remove-orphans")
 
 
 def _run(coro: Any) -> Any:

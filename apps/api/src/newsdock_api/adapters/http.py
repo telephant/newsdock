@@ -5,9 +5,10 @@ Spike-verified pattern (spike.md §1): mount `mcp.streamable_http_app()` and run
 """
 
 import asyncio
-from collections.abc import AsyncIterator
+import logging
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
@@ -32,7 +33,12 @@ from newsdock_api.adapters.listener import NotifyListener, listen_dsn
 from newsdock_api.adapters.live import build_live_router
 from newsdock_api.adapters.passwords import Argon2Hasher, make_dummy_hash
 from newsdock_api.adapters.principal import PrincipalResolver, build_guards
+from newsdock_api.adapters.query_embedder import OllamaQueryEmbedder
 from newsdock_api.adapters.repo import SqlArticleRepo
+from newsdock_api.adapters.reset_api import build_reset_router
+from newsdock_api.adapters.reset_repo import SqlResetRepo
+from newsdock_api.adapters.semantic_repo import SqlSemanticRepo
+from newsdock_api.adapters.smtp_mailer import SmtpMailer
 from newsdock_api.adapters.sse import build_stream_router
 from newsdock_api.adapters.subscriptions_api import build_subscriptions_router
 from newsdock_api.adapters.subscriptions_repo import SqlSubscriptionsRepo
@@ -46,12 +52,20 @@ from newsdock_api.domain.agents import (
     KeyLookup,
 )
 from newsdock_api.domain.loginlimit import LoginLimiter
+from newsdock_api.domain.mail import Mailer
 from newsdock_api.domain.ratelimit import FixedWindowLimiter
 from newsdock_api.domain.records import (
     ArticleDetail,
     FeedPage,
     HealthStatus,
     NewArticlesPage,
+)
+from newsdock_api.domain.resetlimit import ResetAttemptLimiter, ResetRequestLimiter
+from newsdock_api.domain.semantic import (
+    EmbeddingUnavailable,
+    InvalidQuery,
+    QueryEmbedder,
+    SemanticService,
 )
 from newsdock_api.domain.service import (
     ArticleService,
@@ -65,6 +79,8 @@ from newsdock_api.domain.signuplimit import SignupLimiter
 from newsdock_api.domain.streams import StreamLimiter, WakeHub
 from newsdock_api.domain.subscriptions import SubscriptionStore
 
+logger = logging.getLogger(__name__)
+
 
 def create_app(
     settings: Settings | None = None,
@@ -75,6 +91,9 @@ def create_app(
     hasher: PasswordHasher | None = None,
     login_limiter: LoginLimiter | None = None,
     signup_limiter: SignupLimiter | None = None,
+    query_embedder: QueryEmbedder | None = None,
+    mailer: Mailer | None = None,
+    reset_clock: Callable[[], datetime] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(DbSettings())
@@ -99,6 +118,23 @@ def create_app(
         return ANONYMOUS
 
     service = ArticleService(repo, limits=settings.limits())
+    semantic = SemanticService(
+        SqlSemanticRepo(engine, ef_search=settings.semantic_ef_search),
+        query_embedder
+        or OllamaQueryEmbedder(
+            url=settings.embedding_ollama_url,
+            model=settings.embedding_model,
+            dimension=settings.embedding_dimension,
+            prefix=settings.embedding_query_prefix,
+            timeout=settings.semantic_ollama_timeout_seconds,
+        ),
+        model=settings.embedding_model,
+        candidates=settings.semantic_candidates,
+        rrf_k=settings.semantic_rrf_k,
+        max_query_length=settings.semantic_query_max_length,
+        default_limit=settings.search_page_default,
+        max_limit=settings.search_page_max,
+    )
 
     mcp = MCPServer("newsdock")
 
@@ -117,6 +153,40 @@ def create_app(
             domain=domain, text=text, limit=limit,
         )  # fmt: skip
         return {"articles": [a.model_dump(mode="json") for a in articles]}
+
+    @mcp.tool()
+    def semantic_search(
+        query: str,
+        mode: str = "hybrid",
+        time_from: datetime | None = None,
+        time_to: datetime | None = None,
+        theme: str | None = None,
+        domain: str | None = None,
+        limit: int | None = None,
+    ) -> dict[str, Any]:
+        """Search article titles by meaning, not only by words.
+
+        `query` is plain language ("interest rate hike" finds "Central bank lifts
+        borrowing costs"). `mode` is "hybrid" (default: meaning plus words, fused) or
+        "vector" (meaning only). Filters work as in search_articles. Each result has
+        a `score` and `matched_by`. If the embedding service is down, "hybrid" falls
+        back to word matching and sets `degraded`; "vector" returns the error
+        `embedding_unavailable`.
+        """
+        try:
+            result = semantic.search(
+                query, mode=mode, time_from=time_from, time_to=time_to,
+                theme=theme, domain=domain, limit=limit,
+            )  # fmt: skip
+        except InvalidQuery as exc:
+            raise ToolError(f"invalid_query: {exc}") from exc
+        except EmbeddingUnavailable as exc:
+            logger.warning("semantic_search: query could not be embedded: %s", exc)
+            raise ToolError(
+                "embedding_unavailable: the query could not be embedded; "
+                "use mode 'hybrid' or search_articles"
+            ) from exc
+        return result.model_dump(mode="json")
 
     @mcp.tool(name="get_article")
     def get_article_tool(article_id: str) -> dict[str, Any]:
@@ -287,6 +357,44 @@ def create_app(
             cookie_secure=settings.auth_cookie_secure,
             session_idle=settings.session_idle,
             session_absolute=settings.session_absolute,
+        )
+    )
+    reset_secret = settings.reset_code_secret
+    reset_enabled = settings.password_reset_enabled
+    reset_mailer = mailer
+    if reset_enabled and reset_mailer is None:
+        smtp_password = settings.smtp_password
+        reset_mailer = SmtpMailer(
+            host=settings.smtp_host.strip(),
+            port=settings.smtp_port,
+            security=settings.smtp_security,
+            user=settings.smtp_user,
+            password=smtp_password.get_secret_value() if smtp_password else None,
+            sender=settings.mail_from.strip(),
+            timeout=settings.smtp_timeout_seconds,
+        )
+    app.include_router(
+        build_reset_router(
+            accounts,
+            SqlResetRepo(engine),
+            password_hasher,
+            limiter_for_logins,
+            ResetRequestLimiter(
+                settings.auth_reset_max_per_email,
+                settings.auth_reset_max_per_address,
+                settings.reset_window_seconds,
+            ),
+            ResetAttemptLimiter(
+                settings.auth_reset_max_tries_per_address,
+                settings.reset_window_seconds,
+            ),
+            reset_mailer,
+            enabled=reset_enabled,
+            secret=reset_secret.get_secret_value() if reset_secret else "",
+            code_minutes=settings.auth_reset_code_minutes,
+            max_attempts=settings.auth_reset_max_attempts,
+            min_password_length=settings.auth_min_pw_length,
+            clock=reset_clock or (lambda: datetime.now(UTC)),
         )
     )
     app.include_router(

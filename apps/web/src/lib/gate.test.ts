@@ -25,6 +25,8 @@ test("login, signup and framework files never need a cookie", () => {
   for (const pathname of [
     "/login",
     "/signup",
+    "/forgot-password",
+    "/reset-password",
     "/login/",
     "/_next/static/chunk.js",
     "/_next/image",

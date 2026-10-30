@@ -18,6 +18,23 @@ class ArticleSummary(BaseModel):
     source_count: int = 1  # copies of this story; pre-feature rows read as 1 (M2a)
 
 
+class SemanticHit(ArticleSummary):
+    """A `semantic_search` result: the summary plus how it was found.
+
+    `score` is the cosine similarity in `vector` mode and the fused (reciprocal-rank)
+    score in `hybrid` mode; `matched_by` lists the legs that returned the article.
+    """
+
+    score: float
+    matched_by: list[str]
+
+
+class SemanticResult(BaseModel):
+    articles: list[SemanticHit]
+    mode: str
+    degraded: bool  # hybrid fell back to the keyword leg because embedding failed
+
+
 class SourceRecord(BaseModel):
     """One copy (URL) that carried the story (M2a)."""
 

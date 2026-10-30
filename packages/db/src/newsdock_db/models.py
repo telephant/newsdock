@@ -8,6 +8,7 @@ they do not drift from these models. Apps use them only in `adapters/`.
 from datetime import datetime
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     CheckConstraint,
@@ -67,6 +68,10 @@ class Article(Base):
     tone_neg: Mapped[float | None] = mapped_column(REAL, nullable=True)
     tone_polarity: Mapped[float | None] = mapped_column(REAL, nullable=True)
     word_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # semantic-search (M3, migration 0008): filled by the embedder worker, never by
+    # the sink; NULL = not embedded yet. Canonical rows only (ADR-0024, ADR-0025).
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         Index("ix_articles_published_at", "published_at"),
@@ -74,6 +79,22 @@ class Article(Base):
         Index("ix_articles_themes", "themes", postgresql_using="gin"),
         Index("ix_articles_domain", "domain"),
         Index("ix_articles_story_key_published_at", "story_key", "published_at"),
+        Index(
+            "ix_articles_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+        Index(
+            "ix_articles_title_fts",
+            text("to_tsvector('english', title)"),
+            postgresql_using="gin",
+        ),
+        # the embedder's queue: rows still waiting for a vector (migration 0009)
+        Index(
+            "ix_articles_unembedded", "seq", postgresql_where=text("embedding IS NULL")
+        ),
     )
 
 
@@ -270,3 +291,31 @@ class UserSession(Base):
         Index("ix_sessions_user_id", "user_id"),
         Index("ix_sessions_expires_at", "expires_at"),
     )
+
+
+class PasswordReset(Base):
+    """The open password reset code of a user (M2f forgot-password, ADR-0026).
+
+    One row per user: a newer request replaces the older code. `code_hash` is a keyed
+    HMAC of the six-digit code, never the code.
+    """
+
+    __tablename__ = "password_resets"
+
+    user_id: Mapped[str] = mapped_column(
+        Uuid(as_uuid=False),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    code_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (Index("ix_password_resets_expires_at", "expires_at"),)

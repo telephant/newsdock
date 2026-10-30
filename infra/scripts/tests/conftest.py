@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-PYTHON_APPS = ["ingester", "processor", "sink", "api", "agent"]
+PYTHON_APPS = ["ingester", "processor", "sink", "api", "agent", "embedder"]
 ROOT_FILES = [
     "Makefile",
     "uv.lock",
