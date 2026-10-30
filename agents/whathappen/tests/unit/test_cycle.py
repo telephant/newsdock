@@ -6,10 +6,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from newsdock_agent.adapters.files import DigestWriter
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.baseline import Baseline, BaselineEntry
-from newsdock_agent.domain.digest import DigestCycle, DigestParams
+
+from whathappen.adapters.files import DigestWriter
+from whathappen.domain.articles import Article
+from whathappen.domain.baseline import Baseline, BaselineEntry
+from whathappen.domain.digest import DigestCycle, DigestParams
 
 NOW = datetime(2026, 10, 30, 14, 7, tzinfo=UTC)
 

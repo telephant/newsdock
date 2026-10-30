@@ -1,6 +1,6 @@
 """Prompt builder (TC-14; AC-9): the model gets prose work only."""
 
-from newsdock_agent.domain.prompt import theme_prompt
+from whathappen.domain.prompt import theme_prompt
 
 
 def test_tc14_prompt_has_the_label_and_the_titles_and_the_instruction() -> None:

@@ -6,15 +6,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote
 
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.baseline import Baseline
-from newsdock_agent.domain.render import (
+from whathappen.domain.articles import Article
+from whathappen.domain.baseline import Baseline
+from whathappen.domain.render import (
     render_digest,
     story_line,
     theme_label,
 )
-from newsdock_agent.domain.stories import ThemePick, pick_stories
-from newsdock_agent.domain.themes import RankedTheme, count_themes, rank_themes
+from whathappen.domain.stories import ThemePick, pick_stories
+from whathappen.domain.themes import RankedTheme, count_themes, rank_themes
 
 FIXTURE = Path(__file__).resolve().parents[1] / "fixtures" / "digest_window.json"
 NOW = datetime(2026, 10, 30, 14, 7, tzinfo=UTC)

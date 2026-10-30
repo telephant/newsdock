@@ -1,5 +1,9 @@
 # what-happen — Plan
 
+## Relocation (2026-10-30)
+
+Tasks T-01 to T-11 were carried out with the digest inside `apps/agent` (ADR-0028). Using it showed the cost (two agents in one app, one image, one key prefix), so the owner moved it to an independent server, `agents/whathappen/`, with its own project, Docker image, compose file and `.env` ([ADR-0029](../../adr/0029-whathappen-as-an-independent-agent-server.md)). The task files keep the names of the time they were written; the mapping is: `apps/agent/src/newsdock_agent/` → `agents/whathappen/src/whathappen/`, `digest_*` settings → `WHATHAPPEN_*`, `NEWSDOCK_DIGEST_API_KEY` → `WHATHAPPEN_API_KEY`, `make digest-once` → `make -C agents/whathappen once`, `infra/digests/` → `agents/whathappen/output/`, compose service `digest` → its own `agents/whathappen/compose.yaml`. The moved tests ran green in the new place (see verify.md, relocation addendum).
+
 ## Plan validation
 
 Run 2026-10-30 after writing tests and tasks (commands in the right column were run, not eyeballed).
@@ -9,7 +13,7 @@ Run 2026-10-30 after writing tests and tasks (commands in the right column were 
 | 1 | Every AC-1…AC-16 appears in `tests.md` (`grep` per AC); every TC names an AC | pass |
 | 2 | Every AC maps to a component in `design.md` §7 | pass |
 | 3 | Every AC appears in the `Implements:` line of at least one task | pass |
-| 4 | Names agree across docs: `digest_*` settings, `C-50…C-58`, `F-40/F-41`, file names, `NEWSDOCK_DIGEST_API_KEY` | pass |
+| 4 | Names agree across docs: settings, `C-50…C-58`, `F-40/F-41`, file names, `WHATHAPPEN_API_KEY` | pass |
 | 5 | No Proposed ADR treated as decided (ADR-0028 is Accepted) | pass |
 | 6 | Nothing from `backlog.md` in the tasks (no UI page, no label table, no region filter) | pass |
 | 7 | Open questions and unchecked checklist items | none open; design checklist resolved by delegation (user asked to finish the pipeline), listed in `design.md` §8 for review |
@@ -18,7 +22,7 @@ Findings fixed while planning: D-1 text no longer says "no ADR"; D-7 carries the
 
 Risks carried into implementation:
 
-- R-1 (closed 2026-10-30) A root `digests/` folder is rejected by `check_layout.py` (DR-1); the output lives in `infra/digests/` (spike §4).
+- R-1 (closed 2026-10-30) A root `digests/` folder is rejected by `check_layout.py` (DR-1); the output lives in `agents/whathappen/output/` (spike §4).
 - R-2 (closed 2026-10-30) The live stack was running; T-01 used real data (spike.md).
 - R-5 (medium, open) Theme groups are only loosely coherent (spike §2.5), so model lines may be vague. Accepted for a test harness; T-11 judges it on a warm baseline; story clustering is in the backlog. The user chose the shape (D-3), so this is flagged in the final report.
 - R-3 (low) A 3B model may produce poor sentences. Accepted by the spec (D-5, D-9); T-01 only picks the better of two.
@@ -38,14 +42,14 @@ Spike first: **T-01** de-risks the biggest unverified claims (articles per hour,
 | 5 Ship | T-10 compose, Makefile, docs, isolation | AC-15 | 0.5 day |
 | 6 Live | T-11 live run and closing | AC-16 | 0.5 day |
 
-Milestones: after phase 2 the digest text can be rendered from fake data; after phase 4 `make digest-once` logic works against fakes; after T-10 the service starts under compose; T-11 proves it on real data.
+Milestones: after phase 2 the digest text can be rendered from fake data; after phase 4 `make once` logic works against fakes; after T-10 the service starts under compose; T-11 proves it on real data.
 
 ## Task list
 
 | Task | Title | Implements | Depends on |
 |---|---|---|---|
 | [T-01](tasks/T-01.md) | Spike: measure real data, pick the model, check the output folder — **done 2026-10-30** ([spike.md](spike.md)) | (measurements) | none |
-| [T-02](tasks/T-02.md) | `digest_*` settings and config rows — **done 2026-10-30** | AC-15 | T-01 |
+| [T-02](tasks/T-02.md) | Settings (first `WHATHAPPEN_*` rows in the platform config, now `WHATHAPPEN_*`) — **done 2026-10-30** | AC-15 | T-01 |
 | [T-03](tasks/T-03.md) | Theme counting, ranking and the baseline model — **done 2026-10-30** | AC-4, AC-5, AC-14 | T-02 |
 | [T-04](tasks/T-04.md) | Story picker — **done 2026-10-30** | AC-6 | T-03 |
 | [T-05](tasks/T-05.md) | Markdown renderer and prompt builder — **done 2026-10-30** | AC-7, AC-8, AC-9 | T-04 |

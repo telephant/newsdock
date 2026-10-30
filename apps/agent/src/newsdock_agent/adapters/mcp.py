@@ -81,15 +81,8 @@ class McpApiClient:
                 raise Unauthorized(self._url) from group
             raise
 
-    def list_new_articles(
-        self, limit: int, cursor: str | None = None
-    ) -> tuple[list[dict[str, object]], str]:
-        """One page. Without a cursor the server resumes this agent's acked position;
-        an explicit cursor always wins (ADR-0017), which is how the digest pages."""
-        arguments: dict[str, Any] = {"limit": limit}
-        if cursor is not None:
-            arguments["cursor"] = cursor
-        page = self._call("list_new_articles", arguments)
+    def list_new_articles(self, limit: int) -> tuple[list[dict[str, object]], str]:
+        page = self._call("list_new_articles", {"limit": limit})
         return page["articles"], page["next_cursor"]
 
     def ack_cursor(self, cursor: str) -> None:

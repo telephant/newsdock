@@ -1,6 +1,6 @@
 # ADR-0028: The what-happen digest is a second entry point of `apps/agent`
 
-Status: Accepted 2026-10-30 (the user chose this in spec decisions D-1 and D-2)
+Status: **Superseded by [ADR-0029](0029-whathappen-as-an-independent-agent-server.md)** (2026-10-30). Accepted earlier the same day (the user chose this in spec decisions D-1 and D-2); in use it mixed two agents in one app, so the digest moved to `agents/whathappen`.
 
 ## Context
 

@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 
-from newsdock_agent.domain.baseline import Baseline, BaselineEntry, entry_from_counts
+from whathappen.domain.baseline import Baseline, BaselineEntry, entry_from_counts
 
 T0 = datetime(2026, 10, 30, 0, 7, tzinfo=UTC)
 

@@ -7,8 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from newsdock_agent.adapters.files import BaselineStore, DigestWriter
-from newsdock_agent.domain.baseline import Baseline, BaselineEntry
+
+from whathappen.adapters.files import BaselineStore, DigestWriter
+from whathappen.domain.baseline import Baseline, BaselineEntry
 
 NOW = datetime(2026, 10, 30, 14, 7, tzinfo=UTC)
 
@@ -28,7 +29,7 @@ def fail_replace_for(monkeypatch: pytest.MonkeyPatch, name: str) -> Callable[[],
             raise OSError("simulated failure between temp write and rename")
         real(src, dst)
 
-    monkeypatch.setattr("newsdock_agent.adapters.files.os.replace", replace)
+    monkeypatch.setattr("whathappen.adapters.files.os.replace", replace)
     return lambda: calls["n"]
 
 

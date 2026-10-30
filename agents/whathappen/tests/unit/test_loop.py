@@ -1,4 +1,4 @@
-"""Digest entry: hourly loop, heartbeat, --once (TC-19; AC-13)."""
+"""Runner and CLI: hourly loop, heartbeat, --once (TC-19; AC-13)."""
 
 import logging
 from datetime import datetime, timedelta
@@ -6,10 +6,12 @@ from pathlib import Path
 from typing import Protocol
 
 import pytest
-from newsdock_agent import digest
-from newsdock_agent.config import Settings
-from newsdock_agent.domain.digest import DigestCycle
-from newsdock_agent.domain.loop import Unauthorized
+
+from whathappen import cli
+from whathappen.config import Settings
+from whathappen.domain import runner
+from whathappen.domain.digest import DigestCycle
+from whathappen.domain.errors import Unauthorized
 
 
 class ClockLike(Protocol):
@@ -36,9 +38,9 @@ class FakeCycle:
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    for name in ("NEWSDOCK_CONFIG_FILE", "NEWSDOCK_AGENT_API_KEY"):
+    for name in ("WHATHAPPEN_API_KEY",):
         monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("NEWSDOCK_AGENT_HEARTBEAT_FILE", str(tmp_path / "healthy"))
+    monkeypatch.setenv("WHATHAPPEN_HEARTBEAT_FILE", str(tmp_path / "healthy"))
 
 
 # ---- TC-19: cadence ----------------------------------------------------------------
@@ -48,7 +50,7 @@ def test_tc19_one_cycle_at_start_then_one_per_interval(clock: ClockLike) -> None
     cycle = FakeCycle(clock)
     start = clock.now
     beats: list[int] = []
-    digest.run_loop(
+    runner.run_loop(
         cycle,
         clock=clock,
         sleep=clock.sleep,
@@ -71,7 +73,7 @@ def test_tc19_a_failing_cycle_is_logged_and_the_loop_continues(
     caplog.set_level(logging.WARNING)
     cycle = FakeCycle(clock, fail_on={2: RuntimeError("api down")})
     beats: list[int] = []
-    digest.run_loop(
+    runner.run_loop(
         cycle,
         clock=clock,
         sleep=clock.sleep,
@@ -89,7 +91,7 @@ def test_tc19_a_rejected_key_is_named_in_the_log(
 ) -> None:
     caplog.set_level(logging.ERROR)
     cycle = FakeCycle(clock, fail_on={1: Unauthorized("http://api/mcp")})
-    digest.run_loop(
+    runner.run_loop(
         cycle,
         clock=clock,
         sleep=clock.sleep,
@@ -98,7 +100,7 @@ def test_tc19_a_rejected_key_is_named_in_the_log(
         max_cycles=1,
     )
     messages = " ".join(r.getMessage() for r in caplog.records)
-    assert "401" in messages and "NEWSDOCK_AGENT_API_KEY" in messages
+    assert "401" in messages and "WHATHAPPEN_API_KEY" in messages
 
 
 # ---- --once and the wiring --------------------------------------------------
@@ -106,7 +108,7 @@ def test_tc19_a_rejected_key_is_named_in_the_log(
 
 def test_tc19_once_runs_exactly_one_cycle_and_returns_zero(clock: ClockLike) -> None:
     cycle = FakeCycle(clock)
-    code = digest.run_cli(
+    code = runner.run_cli(
         cycle, once=True, clock=clock, sleep=clock.sleep, interval_seconds=3600,
         heartbeat=lambda: None,
     )  # fmt: skip
@@ -115,7 +117,7 @@ def test_tc19_once_runs_exactly_one_cycle_and_returns_zero(clock: ClockLike) -> 
 
 def test_tc19_once_returns_one_when_the_cycle_fails(clock: ClockLike) -> None:
     cycle = FakeCycle(clock, fail_on={1: RuntimeError("boom")})
-    code = digest.run_cli(
+    code = runner.run_cli(
         cycle, once=True, clock=clock, sleep=clock.sleep, interval_seconds=3600,
         heartbeat=lambda: None,
     )  # fmt: skip
@@ -123,7 +125,7 @@ def test_tc19_once_returns_one_when_the_cycle_fails(clock: ClockLike) -> None:
 
 
 def test_build_cycle_takes_its_parameters_from_the_settings() -> None:
-    cycle = digest.build_cycle(Settings())
+    cycle = cli.build_cycle(Settings())
     assert isinstance(cycle, DigestCycle)
     params = cycle._params
     assert params.page_size == 200  # batch_limit, the API's page maximum
@@ -135,17 +137,17 @@ def test_main_once_wires_settings_and_writes_the_heartbeat(
     clock: ClockLike, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     cycle = FakeCycle(clock)
-    monkeypatch.setattr(digest, "build_cycle", lambda settings: cycle)
-    assert digest.main(["--once"]) == 0
+    monkeypatch.setattr(cli, "build_cycle", lambda settings: cycle)
+    assert cli.main(["--once"]) == 0
     assert len(cycle.times) == 1
     beat = tmp_path / "healthy"
-    assert beat.read_text() == str(Settings().digest_heartbeat_max_age_seconds)
+    assert beat.read_text() == str(Settings().heartbeat_max_age_seconds)
 
 
 def test_main_warns_when_no_api_key_is_set(
     clock: ClockLike, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.WARNING)
-    monkeypatch.setattr(digest, "build_cycle", lambda settings: FakeCycle(clock))
-    digest.main(["--once"])
-    assert any("NEWSDOCK_AGENT_API_KEY" in r.getMessage() for r in caplog.records)
+    monkeypatch.setattr(cli, "build_cycle", lambda settings: FakeCycle(clock))
+    cli.main(["--once"])
+    assert any("WHATHAPPEN_API_KEY" in r.getMessage() for r in caplog.records)

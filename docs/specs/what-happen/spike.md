@@ -1,5 +1,7 @@
 # what-happen — T-01 spike findings (2026-10-30)
 
+> **Relocated 2026-10-30 ([ADR-0029](../../adr/0029-whathappen-as-an-independent-agent-server.md)).** This report describes the agent while it lived inside `apps/agent` (module `newsdock_agent.digest`, settings `digest_*`, `make digest-once`, `infra/digests/`). The code now lives in `agents/whathappen/` (package `whathappen`, variables `WHATHAPPEN_*`, `make -C agents/whathappen once`, `agents/whathappen/output/`). Findings and measurements below still hold.
+
 Run against the live dev stack (Postgres, API, Ollama on the host), with a throwaway registered agent `whathappen-spike` (it stays registered in the dev database; disable it in the UI when you like). Scripts were kept outside the repo. All numbers below are **[verified]** this session unless marked.
 
 ## 1. Data volume and shape

@@ -4,9 +4,10 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.baseline import Baseline, BaselineEntry
-from newsdock_agent.domain.themes import RankedTheme, count_themes, rank_themes
+
+from whathappen.domain.articles import Article
+from whathappen.domain.baseline import Baseline, BaselineEntry
+from whathappen.domain.themes import RankedTheme, count_themes, rank_themes
 
 T0 = datetime(2026, 10, 30, 0, 7, tzinfo=UTC)
 

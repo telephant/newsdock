@@ -1,16 +1,16 @@
 # what-happen — Design (M2g)
 
-Status: design approved 2026-10-30, verified 2026-10-30 (by delegation: the user asked to finish the pipeline; the checklist below was resolved with the recommended answers, review them when you read this) · ADR-0028 Accepted.
+Status: design approved 2026-10-30, verified 2026-10-30 (by delegation: the user asked to finish the pipeline; the checklist below was resolved with the recommended answers, review them when you read this) · ADR-0029 Accepted (supersedes ADR-0028, which put the digest inside `apps/agent`).
 
 Reading order: this file → [diagrams](diagrams/index.html) (open it) → [design-detail.md](design-detail.md) only if you need schemas and algorithms. Spec: [spec.md](spec.md).
 
-The digest is a second entry point of the existing `apps/agent` (D-1, D-2). It reads only through MCP, keeps one small JSON file of its own, and writes markdown files. No API, database, Kafka or web change.
+The digest is an independent agent server in `agents/whathappen` (D-1, D-2, ADR-0029): its own project, image, compose file and `.env`, no platform code. It reads only through MCP, keeps one small JSON file of its own, and writes markdown files. No API, database, Kafka or web change.
 
 ## 1. Components
 
 | Id | Job | Where / notes |
 |---|---|---|
-| C-50 | Digest entry: settings, wiring, the hourly loop, heartbeat, `--once` | `newsdock_agent/digest.py` (`python -m newsdock_agent.digest`); wires only |
+| C-50 | Digest entry: settings, wiring, the hourly loop, heartbeat, `--once` | `cli.py` (wiring, `--once`) and `domain/runner.py` (loop), started by `python -m whathappen` |
 | C-51 | `DigestCycle`: one pass read → count → rank → pick → summarise → render → write → ack → baseline | `domain/digest.py`; works through ports, injectable clock |
 | C-52 | Theme counting, ranking against the baseline, baseline rolling window | `domain/themes.py`, `domain/baseline.py`, plus the typed `domain/articles.py`; pure |
 | C-53 | Story picker: top stories per theme, one theme per story | `domain/stories.py`; pure |
@@ -18,14 +18,14 @@ The digest is a second entry point of the existing `apps/agent` (D-1, D-2). It r
 | C-55 | Summariser: one Ollama `/api/chat` call per theme, plain-text answer | `adapters/summarize.py`; the model name is a setting |
 | C-56 | Files: atomic digest writer (+ `latest.md`) and the JSON baseline store | `adapters/files.py` |
 | C-57 | MCP client paging: `list_new_articles(limit, cursor=None)` | extends `adapters/mcp.py`; explicit cursor wins on the server (ADR-0017) |
-| C-58 | Compose service `digest`, `make digest-once`, `digest_*` settings, README | same image, own command, `agent` network only |
+| C-58 | Packaging: `Dockerfile`, `compose.yaml`, `Makefile`, `.env.example`, README, `WHATHAPPEN_*` settings | own network only; reaches the platform's published port and the host's Ollama |
 
-Extension points (backlog, not built): a store port in C-51 for digests (web page), a label map in C-52, a `digest_theme_prefixes` filter.
+Extension points (backlog, not built): a store port in C-51 for digests (web page), a label map in C-52, a `theme_prefixes` filter.
 
 ## 2. Key flows
 
 - **F-40 One cycle** (diagram 2): page `list_new_articles` from the stored position with explicit cursors until a short page or the article cap → count themes → rank → pick stories → one summary per theme → render → write the file → `ack_cursor` → save the baseline.
-- **F-41 Hourly loop** (diagram 3): run a cycle at start, sleep `digest_interval_seconds`, repeat; a failing cycle is logged and the loop continues; the heartbeat is written after every pass.
+- **F-41 Hourly loop** (diagram 3): run a cycle at start, sleep `interval_seconds`, repeat; a failing cycle is logged and the loop continues; the heartbeat is written after every pass.
 
 ## 3. Contracts
 
@@ -40,8 +40,8 @@ Local files (the only state):
 
 | File | Content |
 |---|---|
-| `<digest_dir>/YYYY-MM-DD/HHMM.md` (UTC run time) | one digest |
-| `<digest_dir>/latest.md` | copy of the newest digest |
+| `<output_dir>/YYYY-MM-DD/HHMM.md` (UTC run time) | one digest |
+| `<output_dir>/latest.md` | copy of the newest digest |
 | `<state_dir>/digest-baseline.json` | `{version, entries: [{at, articles, themes{code: count}}]}`, newest 24 entries |
 
 ## 4. The tricky parts
@@ -50,7 +50,7 @@ Local files (the only state):
 2. **Rise is share-based.** `rise = count / (pooled baseline share × articles in this window)`. For equal-size windows it equals "count ÷ usual count" (AC-4), but a short window after a restart or a long catch-up window does not distort it. This refines D-7 (see checklist).
 3. **One story, one theme.** Themes are walked in rank order; each takes its top stories that no earlier theme took. Counts in the heading stay per theme.
 4. **The model writes, Python counts.** The prompt holds only the theme label and titles. A bad or missing answer degrades one section (D-9).
-5. **Window cap.** At `digest_max_articles` the cycle stops paging, digests what it read and acks that position; the next cycle continues (catch-up), so no article is skipped.
+5. **Window cap.** At `max_articles` the cycle stops paging, digests what it read and acks that position; the next cycle continues (catch-up), so no article is skipped.
 6. **Own key, own cursor.** The digest service has its own registered agent; sharing the demo agent's key would make the two loops steal each other's articles.
 7. **Untrusted text.** Titles and the model's lines are escaped as markdown text; headlines can contain anything, including instructions aimed at the model, which can only change a one-line summary.
 
@@ -66,7 +66,7 @@ Local files (the only state):
 
 ## 6. Technology
 
-Python 3.12, `httpx` (Ollama), the existing `mcp` client, `pydantic` settings, stdlib `json`, `pathlib`, `os.replace`. Nothing new to install **[verified]**: all are already dependencies of `apps/agent`. No ADR-worthy library choice; one ADR for the placement (ADR-0028).
+Python 3.12, `httpx` (Ollama), the `mcp` client library (its own copy of the small wrapper), `pydantic` settings, stdlib `json`, `pathlib`, `os.replace`. Nothing new to install **[verified]**: all are already dependencies of `apps/agent`. No ADR-worthy library choice; one ADR for the placement (ADR-0028).
 
 ## 7. AC coverage
 
@@ -95,4 +95,4 @@ Python 3.12, `httpx` (Ollama), the existing `mcp` client, `pydantic` settings, s
 - [x] Is "file, then ack, then baseline" the right order? Resolved: yes, a duplicate digest is cheaper than a lost window.
 - [x] Is catch-up over several cycles (cap, tricky part 5) better than skipping to the newest articles? Resolved: yes, nothing is silently dropped; a skip option is in the backlog if it proves slow.
 - [x] Is one summary per theme (about 8 model calls per hour) the right cost? Resolved: yes, each call is a few titles and seconds.
-- [x] Is a bind-mounted folder (`infra/digests/`, git-ignored; a root `digests/` fails the layout check) the right place for the output? Resolved: yes, you open the files from the host.
+- [x] Is a bind-mounted folder (`agents/whathappen/output/`, git-ignored; a root `digests/` fails the layout check) the right place for the output? Resolved: yes, you open the files from the host.
