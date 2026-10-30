@@ -9,8 +9,8 @@ from collections import Counter
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.baseline import Baseline
+from whathappen.domain.articles import Article
+from whathappen.domain.baseline import Baseline
 
 
 @dataclass(frozen=True)

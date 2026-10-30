@@ -12,7 +12,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from newsdock_agent.domain.baseline import Baseline
+from whathappen.domain.baseline import Baseline
 
 logger = logging.getLogger(__name__)
 

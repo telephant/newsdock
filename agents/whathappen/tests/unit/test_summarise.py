@@ -5,8 +5,9 @@ from collections.abc import Callable
 
 import httpx
 import pytest
-from newsdock_agent.adapters.summarize import OllamaSummariser
-from newsdock_agent.domain.prompt import theme_prompt
+
+from whathappen.adapters.summarize import OllamaSummariser
+from whathappen.domain.prompt import theme_prompt
 
 TITLES = ["ECB holds rates as inflation cools", "US CPI eases for third month"]
 

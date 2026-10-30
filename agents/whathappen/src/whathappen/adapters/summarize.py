@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from newsdock_agent.domain.prompt import theme_prompt
+from whathappen.domain.prompt import theme_prompt
 
 logger = logging.getLogger(__name__)
 

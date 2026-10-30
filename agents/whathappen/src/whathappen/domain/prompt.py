@@ -7,7 +7,7 @@ writes prose.
 
 from collections.abc import Sequence
 
-from newsdock_agent.domain.text import clean_text
+from whathappen.domain.text import clean_text
 
 _TEMPLATE = (
     "Theme: {label}\n"

@@ -1,0 +1,47 @@
+[project]
+name = "whathappen"
+version = "0.1.0"
+description = "Independent what-happen agent server: reads newsdock through MCP and writes an hourly digest."
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.12",
+    "pydantic-settings>=2.15",
+    "mcp>=2.3",
+    "httpx>=0.28",
+    "httpx2>=2.13",
+]
+
+[dependency-groups]
+dev = ["pytest", "ruff", "mypy", "pyyaml", "types-pyyaml"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whathappen"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+testpaths = ["tests"]
+
+# This project is independent of the newsdock workspace: its own lint and type config,
+# so the root tooling (which names its paths explicitly) never needs to know about it.
+[tool.ruff]
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.environ".msg = "read environment variables only in config.py"
+"os.getenv".msg = "read environment variables only in config.py"
+
+[tool.ruff.lint.per-file-ignores]
+"**/config.py" = ["TID251"]
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+explicit_package_bases = true
+mypy_path = ["src"]

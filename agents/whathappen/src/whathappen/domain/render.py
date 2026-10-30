@@ -8,9 +8,9 @@ data or the model goes through `escape_text`, so no markup or HTML is produced.
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.stories import ThemePick
-from newsdock_agent.domain.text import clean_text, encode_url, escape_text
+from whathappen.domain.articles import Article
+from whathappen.domain.stories import ThemePick
+from whathappen.domain.text import clean_text, encode_url, escape_text
 
 NOTICE = (
     "> From headlines only. Summaries are written by a small local model and can "

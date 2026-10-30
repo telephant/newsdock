@@ -1,0 +1,33 @@
+name: whathappen
+
+# The what-happen agent server, started on its own (docker compose up -d in this folder).
+# It is an outside client of newsdock: it reaches the platform's published MCP port and
+# the host's Ollama through the host, not through the platform's docker networks.
+services:
+  whathappen:
+    build: .
+    image: whathappen:dev
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside the container "127.0.0.1" is the container itself, so the host is used.
+      # The platform's MCP endpoint refuses any Host header outside its allow-list
+      # (localhost, 127.0.0.1, api), so the host is reached under the name "api".
+      # Override in .env with WHATHAPPEN_DOCKER_MCP_URL / WHATHAPPEN_DOCKER_OLLAMA_URL.
+      WHATHAPPEN_MCP_URL: ${WHATHAPPEN_DOCKER_MCP_URL:-http://api:8000/mcp}
+      WHATHAPPEN_OLLAMA_URL: ${WHATHAPPEN_DOCKER_OLLAMA_URL:-http://host.docker.internal:11434}
+      WHATHAPPEN_OUTPUT_DIR: /output
+      WHATHAPPEN_STATE_FILE: /output/baseline.json
+    extra_hosts:
+      - "api:host-gateway"  # the platform's published port, under a name its MCP accepts
+      - "host.docker.internal:host-gateway"  # Ollama; Docker Desktop already has it
+    volumes:
+      - ./output:/output  # the digests and the baseline: open them from the host
+    healthcheck:
+      test: ["CMD", "python", "-m", "whathappen.adapters.healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s

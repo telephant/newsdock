@@ -7,7 +7,17 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from newsdock_agent.domain.articles import Article
+
+from whathappen.config import Settings
+from whathappen.domain.articles import Article
+
+
+@pytest.fixture(autouse=True)
+def isolated_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test reads a real agents/whathappen/.env or a WHATHAPPEN_* shell variable."""
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for name in Settings.model_fields:
+        monkeypatch.delenv(f"WHATHAPPEN_{name.upper()}", raising=False)
 
 
 @pytest.fixture

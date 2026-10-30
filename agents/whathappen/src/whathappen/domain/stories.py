@@ -8,8 +8,8 @@ highest-ranked one, and does not make every theme's prompt the same.
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.themes import RankedTheme
+from whathappen.domain.articles import Article
+from whathappen.domain.themes import RankedTheme
 
 
 @dataclass(frozen=True)

@@ -20,6 +20,22 @@ def test_valid_tree_has_no_violations(tree: Path) -> None:
     assert messages(tree) == []
 
 
+def test_agents_is_an_allowed_top_level_folder(tree: Path) -> None:  # ADR-0029
+    # independent agent servers live outside the platform's apps/ and its rules
+    write(tree / "agents" / "whathappen" / "src" / "whathappen" / "__init__.py")
+    write(tree / "agents" / "whathappen" / "tests" / "unit" / "test_x.py")
+    write(tree / "agents" / "whathappen" / "README.md")
+    assert messages(tree) == []
+
+
+def test_python_outside_src_or_tests_in_an_agent_still_fails(tree: Path) -> None:
+    write(tree / "agents" / "whathappen" / "helper.py")
+    found = messages(tree)
+    assert any(
+        m.startswith("DR-4") and "agents/whathappen/helper.py" in m for m in found
+    )
+
+
 def test_python_file_outside_src_or_tests_fails(tree: Path) -> None:  # TC-37
     write(tree / "apps" / "api" / "helper.py")
     found = messages(tree)

@@ -1,5 +1,7 @@
 # what-happen — Verify
 
+> **Relocated 2026-10-30 ([ADR-0029](../../adr/0029-whathappen-as-an-independent-agent-server.md)).** This report describes the agent while it lived inside `apps/agent` (module `newsdock_agent.digest`, settings `digest_*`, `make digest-once`, `infra/digests/`). The code now lives in `agents/whathappen/` (package `whathappen`, variables `WHATHAPPEN_*`, `make -C agents/whathappen once`, `agents/whathappen/output/`). Findings and measurements below still hold.
+
 Verified 2026-10-30 on branch `worktree-p2-delivery` (working copy, nothing committed yet). **Verdict: pass with follow-ups.** All 16 ACs hold; the follow-ups are the owner's browser link check, one Docker scene that cannot run beside the dev stack, and a quality question only hours of running can answer.
 
 ## What was run in this session
@@ -70,3 +72,20 @@ Nothing implemented outside the spec: no UI page, no database storage, no new MC
 | F-6 | P2 | Backlog (already added): `published_at` outliers (an article dated 2004 in a live window) |
 
 Next milestone candidates from the backlog: story-similarity grouping (needs an MCP tool for neighbours or vectors), body extraction (M3), or `/spec-verify forgot-password`, which is still pending from before.
+
+## Relocation addendum (2026-10-30): moved to `agents/whathappen`
+
+After the verdict above, the owner asked for the digest to be an independent agent server instead of a mode of the demo agent ([ADR-0029](../../adr/0029-whathappen-as-an-independent-agent-server.md)). The code moved with its tests; this is what was re-run after the move.
+
+| Run | Result |
+|---|---|
+| `agents/whathappen`: `make check` (ruff, ruff format, mypy strict, pytest) | exit 0; **129 passed** (98 moved tests, plus 31 new: settings and `.env`, MCP client, heartbeat, packaging/independence) |
+| Root `make check` (ruff, mypy, import-linter, layout incl. the new `agents/` rule, config, 681 Python tests, 181 web tests, docs) | exit 0; the demo agent's tests and settings are back to their pre-digest state |
+| Independence test (`test_packaging.py`) | passes: no source or test file imports `newsdock*`, `apps` or `packages`; no workspace dependency; compose has no network, no `depends_on`, no database/Kafka env |
+| Container, `docker compose build` then `run --rm whathappen python -m whathappen --once` against the running platform | exit 0, digest of 3 097 articles written to `./output` |
+| Container as a service, `up -d --wait` | healthy in 5 s; attached to `whathappen_default` only; uid 1000 |
+| `make once` on the host (with and without `.env`) | guard message without the key; with it the cycle ran (empty window: the container had read it) |
+
+**New finding from the first container run (the point of an outside client):** the platform's MCP endpoint answered `421 Invalid Host header` to `Host: host.docker.internal:8000`, while the same container reached `/api/health` fine. The allow-list (`mcp_allowed_hosts`) is `localhost:*,127.0.0.1:*,api:*` and is pinned by the externalize-config snapshot, so the platform was not changed: the agent's compose file maps the name `api` to the host. Recorded in design-detail section 8, the agent README and ADR-0029.
+
+**Changes to earlier results:** AC-15 now reads "the agent server is independent of the platform" (TC-21, TC-22, TC-23 rewritten in tests.md); the Docker isolation scene extension is gone with the move (TC-23 became the live container check above), so follow-up F-2 is reduced to the platform's own older Docker scenes. F-1 (browser link check), F-3 (a day of digests) and F-5 (disable the two throwaway agents) stand. The CI job for `agents/` is a new follow-up (F-7).

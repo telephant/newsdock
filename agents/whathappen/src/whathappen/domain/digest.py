@@ -16,11 +16,11 @@ from typing import Protocol
 
 from pydantic import ValidationError
 
-from newsdock_agent.domain.articles import Article
-from newsdock_agent.domain.baseline import Baseline, entry_from_counts
-from newsdock_agent.domain.render import render_digest, theme_label
-from newsdock_agent.domain.stories import pick_stories
-from newsdock_agent.domain.themes import count_themes, rank_themes
+from whathappen.domain.articles import Article
+from whathappen.domain.baseline import Baseline, entry_from_counts
+from whathappen.domain.render import render_digest, theme_label
+from whathappen.domain.stories import pick_stories
+from whathappen.domain.themes import count_themes, rank_themes
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-ROOT_DIRS = {"apps", "packages", "infra", "docs", ".github"}
+ROOT_DIRS = {"apps", "agents", "packages", "infra", "docs", ".github"}  # ADR-0029
 ROOT_FILES = {
     "Makefile",
     "pyproject.toml",
@@ -143,14 +143,26 @@ def check_packages(root: Path) -> list[Violation]:
     return found
 
 
+def check_agents(root: Path) -> list[Violation]:
+    """Independent agent servers (ADR-0029) are their own projects: they only keep
+    Python under src/<name>/ or tests/; the platform's app rules do not apply."""
+    found: list[Violation] = []
+    agents = root / "agents"
+    if agents.is_dir():
+        for agent in sorted(agents.iterdir()):
+            if agent.is_dir() and agent.name not in IGNORED:
+                found.extend(check_python_files(root, agent, agent.name))
+    return found
+
+
 def check_python_elsewhere(root: Path) -> list[Violation]:
-    """Outside apps and packages, Python is allowed only in infra/scripts|migrations."""
+    """Outside apps, agents, packages: Python only in infra/scripts|migrations."""
     found = []
     for path in walk(root):
         where = rel(root, path)
         if path.suffix != ".py" or "/" not in where:
             continue  # root-level files are reported by DR-1
-        if where.split("/")[0] in {"apps", "packages"}:
+        if where.split("/")[0] in {"apps", "agents", "packages"}:
             continue
         if not where.startswith(PYTHON_OUTSIDE_ALLOWED):
             found.append(Violation("DR-4", "Python file in a non-Python place", where))
@@ -199,6 +211,7 @@ def check(root: Path, pending: dict[str, str] | None = None) -> list[Violation]:
         *check_root(root),
         *check_apps(root, pending),
         *check_packages(root),
+        *check_agents(root),
         *check_python_elsewhere(root),
         *check_contracts(root),
     ]
