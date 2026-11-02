@@ -9,16 +9,18 @@ import logging
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
+from pydantic import Field
 
 from newsdock_api.adapters.accounts_api import (
     build_accounts_router,
@@ -57,8 +59,10 @@ from newsdock_api.domain.ratelimit import FixedWindowLimiter
 from newsdock_api.domain.records import (
     ArticleDetail,
     FeedPage,
+    FeedPageTone,
     HealthStatus,
     NewArticlesPage,
+    dump_page,
 )
 from newsdock_api.domain.resetlimit import ResetAttemptLimiter, ResetRequestLimiter
 from newsdock_api.domain.semantic import (
@@ -78,8 +82,29 @@ from newsdock_api.domain.service import (
 from newsdock_api.domain.signuplimit import SignupLimiter
 from newsdock_api.domain.streams import StreamLimiter, WakeHub
 from newsdock_api.domain.subscriptions import SubscriptionStore
+from newsdock_api.domain.tone import (
+    InvalidInclude,
+    InvalidNegativity,
+    check_min_negativity,
+    parse_include,
+)
 
 logger = logging.getLogger(__name__)
+
+# Strict, so a numeric string or `true` is refused instead of coerced to 8.0 or 1.0.
+Negativity = Annotated[float | None, Field(strict=True)]
+
+
+def _tone_arguments(
+    include: list[str] | None, min_negativity: float | None
+) -> tuple[tuple[str, ...], float | None]:
+    """Check the two tone arguments of an MCP tool before any query runs."""
+    try:
+        return parse_include(include), check_min_negativity(min_negativity)
+    except InvalidInclude as exc:
+        raise ToolError(f"invalid_include: {exc}") from exc
+    except InvalidNegativity as exc:
+        raise ToolError(f"invalid_filter: {exc}") from exc
 
 
 def create_app(
@@ -146,13 +171,24 @@ def create_app(
         domain: str | None = None,
         text: str | None = None,
         limit: int | None = None,
+        min_negativity: Negativity = None,
+        include: list[str] | None = None,
     ) -> dict[str, Any]:
-        """Search stored articles by time range, theme, domain and title text."""
+        """Search stored articles by time range, theme, domain and title text.
+
+        `min_negativity` (0 to 100) keeps only articles whose GDELT negative-tone
+        share is at least that value; articles without tone never match it.
+        `include` adds tone numbers to each article: any of "tone", "tone_pos",
+        "tone_neg", "tone_polarity" (null when the article has none). Without it
+        the articles carry no tone fields.
+        """
+        tone, floor = _tone_arguments(include, min_negativity)
         articles = service.search(
             time_from=time_from, time_to=time_to, theme=theme,
             domain=domain, text=text, limit=limit,
+            min_negativity=floor, include=tone,
         )  # fmt: skip
-        return {"articles": [a.model_dump(mode="json") for a in articles]}
+        return {"articles": [a.to_json(tone) for a in articles]}
 
     @mcp.tool()
     def semantic_search(
@@ -163,6 +199,8 @@ def create_app(
         theme: str | None = None,
         domain: str | None = None,
         limit: int | None = None,
+        min_negativity: Negativity = None,
+        include: list[str] | None = None,
     ) -> dict[str, Any]:
         """Search article titles by meaning, not only by words.
 
@@ -171,12 +209,15 @@ def create_app(
         "vector" (meaning only). Filters work as in search_articles. Each result has
         a `score` and `matched_by`. If the embedding service is down, "hybrid" falls
         back to word matching and sets `degraded`; "vector" returns the error
-        `embedding_unavailable`.
+        `embedding_unavailable`. `min_negativity` and `include` work as in
+        search_articles, in both modes.
         """
+        tone, floor = _tone_arguments(include, min_negativity)
         try:
             result = semantic.search(
                 query, mode=mode, time_from=time_from, time_to=time_to,
                 theme=theme, domain=domain, limit=limit,
+                min_negativity=floor, include=tone,
             )  # fmt: skip
         except InvalidQuery as exc:
             raise ToolError(f"invalid_query: {exc}") from exc
@@ -186,7 +227,7 @@ def create_app(
                 "embedding_unavailable: the query could not be embedded; "
                 "use mode 'hybrid' or search_articles"
             ) from exc
-        return result.model_dump(mode="json")
+        return dump_page(result, tone)
 
     @mcp.tool(name="get_article")
     def get_article_tool(article_id: str) -> dict[str, Any]:
@@ -198,24 +239,30 @@ def create_app(
 
     @mcp.tool()
     def list_new_articles(
-        ctx: Context, cursor: str | None = None, limit: int | None = None
+        ctx: Context,
+        cursor: str | None = None,
+        limit: int | None = None,
+        include: list[str] | None = None,
     ) -> dict[str, Any]:
         """List articles newer than the cursor.
 
         Without a cursor an authenticated agent resumes from the position it last
-        acknowledged with ack_cursor; a new agent gets the last hour.
+        acknowledged with ack_cursor; a new agent gets the last hour. `include` adds
+        tone numbers to each article ("tone", "tone_pos", "tone_neg",
+        "tone_polarity"); it does not change which articles or which cursor you get.
         """
         agent = current_agent(ctx)
+        tone, _ = _tone_arguments(include, None)
         stored = None
         if cursor is None and agent.id is not None:
             stored = sql_agents.get_cursor(agent.id)
         try:
             page: NewArticlesPage = service.list_new(
-                cursor=cursor, limit=limit, stored_seq=stored
+                cursor=cursor, limit=limit, stored_seq=stored, include=tone
             )
         except ValueError as exc:
             raise ToolError(f"invalid_cursor: {exc}") from exc
-        return page.model_dump(mode="json")
+        return dump_page(page, tone)
 
     @mcp.tool()
     def ack_cursor(cursor: str, ctx: Context) -> dict[str, Any]:
@@ -405,7 +452,14 @@ def create_app(
         )
     )
 
-    @app.get("/api/articles", dependencies=[Depends(guards.read)])
+    # Returns a JSONResponse built by `dump_page` so tone is written only when asked
+    # for (ADR-0030); `responses` documents the shape for OpenAPI.
+    @app.get(
+        "/api/articles",
+        response_model=None,
+        responses={200: {"model": FeedPageTone}},
+        dependencies=[Depends(guards.read)],
+    )
     def rest_articles(
         theme: str | None = None,
         domain: str | None = None,
@@ -414,7 +468,9 @@ def create_app(
         time_to: datetime | None = None,
         limit: int | None = None,
         before: str | None = None,
-    ) -> FeedPage:
+        min_negativity: float | None = None,
+        include: str | None = None,
+    ) -> JSONResponse:
         before_key: tuple[datetime, str] | None = None
         if before:
             raw_ts, _, raw_hash = before.partition(",")
@@ -422,16 +478,25 @@ def create_app(
                 before_key = (datetime.fromisoformat(raw_ts), raw_hash)
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail="invalid_before") from exc
+        try:
+            tone = parse_include(include)
+            floor = check_min_negativity(min_negativity)
+        except InvalidInclude as exc:
+            raise HTTPException(status_code=422, detail="invalid_include") from exc
+        except InvalidNegativity as exc:
+            raise HTTPException(status_code=422, detail="invalid_filter") from exc
         articles = service.search(
             time_from=time_from, time_to=time_to, theme=theme,
             domain=domain, text=text, limit=limit, before=before_key,
+            min_negativity=floor, include=tone,
         )  # fmt: skip
         next_before = (
             f"{articles[-1].published_at.isoformat()},{articles[-1].article_id}"
             if articles
             else None
         )
-        return FeedPage(articles=articles, next_before=next_before)
+        page = FeedPage(articles=articles, next_before=next_before)
+        return JSONResponse(dump_page(page, tone))
 
     @app.get("/api/articles/{article_id}", dependencies=[Depends(guards.read)])
     def rest_article(article_id: str) -> ArticleDetail:

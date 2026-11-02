@@ -1,5 +1,6 @@
 """TC-1 (API half), TC-2, TC-3 (list), TC-4, TC-5 (routes), TC-15, TC-22."""
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Any
 
@@ -44,10 +45,12 @@ class FakeStore:
         self.rows: dict[str, SubscriptionRecord] = {}
         self.owner_names: dict[str, str] = {}
 
-    def create(self, agent_id: str, filter_json: dict[str, str]) -> SubscriptionRecord:
+    def create(
+        self, agent_id: str, filter_json: Mapping[str, str | float]
+    ) -> SubscriptionRecord:
         record = SubscriptionRecord(
             id=f"sub-{len(self.rows) + 1}", agent_id=agent_id,
-            filter=filter_json, created_at=NOW,
+            filter=dict(filter_json), created_at=NOW,
         )  # fmt: skip
         self.rows[record.id] = record
         self.owner_names[record.id] = agent_id.removeprefix("id-")
@@ -261,3 +264,31 @@ def test_admin_lists_all_subscriptions_with_agent_names() -> None:
     assert c.get("/api/admin/subscriptions").status_code == 401
     off = make_app(keys, store, admin_token=None)
     assert off.get("/api/admin/subscriptions", headers=bearer(ADMIN)).status_code == 401
+
+
+# TC-15, TC-17 (AC-12, AC-13): the saved filter may hold a number
+def test_create_stores_and_returns_min_negativity() -> None:
+    keys, store = FakeKeys(), FakeStore()
+    c = make_app(keys, store)
+    response = c.post(
+        "/api/subscriptions",
+        json={"min_negativity": 8, "theme": "ECON_*"},
+        headers=bearer(keys.add("alpha")),
+    )
+    assert response.status_code == 201
+    assert response.json()["filter"] == {"theme": "ECON_*", "min_negativity": 8}
+    (row,) = store.rows.values()
+    assert row.filter == {"theme": "ECON_*", "min_negativity": 8}
+
+
+@pytest.mark.parametrize("value", [-1, 101, True, "8", "abc"])
+def test_bad_min_negativity_is_422_and_nothing_is_stored(value: Any) -> None:
+    keys, store = FakeKeys(), FakeStore()
+    c = make_app(keys, store)
+    response = c.post(
+        "/api/subscriptions",
+        json={"min_negativity": value},
+        headers=bearer(keys.add("a")),
+    )
+    assert response.status_code == 422
+    assert store.rows == {}

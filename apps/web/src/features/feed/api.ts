@@ -4,9 +4,11 @@
 import type { components } from "@/lib/api/types";
 import { apiFetch } from "@/lib/client/api";
 
-export type ArticleSummary = components["schemas"]["ArticleSummary"];
+// The feed is documented as ArticleSummaryTone / FeedPageTone: the same article with
+// the four tone numbers as optional keys (ADR-0030). The names here stay as they were.
+export type ArticleSummary = components["schemas"]["ArticleSummaryTone"];
 export type ArticleDetail = components["schemas"]["ArticleDetail"];
-export type FeedPage = components["schemas"]["FeedPage"];
+export type FeedPage = components["schemas"]["FeedPageTone"];
 
 // Where and how much to fetch comes from the runtime config (ADR-0014).
 export type ApiConfig = { apiBaseUrl: string; pageSize?: number };

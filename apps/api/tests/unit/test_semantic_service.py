@@ -1,5 +1,6 @@
 """TC-20 (AC-6) and the search rules of AC-6, AC-8, AC-9, AC-10 at service level."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -46,7 +47,9 @@ class FakeRepo:
         self.keyword_calls.append({"query": query, "filters": filters, "limit": limit})
         return list(self.keyword)
 
-    def summaries(self, ids: list[str]) -> dict[str, ArticleSummary]:
+    def summaries(
+        self, ids: list[str], include: Sequence[str] = ()
+    ) -> dict[str, ArticleSummary]:
         return {
             i: ArticleSummary(
                 article_id=i,

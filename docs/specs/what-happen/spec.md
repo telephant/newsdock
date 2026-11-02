@@ -1,5 +1,7 @@
 # what-happen — Spec (M2g: an hourly "what happened" digest agent, a test harness for the server)
 
+> **Superseded 2026-11-02 for the digest shape.** The theme-grouped digest this document describes (themes ranked against a rolling baseline, `×N vs usual`) was replaced by the story-first digest of [`docs/specs/digest-top-stories/`](../digest-top-stories/spec.md) ([ADR-0031](../../adr/0031-story-first-digest-lexical-grouping-behind-a-port.md)); its code, baseline and settings are removed. The reading, ack, atomic-file and failure rules described here still hold. Kept as history.
+
 Status: init, design and plan approved 2026-10-30 (ADR-0028) · implemented and verified 2026-10-30 (pass with follow-ups, see [verify.md](verify.md))
 
 ## 0. Review guide

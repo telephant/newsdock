@@ -1,5 +1,7 @@
 # what-happen — Design detail
 
+> **Superseded 2026-11-02 for the digest shape.** The theme-grouped digest this document describes (themes ranked against a rolling baseline, `×N vs usual`) was replaced by the story-first digest of [`docs/specs/digest-top-stories/`](../digest-top-stories/spec.md) ([ADR-0031](../../adr/0031-story-first-digest-lexical-grouping-behind-a-port.md)); its code, baseline and settings are removed. The reading, ack, atomic-file and failure rules described here still hold. Kept as history.
+
 Reference only: not required reading for approving the design (see [design.md](design.md)).
 
 ## 1. Settings (environment `WHATHAPPEN_<NAME>`, also read from `agents/whathappen/.env`)

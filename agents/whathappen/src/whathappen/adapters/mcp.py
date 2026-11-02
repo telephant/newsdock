@@ -7,7 +7,7 @@ re-checked with one plain request to tell "key rejected" from "platform down".
 
 import asyncio
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 import httpx
@@ -79,13 +79,20 @@ class McpClient:
             raise
 
     def list_new_articles(
-        self, limit: int, cursor: str | None = None
+        self,
+        limit: int,
+        cursor: str | None = None,
+        include: Sequence[str] | None = None,
     ) -> tuple[list[dict[str, object]], str]:
         """One page. Without a cursor the server resumes this agent's acked position;
-        an explicit cursor always wins, which is how the digest pages."""
+        an explicit cursor always wins, which is how the digest pages. `include` asks
+        for extra article fields (the digest asks for `tone_neg`); a platform that
+        does not know it ignores it and the fields are simply absent."""
         arguments: dict[str, Any] = {"limit": limit}
         if cursor is not None:
             arguments["cursor"] = cursor
+        if include:
+            arguments["include"] = list(include)
         page = self._call("list_new_articles", arguments)
         return page["articles"], page["next_cursor"]
 

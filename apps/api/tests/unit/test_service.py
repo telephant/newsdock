@@ -1,5 +1,6 @@
 """TC-17, TC-18, TC-20, TC-22, TC-23, TC-24 (service side) over a fake repo."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -55,6 +56,8 @@ class FakeRepo:
         theme: str | None = None,
         domain: str | None = None,
         text: str | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]:
         self.list_calls.append((after_seq, since, limit))
         self.filters.append((theme, domain, text))

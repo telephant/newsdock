@@ -63,6 +63,29 @@ def test_list_sends_the_cursor_only_when_given(monkeypatch: pytest.MonkeyPatch) 
     ]
 
 
+def test_list_sends_include_only_when_given(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake(self: McpClient, tool: str, arguments: dict[str, Any]) -> Any:
+        calls.append((tool, arguments))
+        return {"articles": [], "next_cursor": "c0"}
+
+    monkeypatch.setattr(McpClient, "_raw_call", fake)
+    client = McpClient("http://api/mcp", api_key=None)
+    client.list_new_articles(200)
+    client.list_new_articles(200, include=None)
+    client.list_new_articles(200, include=())
+    client.list_new_articles(200, cursor="c1", include=["tone_neg"])
+    client.list_new_articles(200, include=("tone_neg", "tone"))
+    assert calls == [
+        ("list_new_articles", {"limit": 200}),
+        ("list_new_articles", {"limit": 200}),
+        ("list_new_articles", {"limit": 200}),
+        ("list_new_articles", {"limit": 200, "cursor": "c1", "include": ["tone_neg"]}),
+        ("list_new_articles", {"limit": 200, "include": ["tone_neg", "tone"]}),
+    ]
+
+
 def test_ack_calls_the_tool(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, dict[str, Any]]] = []
 

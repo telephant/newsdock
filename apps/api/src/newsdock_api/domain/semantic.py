@@ -7,6 +7,7 @@ take the same filters. If the query cannot be embedded, `vector` mode fails with
 `EmbeddingUnavailable` and `hybrid` falls back to the keyword leg, flagged degraded.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
@@ -33,6 +34,7 @@ class SearchFilters:
     time_to: datetime | None = None
     theme: str | None = None  # exact, or a trailing `*` for a prefix
     domain: str | None = None
+    min_negativity: float | None = None  # tone_neg at or above; checked by the caller
 
 
 @dataclass(frozen=True)
@@ -57,7 +59,9 @@ class SemanticRepo(Protocol):
         """Full-text matches on the title, best first."""
         ...
 
-    def summaries(self, ids: list[str]) -> dict[str, ArticleSummary]: ...
+    def summaries(
+        self, ids: list[str], include: Sequence[str] = ()
+    ) -> dict[str, ArticleSummary]: ...
 
 
 class QueryEmbedder(Protocol):
@@ -98,6 +102,8 @@ class SemanticService:
         theme: str | None = None,
         domain: str | None = None,
         limit: int | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> SemanticResult:
         text = query.strip()
         if not text:
@@ -112,7 +118,7 @@ class SemanticService:
             else max(1, min(limit, self._max_limit))
         )
         depth = max(self._candidates, size)  # candidates per leg
-        filters = SearchFilters(time_from, time_to, theme, domain)
+        filters = SearchFilters(time_from, time_to, theme, domain, min_negativity)
 
         vector_hits: list[Hit] = []
         degraded = False
@@ -143,7 +149,7 @@ class SemanticService:
             fused = fuse(legs, k=self._rrf_k)[:size]
             scored = [(f.id, f.score, list(f.matched_by)) for f in fused]
 
-        summaries = self._repo.summaries([s[0] for s in scored])
+        summaries = self._repo.summaries([s[0] for s in scored], include)
         articles = [
             SemanticHit.model_validate(
                 {**dict(summaries[i]), "score": score, "matched_by": matched}

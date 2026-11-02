@@ -7,7 +7,7 @@ articles ingested within `first_run_window` (R-2). Limits clamped (design.md §3
 import base64
 import binascii
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
@@ -46,6 +46,8 @@ class ArticleRepo(Protocol):
         text: str | None,
         limit: int,
         before: tuple[datetime, str] | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]: ...
 
     def list_new(
@@ -57,6 +59,8 @@ class ArticleRepo(Protocol):
         theme: str | None = None,
         domain: str | None = None,
         text: str | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]: ...
 
     def latest_seq(self) -> int | None:
@@ -116,6 +120,8 @@ class ArticleService:
         text: str | None = None,
         limit: int | None = None,
         before: tuple[datetime, str] | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]:
         return self._repo.search(
             time_from=time_from,
@@ -125,6 +131,8 @@ class ArticleService:
             text=text,
             limit=_clamp(limit, self._limits.search_default, self._limits.search_max),
             before=before,
+            min_negativity=min_negativity,
+            include=include,
         )
 
     def latest_cursor(self) -> str:
@@ -142,6 +150,8 @@ class ArticleService:
         theme: str | None = None,
         domain: str | None = None,
         text: str | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> NewArticlesPage:
         """Page after `cursor`; else after the agent's stored position; else the
         first-run window. An explicit cursor always wins (ADR-0017)."""
@@ -163,6 +173,8 @@ class ArticleService:
             theme=theme,
             domain=domain,
             text=text,
+            min_negativity=min_negativity,
+            include=include,
         )
         if articles:
             next_cursor = encode_cursor(max(a.seq for a in articles))

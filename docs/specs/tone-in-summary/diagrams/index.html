@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tone-in-summary — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>tone-in-summary — Milestone 3b diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s1">2 Read with tone</a><a href="#s2">3 Subscription</a><a href="#e">4 Data and payload</a></nav></header>
+
+<section id="c"><h2>1 Component delta</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  AG["agent / client"] --> MCP["C-66 MCP tools + REST feed"]
+  MCP --> T["C-60 tone rules"]
+  MCP --> SVC["C-64 service"]
+  MCP --> SEM["C-63 semantic search"]
+  SVC --> REPO["C-62 repo + apply_filters"]
+  SEM --> REPO
+  REPO --> ART[("articles: tone columns")]
+  MCP --> REC["C-61 records: to_json(include)"]
+  SUB["C-65 subscription filter"] --> REPO
+  CON["C-67 openapi.json + types.ts"] -.-> MCP
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is there exactly one place that filters on <code>tone_neg</code> (C-62)?</li>
+<li>Do search, both semantic legs and subscriptions all go through it?</li>
+<li>Is there any new table, setting or dependency? (There should be none.)</li>
+<li>Does C-60 sit in front of every surface so bad input never reaches SQL?</li></ul></div></section>
+
+<section id="s1"><h2>2 Read with tone and a negativity filter (F-60, F-61)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Agent
+  participant M as C-66 surface
+  participant T as C-60 rules
+  participant R as C-62 repo
+  participant D as Postgres
+  A->>M: search_articles(min_negativity=8, include=["tone_neg"])
+  M->>T: parse_include, check_min_negativity
+  alt bad input
+    T-->>M: InvalidInclude / InvalidNegativity
+    M-->>A: invalid_include / invalid_filter
+  else ok
+    M->>R: search(min_negativity=8, include=("tone_neg",))
+    R->>D: WHERE tone_neg >= CAST(8 AS REAL) ORDER BY published_at DESC
+    D-->>R: rows (NULL tone_neg rows are not matched)
+    R-->>M: summaries with tone_neg filled
+    M-->>A: articles[] via to_json: default keys + tone_neg
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Without <code>include</code>, is the response exactly today's (AC-1)?</li>
+<li>Does an article with no <code>tone_neg</code> never come back when the filter is set (AC-9)?</li>
+<li>Is the bad-input path decided before any SQL runs (AC-6, AC-13)?</li>
+<li>Does <code>semantic_search</code> follow the same path in both legs (AC-10)?</li></ul></div></section>
+
+<section id="s2"><h2>3 Saved subscription with a negativity filter (F-62)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant A as Agent
+  participant S as C-65 subscription API
+  participant D as Postgres
+  participant L as stream (SSE)
+  A->>S: POST /api/subscriptions {"min_negativity": 8}
+  S->>S: parse_filter (number 0..100, not bool)
+  S->>D: INSERT filter JSONB
+  A->>L: GET /api/subscriptions/{id}/stream
+  D-->>L: NOTIFY articles_new (wake-up only)
+  L->>D: list_new(after_seq, min_negativity=8) via apply_filters
+  D-->>L: matching rows only
+  L-->>A: SSE events (payload unchanged: no include)
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Do old subscriptions (string values only) still load and match (failure table)?</li>
+<li>Is the stream's data still always read by the cursor query, never from the notification?</li>
+<li>Is the event payload unchanged (spec D-8)?</li></ul></div></section>
+
+<section id="e"><h2>4 Data and payload shape</h2><div class="card">
+<pre class="mermaid">
+classDiagram
+  class articles {
+    +tone real
+    +tone_pos real
+    +tone_neg real
+    +tone_polarity real
+    +word_count int
+  }
+  class ArticleSummary {
+    +article_id, title, url, domain
+    +published_at, themes, source_count, scores
+    -tone, tone_pos, tone_neg, tone_polarity (excluded by default)
+    +to_json(include)
+  }
+  class ArticleDetail {
+    +tone, tone_pos, tone_neg, tone_polarity
+    +word_count
+  }
+  articles --> ArticleSummary : fills only requested names
+  articles --> ArticleDetail : fills all four
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is every new payload key backed by an existing column (no migration)?</li>
+<li>Are the four fields hidden from every default dump, so streams and the live feed cannot leak them?</li>
+<li>Does the detail return all four numbers unconditionally (AC-8)?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

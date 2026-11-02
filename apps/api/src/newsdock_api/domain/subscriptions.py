@@ -6,6 +6,7 @@ of an article's themes; anything else is an exact theme. An empty filter matches
 every article.
 """
 
+from collections.abc import Mapping
 from datetime import datetime
 from typing import Any, Protocol
 
@@ -13,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, StrictStr, ValidationError, field_va
 from pydantic_core.core_schema import ValidationInfo
 
 from newsdock_api.domain.agents import AgentScope
+from newsdock_api.domain.tone import InvalidNegativity, check_min_negativity
 
 PREFIX_MARK = "*"
 
@@ -27,6 +29,16 @@ class SubscriptionFilter(BaseModel):
     theme: StrictStr | None = None
     domain: StrictStr | None = None
     text: StrictStr | None = None
+    min_negativity: float | None = None  # tone_neg at or above (0..100), spec D-4
+
+    @field_validator("min_negativity", mode="before")
+    @classmethod
+    def _a_number_in_range(cls, value: object) -> object:
+        """A real JSON number only: no bool, no string, nothing outside 0..100."""
+        try:
+            return check_min_negativity(value)  # type: ignore[arg-type]
+        except InvalidNegativity as exc:
+            raise ValueError(str(exc)) from exc
 
     @field_validator("theme", "domain", "text")
     @classmethod
@@ -55,11 +67,16 @@ class SubscriptionFilter(BaseModel):
             )
         return value
 
-    def as_query(self) -> dict[str, str | None]:
+    def as_query(self) -> dict[str, str | float | None]:
         """Arguments for `list_new` / `search` (None = no constraint)."""
-        return {"theme": self.theme, "domain": self.domain, "text": self.text}
+        return {
+            "theme": self.theme,
+            "domain": self.domain,
+            "text": self.text,
+            "min_negativity": self.min_negativity,
+        }
 
-    def as_json(self) -> dict[str, str]:
+    def as_json(self) -> dict[str, str | float]:
         """Storage form: only the fields that were given."""
         return {k: v for k, v in self.as_query().items() if v is not None}
 
@@ -85,7 +102,7 @@ def split_theme(theme: str) -> tuple[str, bool]:
 class SubscriptionRecord(BaseModel):
     id: str
     agent_id: str
-    filter: dict[str, str]
+    filter: dict[str, str | float]
     created_at: datetime
 
 
@@ -97,7 +114,7 @@ class SubscriptionStore(Protocol):
     """Persistence the routes and the stream need (SqlSubscriptionsRepo)."""
 
     def create(
-        self, agent_id: str, filter_json: dict[str, str]
+        self, agent_id: str, filter_json: Mapping[str, str | float]
     ) -> SubscriptionRecord: ...
 
     def list_own(self, agent_id: str) -> list[SubscriptionRecord]: ...

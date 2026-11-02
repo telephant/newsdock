@@ -128,9 +128,12 @@ def test_build_cycle_takes_its_parameters_from_the_settings() -> None:
     cycle = cli.build_cycle(Settings())
     assert isinstance(cycle, DigestCycle)
     params = cycle._params
-    assert params.page_size == 200  # batch_limit, the API's page maximum
-    assert params.skip_prefixes[:2] == ("TAX_", "WB_")
-    assert (params.max_themes, params.stories_per_theme) == (8, 3)
+    assert params.page_size == 200  # the API's page maximum
+    assert (params.top_stories, params.max_sections) == (5, 6)
+    assert (params.groups_per_section, params.min_group_sources) == (4, 2)
+    assert (params.also_per_group, params.section_min_hits) == (3, 1)
+    assert params.tone_divisor == 10.0
+    assert params.labels == Settings().section_label_map
 
 
 def test_main_once_wires_settings_and_writes_the_heartbeat(

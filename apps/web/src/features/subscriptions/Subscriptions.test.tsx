@@ -62,6 +62,33 @@ test("shows each subscription with its agent and filter fields", async () => {
   expect(screen.getByText(/any article/i)).toBeTruthy(); // beta's empty filter
 });
 
+// TC-21 (AC-15): a saved filter may hold a number next to the strings.
+test("shows a numeric min_negativity filter next to string fields", async () => {
+  const subs = [
+    {
+      id: "s3",
+      agent_id: "a3",
+      agent_name: "gamma",
+      filter: { theme: "ARMEDCONFLICT*", min_negativity: 8 },
+      created_at: "2026-10-30T10:00:00Z",
+    },
+    {
+      id: "s4",
+      agent_id: "a4",
+      agent_name: "delta",
+      filter: { min_negativity: 9.7 },
+      created_at: "2026-10-30T11:00:00Z",
+    },
+  ];
+  stub({ "GET /api/admin/subscriptions": () => json(subs) });
+  render(<Subscriptions />);
+  await screen.findByText("gamma");
+  expect(screen.getByText("theme: ARMEDCONFLICT*")).toBeTruthy();
+  expect(screen.getByText("min_negativity: 8")).toBeTruthy();
+  expect(screen.getByText("min_negativity: 9.7")).toBeTruthy();
+  expect(screen.queryByText(/any article/i)).toBeNull(); // both have a filter
+});
+
 test("deleting asks first, calls the route and removes the row", async () => {
   const fetchMock = stub({
     "GET /api/admin/subscriptions": () => json(SUBS),

@@ -1,5 +1,7 @@
 """Subscription persistence (role: api_rw): parameterized ORM queries only."""
 
+from collections.abc import Mapping
+
 from newsdock_db.models import Agent as AgentRow
 from newsdock_db.models import Subscription
 from sqlalchemy import Engine, delete, func, select
@@ -24,9 +26,11 @@ class SqlSubscriptionsRepo:
     def __init__(self, engine: Engine) -> None:
         self._engine = engine
 
-    def create(self, agent_id: str, filter_json: dict[str, str]) -> SubscriptionRecord:
+    def create(
+        self, agent_id: str, filter_json: Mapping[str, str | float]
+    ) -> SubscriptionRecord:
         with Session(self._engine) as session:
-            row = Subscription(agent_id=agent_id, filter=filter_json)
+            row = Subscription(agent_id=agent_id, filter=dict(filter_json))
             session.add(row)
             session.commit()
             session.refresh(row)

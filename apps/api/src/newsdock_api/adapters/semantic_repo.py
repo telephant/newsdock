@@ -6,6 +6,7 @@ full-text on the title with the same expression as the GIN index (spec D-8). Bot
 use the one filter implementation of `adapters/repo.py`.
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 from newsdock_db.models import Article
@@ -41,6 +42,7 @@ class SqlSemanticRepo:
             theme=filters.theme,
             domain=filters.domain,
             text_filter=None,
+            min_negativity=filters.min_negativity,
         )
         ranked = inner.order_by(distance).limit(limit).subquery()
         # `relaxed_order` can return rows slightly out of order, so sort exactly outside
@@ -73,6 +75,7 @@ class SqlSemanticRepo:
             theme=filters.theme,
             domain=filters.domain,
             text_filter=None,
+            min_negativity=filters.min_negativity,
         )
         statement = statement.order_by(
             rank.desc(), Article.published_at.desc(), Article.url_hash
@@ -81,5 +84,7 @@ class SqlSemanticRepo:
             rows = session.execute(statement).all()
         return [Hit(r[0], r[1]) for r in rows]
 
-    def summaries(self, ids: list[str]) -> dict[str, ArticleSummary]:
-        return self._articles.summaries(ids)
+    def summaries(
+        self, ids: list[str], include: Sequence[str] = ()
+    ) -> dict[str, ArticleSummary]:
+        return self._articles.summaries(ids, include)

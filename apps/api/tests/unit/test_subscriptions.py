@@ -13,13 +13,18 @@ MAX = 20
 
 def test_valid_filter_round_trips_and_gives_query_arguments() -> None:
     f = parse_filter({"theme": "ECON_*", "domain": "example.com", "text": "fed"}, MAX)
-    assert f.as_query() == {"theme": "ECON_*", "domain": "example.com", "text": "fed"}
+    assert f.as_query() == {
+        "theme": "ECON_*", "domain": "example.com", "text": "fed",
+        "min_negativity": None,
+    }  # fmt: skip
     assert f.as_json() == {"theme": "ECON_*", "domain": "example.com", "text": "fed"}
 
 
 def test_empty_filter_is_allowed_and_matches_everything() -> None:
     f = parse_filter({}, MAX)
-    assert f.as_query() == {"theme": None, "domain": None, "text": None}
+    assert f.as_query() == {
+        "theme": None, "domain": None, "text": None, "min_negativity": None,
+    }  # fmt: skip
     assert f.as_json() == {}
 
 

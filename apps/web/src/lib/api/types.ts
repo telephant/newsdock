@@ -430,7 +430,7 @@ export interface components {
       agent_id: string;
       /** Filter */
       filter: {
-        [key: string]: string;
+        [key: string]: string | number;
       };
       /**
        * Created At
@@ -499,6 +499,12 @@ export interface components {
       orgs: string[];
       /** Tone */
       tone: number | null;
+      /** Tone Pos */
+      tone_pos?: number | null;
+      /** Tone Neg */
+      tone_neg?: number | null;
+      /** Tone Polarity */
+      tone_polarity?: number | null;
       /** Word Count */
       word_count: number | null;
       /** Analyses */
@@ -508,8 +514,13 @@ export interface components {
       /** Source Count */
       source_count: number;
     };
-    /** ArticleSummary */
-    ArticleSummary: {
+    /**
+     * ArticleSummaryTone
+     * @description Documentation only (ADR-0030): the feed article as it looks when tone is asked
+     *     for. It redeclares the four fields as ordinary optional ones so the OpenAPI schema
+     *     shows them; no handler builds it.
+     */
+    ArticleSummaryTone: {
       /** Article Id */
       article_id: string;
       /** Title */
@@ -534,6 +545,14 @@ export interface components {
        * @default 1
        */
       source_count: number;
+      /** Tone */
+      tone?: number | null;
+      /** Tone Pos */
+      tone_pos?: number | null;
+      /** Tone Neg */
+      tone_neg?: number | null;
+      /** Tone Polarity */
+      tone_polarity?: number | null;
     };
     /** AuthOptions */
     AuthOptions: {
@@ -548,12 +567,12 @@ export interface components {
       password: string;
     };
     /**
-     * FeedPage
-     * @description REST /api/articles response (keyset pagination via next_before).
+     * FeedPageTone
+     * @description Documentation only: the schema of `GET /api/articles`.
      */
-    FeedPage: {
+    FeedPageTone: {
       /** Articles */
-      articles: components["schemas"]["ArticleSummary"][];
+      articles: components["schemas"]["ArticleSummaryTone"][];
       /** Next Before */
       next_before: string | null;
     };
@@ -1395,6 +1414,8 @@ export interface operations {
         time_to?: string | null;
         limit?: number | null;
         before?: string | null;
+        min_negativity?: number | null;
+        include?: string | null;
       };
       header?: never;
       path?: never;
@@ -1408,7 +1429,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["FeedPage"];
+          "application/json": components["schemas"]["FeedPageTone"];
         };
       };
       /** @description Validation Error */

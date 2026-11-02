@@ -18,10 +18,15 @@ def clean_text(text: str) -> str:
     return _WHITESPACE.sub(" ", html.unescape(text)).strip()
 
 
+def escape_markdown(cleaned: str) -> str:
+    """Backslash-escape markdown syntax in text that is already cleaned (no decoding,
+    so a title decoded once is never decoded a second time)."""
+    return "".join("\\" + ch if ch in _MARKDOWN_SPECIAL else ch for ch in cleaned)
+
+
 def escape_text(text: str) -> str:
     """Clean `text` and backslash-escape markdown syntax so it renders as itself."""
-    cleaned = clean_text(text)
-    return "".join("\\" + ch if ch in _MARKDOWN_SPECIAL else ch for ch in cleaned)
+    return escape_markdown(clean_text(text))
 
 
 def encode_url(url: str) -> str:
