@@ -305,7 +305,7 @@ def test_the_minimum_is_a_setting(make_article: MakeArticle) -> None:
     assert "A single outlet story" in sink.writes[0][1]
 
 
-def test_sections_come_from_the_theme_labels(make_article: MakeArticle) -> None:
+def test_sections_come_from_the_label_map(make_article: MakeArticle) -> None:
     storm = event(make_article, 1, STORM, [20, 5])
     vote = event(make_article, 10, COUNCIL, [9, 4], themes=["ELECTION"])
     _, sink, _, _, _ = run([[raw(a) for a in storm + vote]], top_stories=1)

@@ -1,4 +1,4 @@
-"""File adapters (TC-9, TC-18, TC-20; AC-5, AC-12, AC-14): atomic and forgiving."""
+"""The digest writer (AC-12): atomic, and named by the UTC clock."""
 
 import os
 from collections.abc import Callable
@@ -8,14 +8,9 @@ from typing import Any
 
 import pytest
 
-from whathappen.adapters.files import BaselineStore, DigestWriter
-from whathappen.domain.baseline import Baseline, BaselineEntry
+from whathappen.adapters.files import DigestWriter
 
 NOW = datetime(2026, 10, 30, 14, 7, tzinfo=UTC)
-
-
-def entry(i: int, **themes: int) -> BaselineEntry:
-    return BaselineEntry(at=NOW + timedelta(hours=i), articles=1000, themes=themes)
 
 
 def fail_replace_for(monkeypatch: pytest.MonkeyPatch, name: str) -> Callable[[], int]:
@@ -91,66 +86,3 @@ def test_tc18_an_unwritable_directory_raises_oserror(tmp_path: Path) -> None:
             DigestWriter(blocked / "digests").write(NOW, "x\n")
     finally:
         blocked.chmod(0o700)
-
-
-# ---- TC-9: the baseline store reads forgivingly ------------------------------------
-
-
-@pytest.mark.parametrize(
-    "content",
-    [
-        None,  # missing file
-        "",
-        "not json at all",
-        "[]",
-        '{"version": 2, "entries": []}',
-        '{"version": 1, "entries": [{"at": "yesterday"}]}',
-        '{"version": 1, "entries": "nope"}',
-    ],
-)
-def test_tc9_missing_or_bad_files_load_as_an_empty_baseline(
-    tmp_path: Path, content: str | None
-) -> None:
-    path = tmp_path / "digest-baseline.json"
-    if content is not None:
-        path.write_text(content)
-    assert BaselineStore(path).load() == Baseline()
-
-
-def test_tc9_a_bad_file_is_logged_but_a_missing_one_is_not_a_warning(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    caplog.set_level("INFO")
-    BaselineStore(tmp_path / "missing.json").load()
-    assert not [r for r in caplog.records if r.levelname == "WARNING"]
-    bad = tmp_path / "bad.json"
-    bad.write_text("{oops")
-    BaselineStore(bad).load()
-    assert [r for r in caplog.records if r.levelname == "WARNING"]
-
-
-# ---- TC-20: the baseline store saves atomically -----------------------------------
-
-
-def test_tc20_save_then_load_round_trips_and_creates_the_directory(
-    tmp_path: Path,
-) -> None:
-    store = BaselineStore(tmp_path / "state" / "digest-baseline.json")
-    baseline = Baseline(entries=[entry(0, A=3), entry(1, B=4)])
-    store.save(baseline)
-    assert store.load() == baseline
-
-
-def test_tc20_a_failed_save_keeps_the_previous_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    path = tmp_path / "digest-baseline.json"
-    store = BaselineStore(path)
-    old = Baseline(entries=[entry(0, A=1)])
-    store.save(old)
-    fail_replace_for(monkeypatch, "digest-baseline.json")
-    with pytest.raises(OSError):
-        store.save(Baseline(entries=[entry(0, A=1), entry(1, A=2)]))
-    monkeypatch.undo()
-    assert BaselineStore(path).load() == old
-    assert not [p for p in tmp_path.iterdir() if p.name.endswith(".tmp")]

@@ -45,18 +45,7 @@ class Settings(BaseSettings):
     # The digest
     interval_seconds: int = 3600
     output_dir: str = "output"
-    state_file: str = "output/baseline.json"
-    max_themes: int = 8
-    stories_per_theme: int = 3
-    prompt_titles: int = 3  # = stories shown, so a sentence can be checked
-    min_theme_count: int = 5
-    skip_theme_prefixes: str = (
-        "TAX_,WB_,EPU_,CRISISLEX_,USPEC_,UNGP_,GENERAL_,MEDIA_,SOC_,LEADER,AFFECT"
-    )
     max_articles: int = 20000
-    baseline_hours: int = 24
-    baseline_min_entries: int = 3
-    baseline_themes_kept: int = 2000
     summary_max_chars: int = 300
 
     # The story-first digest (spec digest-top-stories)
@@ -89,16 +78,8 @@ class Settings(BaseSettings):
         return DEFAULT_SECTIONS
 
     @property
-    def skip_prefixes(self) -> tuple[str, ...]:
-        return tuple(p for p in self.skip_theme_prefixes.split(",") if p)
-
-    @property
     def output_path(self) -> Path:
         return _resolve(self.output_dir)
-
-    @property
-    def state_path(self) -> Path:
-        return _resolve(self.state_file)
 
     @property
     def heartbeat_max_age_seconds(self) -> int:

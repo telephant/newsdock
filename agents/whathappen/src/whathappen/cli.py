@@ -2,10 +2,12 @@
 
 import argparse
 import logging
+import sys
 import time
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
+from whathappen.adapters import cleanup
 from whathappen.adapters.files import DigestWriter
 from whathappen.adapters.heartbeat import write_heartbeat
 from whathappen.adapters.mcp import McpClient
@@ -57,9 +59,18 @@ def build_cycle(settings: Settings) -> DigestCycle:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="whathappen")
     parser.add_argument("--once", action="store_true", help="run one cycle and exit")
+    commands = parser.add_subparsers(dest="command")
+    clean = commands.add_parser(
+        "clean-old", help="delete the old theme digest's output files (one time)"
+    )
+    clean.add_argument(
+        "--dry-run", action="store_true", help="list the files, delete nothing"
+    )
     args = parser.parse_args(argv)
 
     settings = Settings()
+    if args.command == "clean-old":
+        return cleanup.run(settings.output_path, dry_run=args.dry_run, out=sys.stdout)
     logging.basicConfig(level=settings.log_level)
     logger.info(
         "whathappen starting: platform %s, model %s, output %s",

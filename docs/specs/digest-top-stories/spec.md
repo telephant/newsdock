@@ -1,6 +1,6 @@
 # digest-top-stories — Spec (M2h: a story-first digest, "what people worry about")
 
-Status: init approved 2026-11-02 · design approved 2026-11-02 (ADR-0031 Accepted) · plan approved 2026-11-02 (9 tasks, 20 tests) · implementation not started
+Status: init approved 2026-11-02 · design approved 2026-11-02 (ADR-0031 Accepted) · plan approved 2026-11-02 (9 tasks, 20 tests) · implemented 2026-11-02 (T-01…T-09 done; all automatic ACs pass; AC-15 is the owner's live read, pending) · verified 2026-11-02 (pass with follow-ups, see [verify.md](verify.md))
 
 ## 0. Review guide
 

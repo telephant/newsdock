@@ -19,12 +19,11 @@ services:
       WHATHAPPEN_MCP_URL: ${WHATHAPPEN_DOCKER_MCP_URL:-http://api:8000/mcp}
       WHATHAPPEN_OLLAMA_URL: ${WHATHAPPEN_DOCKER_OLLAMA_URL:-http://host.docker.internal:11434}
       WHATHAPPEN_OUTPUT_DIR: /output
-      WHATHAPPEN_STATE_FILE: /output/baseline.json
     extra_hosts:
       - "api:host-gateway"  # the platform's published port, under a name its MCP accepts
       - "host.docker.internal:host-gateway"  # Ollama; Docker Desktop already has it
     volumes:
-      - ./output:/output  # the digests and the baseline: open them from the host
+      - ./output:/output  # the digests: open them from the host
     healthcheck:
       test: ["CMD", "python", "-m", "whathappen.adapters.healthcheck"]
       interval: 30s

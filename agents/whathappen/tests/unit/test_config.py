@@ -14,11 +14,7 @@ def test_defaults_match_the_documented_values() -> None:
     assert s.ollama_url == "http://127.0.0.1:11434"
     assert s.model == "qwen3:4b-instruct"
     assert (s.page_size, s.interval_seconds) == (200, 3600)
-    assert (s.max_themes, s.stories_per_theme, s.prompt_titles) == (8, 3, 3)
-    assert (s.min_theme_count, s.max_articles) == (5, 20000)
-    assert (s.baseline_hours, s.baseline_min_entries) == (24, 3)
-    assert (s.baseline_themes_kept, s.summary_max_chars) == (2000, 300)
-    assert s.skip_prefixes[:2] == ("TAX_", "WB_")
+    assert (s.max_articles, s.summary_max_chars) == (20000, 300)
 
 
 def test_it_has_no_database_or_kafka_settings_at_all() -> None:
@@ -31,10 +27,10 @@ def test_environment_variables_use_the_whathappen_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("WHATHAPPEN_MODEL", "llama3.2:3b")
-    monkeypatch.setenv("WHATHAPPEN_MAX_THEMES", "5")
+    monkeypatch.setenv("WHATHAPPEN_TOP_STORIES", "3")
     monkeypatch.setenv("NEWSDOCK_AGENT_MODEL", "ignored")  # the platform's prefix
     s = Settings()
-    assert (s.model, s.max_themes) == ("llama3.2:3b", 5)
+    assert (s.model, s.top_stories) == ("llama3.2:3b", 3)
 
 
 def test_the_projects_own_dotenv_is_read_and_unrelated_keys_are_ignored(
@@ -78,12 +74,10 @@ def test_relative_paths_mean_inside_the_project_and_absolute_ones_stay(
 ) -> None:
     s = Settings()
     assert s.output_path == PROJECT_ROOT / "output"
-    assert s.state_path == PROJECT_ROOT / "output" / "baseline.json"
     monkeypatch.setenv("WHATHAPPEN_OUTPUT_DIR", str(tmp_path / "out"))
-    monkeypatch.setenv("WHATHAPPEN_STATE_FILE", "/state/baseline.json")
-    s = Settings()
-    assert s.output_path == tmp_path / "out"
-    assert s.state_path == Path("/state/baseline.json")
+    assert Settings().output_path == tmp_path / "out"
+    monkeypatch.setenv("WHATHAPPEN_OUTPUT_DIR", "/digests")
+    assert Settings().output_path == Path("/digests")
 
 
 def test_heartbeat_allows_two_intervals_plus_one_cycle_of_model_calls(
@@ -97,11 +91,6 @@ def test_heartbeat_allows_two_intervals_plus_one_cycle_of_model_calls(
     monkeypatch.setenv("WHATHAPPEN_MAX_SECTIONS", "2")
     monkeypatch.setenv("WHATHAPPEN_GROUPS_PER_SECTION", "2")
     assert Settings().heartbeat_max_age_seconds == 2 * 600 + 120 * (3 + 2 * 2)
-
-
-def test_empty_skip_list_means_no_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("WHATHAPPEN_SKIP_THEME_PREFIXES", "")
-    assert Settings().skip_prefixes == ()
 
 
 # ---- the story-first digest settings (spec digest-top-stories) -----------------------

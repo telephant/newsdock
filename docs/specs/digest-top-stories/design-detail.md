@@ -151,3 +151,18 @@ No baseline load or save. `Article` gains `tone_neg: float | None = None`.
 - Titles, domains and URLs are untrusted: cleaned, escaped as markdown text, URLs percent-encoded; no HTML is produced. A prompt-injection headline can only change one sentence (the model has no tools).
 - File names come from the clock; the cleanup never leaves `output_dir`, never follows symlinks out of it, and deletes only files proven old.
 - The key stays in `.env`; nothing about tone or grouping adds a secret.
+
+## 11. Code map (as built, 2026-11-02)
+
+| Component | Module (`agents/whathappen/src/whathappen/`) | Main names |
+|---|---|---|
+| C-70 cycle | `domain/digest.py` | `DigestCycle.run_once`, `DigestParams`, `Digest`, ports `DigestMcpPort`, `SummaryPort`, `DigestSinkPort`, `TONE_INCLUDE` |
+| C-71 titles | `domain/titles.py` | `clean_title`, `title_tokens`, `MatchParams`, `matches` |
+| C-72 grouping | `domain/grouping.py` | `StoryGroup` (`seed`, `sources`, `shown`, `variants`, `also`, `key`), `StoryGrouper`, `LexicalGrouper` |
+| C-73 scoring | `domain/scoring.py` | `score_groups`, `ScoredGroup`, `RANKING_COVERAGE`, `RANKING_TONE` |
+| C-74 selection | `domain/sections.py` | `select`, `SelectParams`, `Selection`, `Section`, `label_for`, `parse_section_labels`, `DEFAULT_SECTIONS`, `OTHER` |
+| C-75 renderer | `domain/render.py` | `render_story_digest`, `MARKER` (text helpers in `domain/text.py`: `escape_markdown`, `escape_text`, `encode_url`) |
+| C-76 prompt | `domain/prompt.py` | `group_prompt` |
+| C-77 MCP client | `adapters/mcp.py` | `McpClient.list_new_articles(limit, cursor, include)` |
+| C-78 cleanup | `adapters/cleanup.py`, `cli.py` | `scan`, `remove`, `run`; subcommand `clean-old [--dry-run]`; Makefile `clean-old`, `clean-old-yes` |
+| C-79 settings and removal | `config.py` | the settings of §1, `section_label_map`; deleted: `domain/themes.py`, `domain/baseline.py`, `domain/stories.py`, `BaselineStore` |

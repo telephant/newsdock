@@ -1,5 +1,7 @@
 # what-happen — Design (M2g)
 
+> **Superseded 2026-11-02 for the digest shape.** The theme-grouped digest this document describes (themes ranked against a rolling baseline, `×N vs usual`) was replaced by the story-first digest of [`docs/specs/digest-top-stories/`](../digest-top-stories/spec.md) ([ADR-0031](../../adr/0031-story-first-digest-lexical-grouping-behind-a-port.md)); its code, baseline and settings are removed. The reading, ack, atomic-file and failure rules described here still hold. Kept as history.
+
 Status: design approved 2026-10-30, verified 2026-10-30 (by delegation: the user asked to finish the pipeline; the checklist below was resolved with the recommended answers, review them when you read this) · ADR-0029 Accepted (supersedes ADR-0028, which put the digest inside `apps/agent`).
 
 Reading order: this file → [diagrams](diagrams/index.html) (open it) → [design-detail.md](design-detail.md) only if you need schemas and algorithms. Spec: [spec.md](spec.md).

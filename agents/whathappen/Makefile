@@ -3,7 +3,7 @@
 # Plain GNU Make 3.81 syntax only.
 COMPOSE := docker compose
 
-.PHONY: help setup test lint types check once run build up down logs
+.PHONY: help setup test lint types check once run build up down logs clean-old clean-old-yes
 
 help: ## List targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-8s %s\n", $$1, $$2}'
@@ -44,3 +44,9 @@ down: ## Stop the agent server
 
 logs: ## Follow the agent server's log
 	$(COMPOSE) logs -f whathappen
+
+clean-old: ## List the old theme digest's output files in output/ (dry run, deletes nothing)
+	uv run python -m whathappen clean-old --dry-run
+
+clean-old-yes: ## Delete the old theme digest's output files (run clean-old first to see them)
+	uv run python -m whathappen clean-old
