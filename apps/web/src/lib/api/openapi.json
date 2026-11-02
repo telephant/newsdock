@@ -945,6 +945,38 @@
               ],
               "title": "Before"
             }
+          },
+          {
+            "name": "min_negativity",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Min Negativity"
+            }
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Include"
+            }
           }
         ],
         "responses": {
@@ -953,7 +985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FeedPage"
+                  "$ref": "#/components/schemas/FeedPageTone"
                 }
               }
             }
@@ -1043,7 +1075,14 @@
           },
           "filter": {
             "additionalProperties": {
-              "type": "string"
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                }
+              ]
             },
             "type": "object",
             "title": "Filter"
@@ -1202,6 +1241,39 @@
             ],
             "title": "Tone"
           },
+          "tone_pos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Pos"
+          },
+          "tone_neg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Neg"
+          },
+          "tone_polarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Polarity"
+          },
           "word_count": {
             "anyOf": [
               {
@@ -1252,7 +1324,7 @@
         ],
         "title": "ArticleDetail"
       },
-      "ArticleSummary": {
+      "ArticleSummaryTone": {
         "properties": {
           "article_id": {
             "type": "string",
@@ -1307,6 +1379,50 @@
             "type": "integer",
             "title": "Source Count",
             "default": 1
+          },
+          "tone": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone"
+          },
+          "tone_pos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Pos"
+          },
+          "tone_neg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Neg"
+          },
+          "tone_polarity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tone Polarity"
           }
         },
         "type": "object",
@@ -1318,7 +1434,8 @@
           "published_at",
           "themes"
         ],
-        "title": "ArticleSummary"
+        "title": "ArticleSummaryTone",
+        "description": "Documentation only (ADR-0030): the feed article as it looks when tone is asked\nfor. It redeclares the four fields as ordinary optional ones so the OpenAPI schema\nshows them; no handler builds it."
       },
       "AuthOptions": {
         "properties": {
@@ -1348,11 +1465,11 @@
         "required": ["email", "password"],
         "title": "Credentials"
       },
-      "FeedPage": {
+      "FeedPageTone": {
         "properties": {
           "articles": {
             "items": {
-              "$ref": "#/components/schemas/ArticleSummary"
+              "$ref": "#/components/schemas/ArticleSummaryTone"
             },
             "type": "array",
             "title": "Articles"
@@ -1371,8 +1488,8 @@
         },
         "type": "object",
         "required": ["articles", "next_before"],
-        "title": "FeedPage",
-        "description": "REST /api/articles response (keyset pagination via next_before)."
+        "title": "FeedPageTone",
+        "description": "Documentation only: the schema of `GET /api/articles`."
       },
       "ForgotBody": {
         "properties": {

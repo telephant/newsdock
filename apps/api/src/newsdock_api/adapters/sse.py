@@ -87,8 +87,8 @@ def build_stream_router(
             slot.release()
             raise
         key_id = getattr(request.state, "key_id", None)
-        query: dict[str, str | None] = {
-            k: sub.filter.get(k) for k in ("theme", "domain", "text")
+        query: dict[str, str | float | None] = {
+            k: sub.filter.get(k) for k in ("theme", "domain", "text", "min_negativity")
         }
 
         async def still_allowed() -> bool:

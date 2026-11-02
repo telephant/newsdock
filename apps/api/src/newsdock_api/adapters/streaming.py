@@ -9,6 +9,7 @@ least every keep-alive interval, and a `Slot` that is released exactly once.
 
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 
@@ -39,7 +40,7 @@ def _page(
     service: ArticleService,
     cursor: str | None,
     stored_seq: int | None,
-    query: dict[str, str | None],
+    query: dict[str, Any],  # `list_new` filter arguments from SubscriptionFilter
 ) -> NewArticlesPage:
     # the stored position only applies until the first event moves `cursor`
     return service.list_new(
@@ -58,7 +59,7 @@ async def article_events(
     *,
     service: ArticleService,
     hub: WakeHub,
-    query: dict[str, str | None],
+    query: dict[str, Any],
     start_cursor: str | None,
     stored_seq: int | None,
     slot: Slot,

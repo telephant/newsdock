@@ -1,10 +1,11 @@
 """Postgres repository (role: api_rw): parameterized ORM queries only (DR-9)."""
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, TypeVar
 
 from newsdock_db.models import Analysis, Article, ArticleSource, IngestSlot
-from sqlalchemy import Engine, Select, func, literal, select, text
+from sqlalchemy import REAL, Engine, Select, cast, func, literal, select, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
@@ -22,7 +23,9 @@ def _summary(
     row: Article,
     scores: dict[str, float] | None = None,
     source_count: int = 1,
+    include: Sequence[str] = (),
 ) -> ArticleSummary:
+    tone = {name: getattr(row, name) for name in include}  # only what was asked for
     return ArticleSummary(
         article_id=row.url_hash,
         title=row.title,
@@ -33,6 +36,7 @@ def _summary(
         seq=row.seq,
         scores=scores,
         source_count=source_count,
+        **tone,
     )
 
 
@@ -47,6 +51,7 @@ def apply_filters(
     theme: str | None,
     domain: str | None,
     text_filter: str | None,
+    min_negativity: float | None = None,
 ) -> _S:
     """The one implementation of the search filters (also used by semantic search)."""
     if time_from is not None:
@@ -72,6 +77,13 @@ def apply_filters(
         statement = statement.where(
             Article.title.ilike(f"%{escape_like(text_filter)}%", escape="\\")
         )
+    if min_negativity is not None:
+        # `tone_neg` is a float4: compare it with a float4 so a typed 9.7 equals the
+        # stored 9.7 (a float8 parameter would be larger). NULL >= x is not true, so
+        # articles without tone drop out.
+        statement = statement.where(
+            Article.tone_neg >= cast(literal(min_negativity), REAL)
+        )
     return statement
 
 
@@ -89,6 +101,8 @@ class SqlArticleRepo:
         text: str | None,
         limit: int,
         before: tuple[datetime, str] | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]:
         statement = (
             apply_filters(
@@ -98,6 +112,7 @@ class SqlArticleRepo:
                 theme=theme,
                 domain=domain,
                 text_filter=text,
+                min_negativity=min_negativity,
             )
             .order_by(Article.published_at.desc(), Article.url_hash)
             .limit(limit)
@@ -117,11 +132,13 @@ class SqlArticleRepo:
             scores = self._scores(session, ids)
             counts = self._source_counts(session, ids)
             return [
-                _summary(r, scores.get(r.url_hash), counts.get(r.url_hash, 1))
+                _summary(r, scores.get(r.url_hash), counts.get(r.url_hash, 1), include)
                 for r in rows
             ]
 
-    def summaries(self, article_ids: list[str]) -> dict[str, ArticleSummary]:
+    def summaries(
+        self, article_ids: list[str], include: Sequence[str] = ()
+    ) -> dict[str, ArticleSummary]:
         """Summaries (with scores and source counts); unknown ids are absent."""
         if not article_ids:
             return {}
@@ -136,7 +153,7 @@ class SqlArticleRepo:
             counts = self._source_counts(session, ids)
             return {
                 r.url_hash: _summary(
-                    r, scores.get(r.url_hash), counts.get(r.url_hash, 1)
+                    r, scores.get(r.url_hash), counts.get(r.url_hash, 1), include
                 )
                 for r in rows
             }
@@ -155,6 +172,8 @@ class SqlArticleRepo:
         theme: str | None = None,
         domain: str | None = None,
         text: str | None = None,
+        min_negativity: float | None = None,
+        include: Sequence[str] = (),
     ) -> list[ArticleSummary]:
         statement = apply_filters(
             select(Article),
@@ -163,6 +182,7 @@ class SqlArticleRepo:
             theme=theme,
             domain=domain,
             text_filter=text,
+            min_negativity=min_negativity,
         )
         statement = statement.order_by(Article.seq).limit(limit)
         if after_seq is not None:
@@ -172,7 +192,10 @@ class SqlArticleRepo:
         with Session(self._engine) as session:
             rows: list[Article] = list(session.scalars(statement).all())
             counts = self._source_counts(session, [r.url_hash for r in rows])
-            return [_summary(r, source_count=counts.get(r.url_hash, 1)) for r in rows]
+            return [
+                _summary(r, source_count=counts.get(r.url_hash, 1), include=include)
+                for r in rows
+            ]
 
     def get(self, article_id: str) -> ArticleDetail | None:
         with Session(self._engine) as session:
@@ -201,6 +224,9 @@ class SqlArticleRepo:
                 persons=row.persons,
                 orgs=row.orgs,
                 tone=row.tone,
+                tone_pos=row.tone_pos,
+                tone_neg=row.tone_neg,
+                tone_polarity=row.tone_polarity,
                 word_count=row.word_count,
                 analyses=[
                     AnalysisRecord(

@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -55,7 +56,7 @@ def _ids(rows: list) -> list[str]:  # type: ignore[type-arg]
     return [r.article_id for r in rows]
 
 
-def _new(repo: SqlArticleRepo, **filters: str | None) -> list[str]:
+def _new(repo: SqlArticleRepo, **filters: Any) -> list[str]:
     return _ids(repo.list_new(after_seq=0, since=None, limit=50, **filters))
 
 

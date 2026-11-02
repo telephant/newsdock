@@ -108,9 +108,12 @@ An authenticated agent can save filters and have matching new articles pushed to
 
 ```bash
 KEY=ndk_...   # from `make agent-create NAME=<name>`
-# the body is the filter: theme (exact, or a prefix like ECON_*), domain, title text; all optional
+# the body is the filter: theme (exact, or a prefix like ECON_*), domain, title text,
+# min_negativity (a number 0-100: only articles whose GDELT negative-tone share is at least that); all optional
 curl -sS -X POST http://127.0.0.1:8000/api/subscriptions -H "Authorization: Bearer $KEY" \
   -H 'Content-Type: application/json' -d '{"theme":"ECON_*","domain":"example.com"}'
+curl -sS -X POST http://127.0.0.1:8000/api/subscriptions -H "Authorization: Bearer $KEY" \
+  -H 'Content-Type: application/json' -d '{"min_negativity": 8}'
 curl -N -H "Authorization: Bearer $KEY" http://127.0.0.1:8000/api/subscriptions/<id>/stream
 curl -N -H "Authorization: Bearer $KEY" -H "Last-Event-ID: <last id>" .../stream   # resume
 ```

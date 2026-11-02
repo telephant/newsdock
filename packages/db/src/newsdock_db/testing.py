@@ -36,14 +36,22 @@ def article(
     domain: str = "example.com",
     themes: list[str] | None = None,
     published_at: datetime = NOW,
+    tone: float | None = None,
+    tone_pos: float | None = None,
+    tone_neg: float | None = None,
+    tone_polarity: float | None = None,
 ) -> Article:
-    """A canonical article row; `model` is stored only when a vector is given."""
+    """A canonical article row; `model` is stored only when a vector is given.
+
+    The tone numbers are stored as given (None = the row has no tone, like the few
+    real rows with an empty tone column)."""
     return Article(
         url_hash=key, gkg_record_id="x", slot="20261028120000",
         url=f"https://{domain}/{key}", title=title, domain=domain,
         published_at=published_at, themes=themes or [], persons=[], orgs=[],
         story_key=f"s {key}",
         embedding=vec, embedding_model=model if vec is not None else None,
+        tone=tone, tone_pos=tone_pos, tone_neg=tone_neg, tone_polarity=tone_polarity,
     )  # fmt: skip
 
 
