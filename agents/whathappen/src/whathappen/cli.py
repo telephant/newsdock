@@ -4,15 +4,17 @@ import argparse
 import logging
 import time
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
-from whathappen.adapters.files import BaselineStore, DigestWriter
+from whathappen.adapters.files import DigestWriter
 from whathappen.adapters.heartbeat import write_heartbeat
 from whathappen.adapters.mcp import McpClient
 from whathappen.adapters.summarize import OllamaSummariser
 from whathappen.config import Settings
 from whathappen.domain.digest import DigestCycle, DigestParams
+from whathappen.domain.grouping import LexicalGrouper
 from whathappen.domain.runner import run_cli
+from whathappen.domain.titles import MatchParams
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,14 @@ def build_cycle(settings: Settings) -> DigestCycle:
     key = settings.api_key.get_secret_value() if settings.api_key else None
     return DigestCycle(
         McpClient(settings.mcp_url, key),
+        LexicalGrouper(
+            MatchParams(
+                overlap=settings.match_overlap,
+                jaccard=settings.match_jaccard,
+                min_shared=settings.match_min_shared,
+            ),
+            timedelta(hours=settings.group_window_hours),
+        ),
         OllamaSummariser(
             settings.ollama_url,
             settings.model,
@@ -29,18 +39,17 @@ def build_cycle(settings: Settings) -> DigestCycle:
             max_chars=settings.summary_max_chars,
         ),
         DigestWriter(settings.output_path),
-        BaselineStore(settings.state_path),
         DigestParams(
             page_size=settings.page_size,
             max_articles=settings.max_articles,
-            skip_prefixes=settings.skip_prefixes,
-            min_theme_count=settings.min_theme_count,
-            max_themes=settings.max_themes,
-            stories_per_theme=settings.stories_per_theme,
-            prompt_titles=settings.prompt_titles,
-            baseline_hours=settings.baseline_hours,
-            baseline_min_entries=settings.baseline_min_entries,
-            themes_kept=settings.baseline_themes_kept,
+            min_group_sources=settings.min_group_sources,
+            top_stories=settings.top_stories,
+            max_sections=settings.max_sections,
+            groups_per_section=settings.groups_per_section,
+            also_per_group=settings.also_per_group,
+            section_min_hits=settings.section_min_hits,
+            tone_divisor=settings.tone_divisor,
+            labels=settings.section_label_map,
         ),
     )
 

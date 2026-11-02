@@ -89,11 +89,49 @@ def test_relative_paths_mean_inside_the_project_and_absolute_ones_stay(
 def test_heartbeat_allows_two_intervals_plus_one_cycle_of_model_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert Settings().heartbeat_max_age_seconds == 2 * 3600 + 120 * 8
+    calls = 5 + 6 * 4  # top stories + sections x groups per section
+    assert Settings().heartbeat_max_age_seconds == 2 * 3600 + 120 * calls
     monkeypatch.setenv("WHATHAPPEN_INTERVAL_SECONDS", "600")
-    assert Settings().heartbeat_max_age_seconds == 2 * 600 + 120 * 8
+    assert Settings().heartbeat_max_age_seconds == 2 * 600 + 120 * calls
+    monkeypatch.setenv("WHATHAPPEN_TOP_STORIES", "3")
+    monkeypatch.setenv("WHATHAPPEN_MAX_SECTIONS", "2")
+    monkeypatch.setenv("WHATHAPPEN_GROUPS_PER_SECTION", "2")
+    assert Settings().heartbeat_max_age_seconds == 2 * 600 + 120 * (3 + 2 * 2)
 
 
 def test_empty_skip_list_means_no_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("WHATHAPPEN_SKIP_THEME_PREFIXES", "")
     assert Settings().skip_prefixes == ()
+
+
+# ---- the story-first digest settings (spec digest-top-stories) -----------------------
+def test_story_digest_defaults_match_the_design() -> None:
+    s = Settings()
+    assert (s.top_stories, s.max_sections, s.groups_per_section) == (5, 6, 4)
+    assert (s.min_group_sources, s.also_per_group) == (2, 3)
+    assert (s.group_window_hours, s.match_min_shared) == (48, 3)
+    assert (s.match_overlap, s.match_jaccard) == (0.75, 0.5)
+    assert (s.tone_divisor, s.section_min_hits) == (10.0, 1)
+
+
+def test_the_default_section_map_is_used_when_nothing_is_set() -> None:
+    from whathappen.domain.sections import DEFAULT_SECTIONS
+
+    assert Settings().section_label_map == DEFAULT_SECTIONS
+
+
+def test_section_labels_can_be_overridden_with_json(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(
+        "WHATHAPPEN_SECTION_LABELS", '{"Sport": ["SPORT"], "Tech": ["SCI"]}'
+    )
+    assert Settings().section_label_map == (("Sport", ("SPORT",)), ("Tech", ("SCI",)))
+
+
+def test_invalid_section_labels_fail_at_start_with_a_clear_message(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WHATHAPPEN_SECTION_LABELS", "not json")
+    with pytest.raises(ValueError, match="section_labels"):
+        Settings()

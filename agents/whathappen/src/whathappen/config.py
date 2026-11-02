@@ -8,8 +8,14 @@ no database or Kafka settings at all.
 
 from pathlib import Path
 
-from pydantic import SecretStr
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from whathappen.domain.sections import (
+    DEFAULT_SECTIONS,
+    SectionLabels,
+    parse_section_labels,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # agents/whathappen
 
@@ -53,7 +59,34 @@ class Settings(BaseSettings):
     baseline_themes_kept: int = 2000
     summary_max_chars: int = 300
 
+    # The story-first digest (spec digest-top-stories)
+    top_stories: int = 5  # groups in the Top stories block
+    max_sections: int = 6
+    groups_per_section: int = 4
+    min_group_sources: int = 2  # a group carried by fewer outlets is not listed
+    also_per_group: int = 3  # other headlines shown, and sent to the model, per group
+    group_window_hours: int = 48  # a headline joins a group within this of its seed
+    match_overlap: float = 0.75
+    match_jaccard: float = 0.5
+    match_min_shared: int = 3
+    tone_divisor: float = 10.0  # score = sources x (1 + tone_neg / divisor)
+    section_min_hits: int = 1  # theme hits a label needs to claim a group
+    section_labels: str = ""  # JSON label -> theme prefixes; empty = the built-in map
+
     heartbeat_file: str = "/tmp/healthy"  # noqa: S108 - container-local liveness file
+
+    @field_validator("section_labels")
+    @classmethod
+    def _section_labels_must_parse(cls, value: str) -> str:
+        if value.strip():
+            parse_section_labels(value)  # raises a ValueError naming section_labels
+        return value
+
+    @property
+    def section_label_map(self) -> SectionLabels:
+        if self.section_labels.strip():
+            return parse_section_labels(self.section_labels)
+        return DEFAULT_SECTIONS
 
     @property
     def skip_prefixes(self) -> tuple[str, ...]:
@@ -69,10 +102,10 @@ class Settings(BaseSettings):
 
     @property
     def heartbeat_max_age_seconds(self) -> int:
-        """Twice the interval plus the worst case of one cycle's model calls."""
-        return int(
-            2 * self.interval_seconds + self.ollama_timeout_seconds * self.max_themes
-        )
+        """Twice the interval plus the worst case of one cycle's model calls (one per
+        listed group)."""
+        calls = self.top_stories + self.max_sections * self.groups_per_section
+        return int(2 * self.interval_seconds + self.ollama_timeout_seconds * calls)
 
 
 def _resolve(value: str) -> Path:

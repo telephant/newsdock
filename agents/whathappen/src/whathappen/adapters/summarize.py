@@ -1,8 +1,8 @@
-"""Ollama summariser: one plain-prose `/api/chat` call per theme (C-55).
+"""Ollama summariser: one plain-prose `/api/chat` call per story group (C-55).
 
 Unlike the scorer there is no JSON schema; the model writes one sentence. Whatever
 goes wrong (Ollama down, slow, an error status, an empty or odd answer) the result is
-`None`, so a section shows "Summary unavailable." and the digest is still written.
+`None`, so the group shows its links without a sentence and the digest is still written.
 """
 
 import logging
@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 
-from whathappen.domain.prompt import theme_prompt
+from whathappen.domain.prompt import group_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +51,10 @@ class OllamaSummariser:
             base_url=base_url, timeout=timeout_seconds, transport=transport
         )
 
-    def summarise(self, label: str, titles: Sequence[str]) -> str | None:
+    def summarise(self, titles: Sequence[str]) -> str | None:
         body: dict[str, Any] = {
             "model": self._model,
-            "messages": [{"role": "user", "content": theme_prompt(label, titles)}],
+            "messages": [{"role": "user", "content": group_prompt(titles)}],
             "stream": False,
             "options": {"temperature": self._temperature},
         }
@@ -63,7 +63,7 @@ class OllamaSummariser:
             response.raise_for_status()
             data = response.json()
         except (httpx.HTTPError, ValueError) as exc:
-            logger.warning("no summary for %s: %s", label, type(exc).__name__)
+            logger.warning("no summary for a group: %s", type(exc).__name__)
             return None
         message = data.get("message") if isinstance(data, dict) else None
         content = message.get("content") if isinstance(message, dict) else None

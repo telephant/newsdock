@@ -1,0 +1,566 @@
+{
+ "pairs": [
+  {
+   "a": {
+    "article_id": "6ab4c2f8386e63fd0c43432395147b3bd4f81d0933ed6b91a85d3183eddc9eb2",
+    "title": "Connecticut Senator Chris Murphy is hospitalized with a stroke",
+    "url": "https://www.wwno.org/npr-news/2026-11-01/connecticut-senator-chris-murphy-is-hospitalized-with-a-stroke",
+    "domain": "wwno.org",
+    "published_at": "2026-11-01T14:00:00Z",
+    "themes": [],
+    "source_count": 61,
+    "tone_neg": 4.7058825
+   },
+   "b": {
+    "article_id": "ea8954599a681a5f4f5b202e6a8c39cee7d120055040903facc64d501cf6a8ca",
+    "title": "Senator Chris Murphy Hospitalized After Stroke",
+    "url": "https://talkradio1059.iheart.com/content/2026-11-01-senator-chris-murphy-hospitalized-after-stroke",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T20:15:00Z",
+    "themes": [
+     "ELECTION"
+    ],
+    "source_count": 51,
+    "tone_neg": 3.4313726
+   },
+   "same": true,
+   "why": "the same senator's stroke, reworded"
+  },
+  {
+   "a": {
+    "article_id": "5e2e1f51899461c5cb8c1c30499673b2b91071fc2f2d333a9cb40a5a0961b1bb",
+    "title": "Stevens Endorses Rogers In Michigan Senate Race",
+    "url": "https://klvi.iheart.com/content/2026-11-01-stevens-endorses-rogers-in-michigan-senate-race",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "REL_ANTISEMITISM",
+     "RESIGNATION",
+     "ELECTION"
+    ],
+    "source_count": 56,
+    "tone_neg": 4.33213
+   },
+   "b": {
+    "article_id": "7b6d5a7ba4a44195b775a05e8d5be03c53a4aabd42a45160c120b6a4d058209a",
+    "title": "Haley Stevens endorses GOP candidate in Michigan Senate race, spurning Abdul El-Sayed",
+    "url": "https://www.kedm.org/npr-news/2026-11-01/haley-stevens-endorses-gop-candidate-in-michigan-senate-race-spurning-abdul-el-sayed",
+    "domain": "kedm.org",
+    "published_at": "2026-11-01T20:15:00Z",
+    "themes": [
+     "ELECTION",
+     "KILL",
+     "ECON_WORKINGCLASS",
+     "FOOD_SECURITY",
+     "EDUCATION",
+     "BAN"
+    ],
+    "source_count": 55,
+    "tone_neg": 4.2119565
+   },
+   "same": true,
+   "why": "the same endorsement, reworded"
+  },
+  {
+   "a": {
+    "article_id": "dac2db97ec03f32b74a8a2541d9928d3d21c3a752a7791e47d5d3df830f5ab49",
+    "title": "9 dead as jet nosedives and erupts into fireball near busy roadway in South Florida",
+    "url": "https://www.wuky.org/npr-news/2026-11-02/9-dead-as-jet-nosedives-and-erupts-into-fireball-near-busy-roadway-in-south-florida",
+    "domain": "wuky.org",
+    "published_at": "2026-11-02T06:45:00Z",
+    "themes": [
+     "NATURAL_DISASTER_ICE",
+     "TRAFFIC",
+     "WOUND",
+     "PROTEST",
+     "STRIKE",
+     "KILL",
+     "SECURITY_SERVICES",
+     "LEGISLATION",
+     "NATURAL_DISASTER_FLOOD",
+     "AVIATION_INCIDENT",
+     "MANMADE_DISASTER_PLANE_CRASH",
+     "DELAY",
+     "MANMADE_DISASTER_IMPLIED"
+    ],
+    "source_count": 60,
+    "tone_neg": 6.6572237
+   },
+   "b": {
+    "article_id": "ac0b3598430c825d966d0c0d749f06dc328d02a2c7ac06730530f3b9bd8d0cac",
+    "title": "Jet nosedives and erupts into fireball near busy roadway in South Florida. All 9 on board died",
+    "url": "https://www.news-gazette.com/news/nation-world/jet-nosedives-and-erupts-into-fireball-near-busy-roadway-in-south-florida-all-9-on/article_e477c6af-bb73-5395-85d9-6a058e1d3deb.html",
+    "domain": "news-gazette.com",
+    "published_at": "2026-11-02T06:58:00Z",
+    "themes": [
+     "AVIATION_INCIDENT",
+     "MANMADE_DISASTER_PLANE_CRASH",
+     "DELAY",
+     "KILL",
+     "TRAFFIC",
+     "MANMADE_DISASTER_IMPLIED",
+     "PROTEST",
+     "STRIKE",
+     "NATURAL_DISASTER_FLOOD",
+     "WOUND",
+     "NATURAL_DISASTER_ICE"
+    ],
+    "source_count": 8,
+    "tone_neg": 6.4469914
+   },
+   "same": true,
+   "why": "the same crash, with and without the headline count"
+  },
+  {
+   "a": {
+    "article_id": "bdd985aaa26d3d0135513b95217565e2167d458e3d91818e7ba04c52d56d798a",
+    "title": "UN's peacekeeping mission in disputed Western Sahara ends after 35 years",
+    "url": "https://www.ktep.org/world-news/2026-11-02/uns-peacekeeping-mission-in-disputed-western-sahara-ends-after-35-years",
+    "domain": "ktep.org",
+    "published_at": "2026-11-02T07:45:00Z",
+    "themes": [
+     "MOVEMENT_GENERAL",
+     "ELECTION",
+     "ENV_FISHERY",
+     "SOVEREIGNTY",
+     "VETO",
+     "REFUGEES",
+     "PEACEKEEPING",
+     "SECURITY_SERVICES",
+     "CEASEFIRE",
+     "ARMEDCONFLICT",
+     "ETH_INDIGINOUS"
+    ],
+    "source_count": 43,
+    "tone_neg": 6.8922305
+   },
+   "b": {
+    "article_id": "96d3368266ea657b7778ac2d5c1e3423fc9daa86e01a4a69066e3bd458320a83",
+    "title": "UN's peacekeeping mission in Western Sahara ends after 35 years following US-Russia standoff",
+    "url": "https://www.hindustantimes.com/world-news/us-news/uns-peacekeeping-mission-in-western-sahara-ends-after-35-years-following-us-russia-standoff-101793558237521.html",
+    "domain": "hindustantimes.com",
+    "published_at": "2026-11-01T18:37:00Z",
+    "themes": [
+     "CEASEFIRE",
+     "SOVEREIGNTY",
+     "REFUGEES",
+     "MOVEMENT_GENERAL",
+     "ENV_FISHERY",
+     "VETO",
+     "PEACEKEEPING",
+     "SECURITY_SERVICES",
+     "ARMEDCONFLICT",
+     "ETH_INDIGINOUS",
+     "ELECTION"
+    ],
+    "source_count": 8,
+    "tone_neg": 6.5989847
+   },
+   "same": true,
+   "why": "the same mission ending, reworded"
+  },
+  {
+   "a": {
+    "article_id": "887882e2128bb59d6e5c209ba2adb3219e6c06958726eeb8dac6d7a7f378cd53",
+    "title": "Fines for childcare centre and worker for toddler death",
+    "url": "https://www.northweststar.com.au/story/9384632/fines-for-childcare-centre-and-worker-for-toddler-death",
+    "domain": "northweststar.com.au",
+    "published_at": "2026-11-02T07:32:00Z",
+    "themes": [
+     "SECURITY_SERVICES",
+     "LEGISLATION",
+     "MEDICAL",
+     "TRIAL",
+     "BAN",
+     "KILL"
+    ],
+    "source_count": 29,
+    "tone_neg": 7.0895524
+   },
+   "b": {
+    "article_id": "95a421e5c36cd2785ef5db2d84c2023ab9792bf24f90dbaa1e0b637c065c95f4",
+    "title": "Childcare centre and worker fined over toddler death",
+    "url": "https://www.crookwellgazette.com.au/story/9384632/childcare-centre-and-worker-fined-over-toddler-death",
+    "domain": "crookwellgazette.com.au",
+    "published_at": "2026-11-02T06:08:00Z",
+    "themes": [
+     "KILL",
+     "BAN",
+     "TRIAL",
+     "SECURITY_SERVICES",
+     "LEGISLATION",
+     "MEDICAL"
+    ],
+    "source_count": 14,
+    "tone_neg": 7.5757575
+   },
+   "same": true,
+   "why": "the same fine, active and passive"
+  },
+  {
+   "a": {
+    "article_id": "60820e4f5bb87865ca3a15752678102a4825865dbdb6134caa3aa8540cfa4ea7",
+    "title": "Trump boosts Republican fight to keep senate and house control in mid-terms",
+    "url": "https://www.readingchronicle.co.uk/news/national/26688636.trump-boosts-republican-fight-keep-senate-house-control-mid-terms",
+    "domain": "readingchronicle.co.uk",
+    "published_at": "2026-11-02T07:52:00Z",
+    "themes": [
+     "ARMEDCONFLICT",
+     "MILITARY",
+     "RURAL",
+     "ELECTION"
+    ],
+    "source_count": 56,
+    "tone_neg": 3.1182795
+   },
+   "b": {
+    "article_id": "d034e31c26c9bb62b52a176ff115d72cc4e3b28943308a4cbf347dab12bd2a58",
+    "title": "Trump's rallies in Iowa and Kansas come as Republicans fight to keep Senate and House control",
+    "url": "https://www.ktbs.com/news/national_politics/trumps-rallies-in-iowa-and-kansas-come-as-republicans-fight-to-keep-senate-and-house/article_3f229842-3e8a-55ea-a51e-c100f708c24f.html",
+    "domain": "ktbs.com",
+    "published_at": "2026-11-01T19:50:00Z",
+    "themes": [
+     "ARMEDCONFLICT",
+     "ELECTION"
+    ],
+    "source_count": 6,
+    "tone_neg": 3.5679846
+   },
+   "same": true,
+   "why": "the same rally push, reworded"
+  },
+  {
+   "a": {
+    "article_id": "bec23ff78158a5f40690526cea7b51e981b592bb2a00aec3c4031a1ffff1ae16",
+    "title": "Judge dismisses lawsuit seeking to block certification of Alaska Senate race if GOP incumbent loses",
+    "url": "http://www.dailyadvance.com/news/national/judge-dismisses-lawsuit-seeking-to-block-certification-of-alaska-senate-race-if-gop-incumbent-loses/article_25a90729-009e-5cbf-936b-618d71cb5152.html",
+    "domain": "dailyadvance.com",
+    "published_at": "2026-11-01T18:16:00Z",
+    "themes": [
+     "RECRUITMENT",
+     "DEMOCRACY",
+     "TRIAL",
+     "CONSTITUTIONAL",
+     "APPOINTMENT",
+     "EDUCATION",
+     "MARITIME",
+     "ELECTION",
+     "LEGISLATION"
+    ],
+    "source_count": 22,
+    "tone_neg": 2.9797378
+   },
+   "b": {
+    "article_id": "9e45b7f5cb25e7217a2c15d2ab15e6690f84cc5714efb832ea75149544181900",
+    "title": "Judge dismisses Dan Sullivan Alaska Senate certification lawsuit",
+    "url": "https://www.wtae.com/article/judge-dismisses-alaska-senate-certification-lawsuit/74305576",
+    "domain": "wtae.com",
+    "published_at": "2026-11-01T20:30:00Z",
+    "themes": [
+     "ELECTION",
+     "DEMOCRACY",
+     "TRIAL",
+     "APPOINTMENT",
+     "RECRUITMENT",
+     "LEGISLATION",
+     "CONSTITUTIONAL",
+     "EDUCATION",
+     "MARITIME"
+    ],
+    "source_count": 12,
+    "tone_neg": 3.8728898
+   },
+   "same": true,
+   "why": "the same ruling, reworded"
+  },
+  {
+   "a": {
+    "article_id": "dc0f9fa2cc7ded64a61fd3780636e2516d8d9cdfbf0457477038af7cc0da17dc",
+    "title": "Court hears Lori Vallow Daybell's appeal in Idaho killings of 2 of her children, romantic rival",
+    "url": "https://www.therecord.com/news/world/united-states/court-hears-lori-vallow-daybell-s-appeal-in-idaho-killings-of-2-of-her-children-romantic-rival/article_8af5bb11-3eec-53bc-8f1b-f0da4c35d087.html",
+    "domain": "therecord.com",
+    "published_at": "2026-11-02T05:16:00Z",
+    "themes": [
+     "RURAL",
+     "TRIAL",
+     "KILL",
+     "IDEOLOGY",
+     "DEATH_PENALTY",
+     "RELIGION"
+    ],
+    "source_count": 20,
+    "tone_neg": 7.740586
+   },
+   "b": {
+    "article_id": "b73691f1c2eba1f7f085b48d47c105d46d0b15e504b6f3898383fc9a7cf4d51a",
+    "title": "Lori Vallow Daybell appeals convictions in Idaho killings",
+    "url": "https://www.wdbo.com/news/national/court-hears-lori/EL2RSIFCKQ4DHAOCAYSFTRBP5A",
+    "domain": "wdbo.com",
+    "published_at": "2026-11-02T05:19:00Z",
+    "themes": [
+     "KILL",
+     "RELIGION",
+     "RURAL",
+     "DEATH_PENALTY",
+     "TRIAL",
+     "IDEOLOGY"
+    ],
+    "source_count": 3,
+    "tone_neg": 8.653846
+   },
+   "same": true,
+   "why": "the same appeal, reworded"
+  },
+  {
+   "a": {
+    "article_id": "2287c79dfbe2a119fa2ae5b688ae00c92cebb6386e52b944c37834f920488545",
+    "title": "Nine killed in Florida plane crash",
+    "url": "https://www.bbc.co.uk/news/articles/cm369yy7lw73o",
+    "domain": "bbc.co.uk",
+    "published_at": "2026-11-01T21:21:00Z",
+    "themes": [
+     "WOUND",
+     "EMERG_MASSCASUALTY",
+     "KILL",
+     "MANMADE_DISASTER_IMPLIED"
+    ],
+    "source_count": 10,
+    "tone_neg": 6.550218
+   },
+   "b": {
+    "article_id": "9ff3ee03aa9b1a48ab981f8f4cff95e6645725d221845d3f0ec9e6a34051aa27",
+    "title": "Nine dead in small plane crash near Trump's Florida home",
+    "url": "https://punchng.com/nine-dead-in-small-plane-crash-near-trumps-florida-home",
+    "domain": "punchng.com",
+    "published_at": "2026-11-02T06:52:00Z",
+    "themes": [
+     "MILITARY",
+     "AVIATION_INCIDENT",
+     "MANMADE_DISASTER_PLANE_CRASH",
+     "EVACUATION",
+     "TRAFFIC",
+     "WOUND",
+     "NATURAL_DISASTER_ICE",
+     "MANMADE_DISASTER_IMPLIED",
+     "KILL"
+    ],
+    "source_count": 4,
+    "tone_neg": 6.887755
+   },
+   "same": true,
+   "why": "the same crash, reworded"
+  },
+  {
+   "a": {
+    "article_id": "ea8954599a681a5f4f5b202e6a8c39cee7d120055040903facc64d501cf6a8ca",
+    "title": "Senator Chris Murphy Hospitalized After Stroke",
+    "url": "https://talkradio1059.iheart.com/content/2026-11-01-senator-chris-murphy-hospitalized-after-stroke",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T20:15:00Z",
+    "themes": [
+     "ELECTION"
+    ],
+    "source_count": 51,
+    "tone_neg": 3.4313726
+   },
+   "b": {
+    "article_id": "3a8bc9e0ea9504929abbaf8d2349b8f47360ac256dc1c793bef94e93e623488c",
+    "title": "Sullivan Accuses Peltola Of Voter Confusion Tactics",
+    "url": "https://1150wima.iheart.com/content/2026-11-01-sullivan-accuses-peltola-of-voter-confusion-tactics",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "LEGISLATION",
+     "RECRUITMENT",
+     "EDUCATION",
+     "ARMEDCONFLICT",
+     "ELECTION"
+    ],
+    "source_count": 48,
+    "tone_neg": 6.25
+   },
+   "same": false,
+   "why": "a stroke and a Senate-race accusation share only 'senator'-type words"
+  },
+  {
+   "a": {
+    "article_id": "28990902ec2c6fe93ddcba1ecee02df818b807199b49efad3ad93a6b9e8a79a7",
+    "title": "Judge tosses Trump's attempt to block Alaska Senate results if GOP incumbent loses",
+    "url": "https://www.wwno.org/npr-news/2026-11-01/judge-tosses-trumps-attempt-to-block-alaska-senate-results-if-gop-incumbent-loses",
+    "domain": "wwno.org",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "RECRUITMENT",
+     "TRIAL",
+     "SLFID_CIVIL_LIBERTIES",
+     "ELECTION"
+    ],
+    "source_count": 51,
+    "tone_neg": 3.1772575
+   },
+   "b": {
+    "article_id": "3a8bc9e0ea9504929abbaf8d2349b8f47360ac256dc1c793bef94e93e623488c",
+    "title": "Sullivan Accuses Peltola Of Voter Confusion Tactics",
+    "url": "https://1150wima.iheart.com/content/2026-11-01-sullivan-accuses-peltola-of-voter-confusion-tactics",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "LEGISLATION",
+     "RECRUITMENT",
+     "EDUCATION",
+     "ARMEDCONFLICT",
+     "ELECTION"
+    ],
+    "source_count": 48,
+    "tone_neg": 6.25
+   },
+   "same": false,
+   "why": "two different Alaska Senate stories"
+  },
+  {
+   "a": {
+    "article_id": "5e2e1f51899461c5cb8c1c30499673b2b91071fc2f2d333a9cb40a5a0961b1bb",
+    "title": "Stevens Endorses Rogers In Michigan Senate Race",
+    "url": "https://klvi.iheart.com/content/2026-11-01-stevens-endorses-rogers-in-michigan-senate-race",
+    "domain": "iheart.com",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "REL_ANTISEMITISM",
+     "RESIGNATION",
+     "ELECTION"
+    ],
+    "source_count": 56,
+    "tone_neg": 4.33213
+   },
+   "b": {
+    "article_id": "60820e4f5bb87865ca3a15752678102a4825865dbdb6134caa3aa8540cfa4ea7",
+    "title": "Trump boosts Republican fight to keep senate and house control in mid-terms",
+    "url": "https://www.readingchronicle.co.uk/news/national/26688636.trump-boosts-republican-fight-keep-senate-house-control-mid-terms",
+    "domain": "readingchronicle.co.uk",
+    "published_at": "2026-11-02T07:52:00Z",
+    "themes": [
+     "ARMEDCONFLICT",
+     "MILITARY",
+     "RURAL",
+     "ELECTION"
+    ],
+    "source_count": 56,
+    "tone_neg": 3.1182795
+   },
+   "same": false,
+   "why": "a Michigan endorsement and the national rally push share 'Senate'"
+  },
+  {
+   "a": {
+    "article_id": "4933744c1a7a85cd8ae3c127a944ab8d22de408880afcb77ec503b637f193056",
+    "title": "Home Secretary to announce immigration rules overhaul on Monday",
+    "url": "https://www.herefordtimes.com/news/national/26688447.home-secretary-announce-immigration-rules-overhaul-monday",
+    "domain": "herefordtimes.com",
+    "published_at": "2026-11-01T19:22:00Z",
+    "themes": [
+     "DELAY",
+     "IMMIGRATION",
+     "ACT_MAKESTATEMENT"
+    ],
+    "source_count": 91,
+    "tone_neg": 6.852792
+   },
+   "b": {
+    "article_id": "cdf8f3833b1654096b519fdd68b570923f0f74383d6562f1336db7c3293d76fe",
+    "title": "Skilled migrants could contribute &#xA3;115bn to public finances, think tank says",
+    "url": "https://www.huntspost.co.uk/news/national/26688586.skilled-migrants-contribute-gbp115bn-public-finances-think-tank-says",
+    "domain": "huntspost.co.uk",
+    "published_at": "2026-11-02T07:02:00Z",
+    "themes": [
+     "ACT_MAKESTATEMENT",
+     "EXTREMISM",
+     "MEDICAL",
+     "ARMEDCONFLICT",
+     "IMMIGRATION"
+    ],
+    "source_count": 77,
+    "tone_neg": 4.9932523
+   },
+   "same": false,
+   "why": "two different immigration stories"
+  },
+  {
+   "a": {
+    "article_id": "1b900ef8807cda5ae877398649feb76aef9de25063e84b7b453554e0afa8b1e6",
+    "title": "Binance hit by $6.3 billion hack blamed on North Korea",
+    "url": "http://www.theusnews.com/news/279405102/binance-hit-by-usd6-3-billion-hack-blamed-on-north-korea",
+    "domain": "theusnews.com",
+    "published_at": "2026-11-02T08:00:00Z",
+    "themes": [
+     "CYBER_ATTACK",
+     "SCIENCE",
+     "ARREST",
+     "ECON_BITCOIN",
+     "MIL_WEAPONS_PROLIFERATION"
+    ],
+    "source_count": 28,
+    "tone_neg": 6.5466447
+   },
+   "b": {
+    "article_id": "644ad0edb3916072d648531f81b908c6b79de40f898e289bcf74a6c90c18d8c6",
+    "title": "DoorDash makes biggest acquisition with $17 billion Instacart deal",
+    "url": "http://www.azerbaijannews.net/news/279403443/doordash-makes-biggest-acquisition-with-usd17-billion-instacart-deal",
+    "domain": "azerbaijannews.net",
+    "published_at": "2026-11-01T19:45:00Z",
+    "themes": [
+     "ARMEDCONFLICT",
+     "ECON_STOCKMARKET",
+     "ECON_GASOLINEPRICE",
+     "ECON_HEATINGOIL"
+    ],
+    "source_count": 3,
+    "tone_neg": 2.1996615
+   },
+   "same": false,
+   "why": "two different billion-dollar business stories"
+  }
+ ],
+ "same_domain_template": [
+  {
+   "article_id": "87ead31e4d1a19da2c70500da41ba2b5c2bb9d63b04d20b69b107a89ac399f24",
+   "title": "Field Level Media Top 25: No. 1 Florida",
+   "url": "https://www.1075thegame.com/2026/11/02/field-level-media-top-25-no-1-florida",
+   "domain": "1075thegame.com",
+   "published_at": "2026-11-02T07:36:00Z",
+   "themes": [],
+   "source_count": 2,
+   "tone_neg": 1.3636364
+  },
+  {
+   "article_id": "ef2abcb5349ba2976400c714902a21ef995509174de2784454963cc63efdaafd",
+   "title": "Field Level Media Top 25: No. 8 Houston",
+   "url": "https://www.1075thegame.com/2026/11/02/field-level-media-top-25-no-8-houston",
+   "domain": "1075thegame.com",
+   "published_at": "2026-11-02T08:19:00Z",
+   "themes": [],
+   "source_count": 2,
+   "tone_neg": 2.020202
+  },
+  {
+   "article_id": "9fd7ab0a6af07d205eaabad1ea4420fa765c12e9ae384f5d8ba95522d8526aa6",
+   "title": "Field Level Media Top 25: No. 3 Illinois",
+   "url": "https://www.1075thegame.com/2026/11/02/field-level-media-top-25-no-3-illinois",
+   "domain": "1075thegame.com",
+   "published_at": "2026-11-02T08:21:00Z",
+   "themes": [],
+   "source_count": 2,
+   "tone_neg": 3.8314176
+  },
+  {
+   "article_id": "2d4010001e7442bfd84fae1224271b1501e6d6a32f907d33413eca9751fcde2b",
+   "title": "Field Level Media Top 25: No. 14 Gonzaga",
+   "url": "https://www.1075thegame.com/2026/11/02/field-level-media-top-25-no-14-gonzaga",
+   "domain": "1075thegame.com",
+   "published_at": "2026-11-02T08:46:00Z",
+   "themes": [],
+   "source_count": 2,
+   "tone_neg": 4.255319
+  }
+ ],
+ "template_domain": "1075thegame.com"
+}

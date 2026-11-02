@@ -31,6 +31,7 @@ def make_article() -> Callable[..., Article]:
         title: str | None = None,
         url: str | None = None,
         domain: str | None = "example.com",
+        tone_neg: float | None = None,
     ) -> Article:
         return Article(
             article_id=f"id{n}",
@@ -40,6 +41,7 @@ def make_article() -> Callable[..., Article]:
             published_at=published_at or datetime(2026, 10, 30, 14, 0, tzinfo=UTC),
             themes=themes or [],
             source_count=source_count,
+            tone_neg=tone_neg,
         )
 
     return make

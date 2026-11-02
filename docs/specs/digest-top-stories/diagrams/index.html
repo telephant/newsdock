@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>digest-top-stories — diagrams</title>
+<style>
+:root { --bg:#ffffff; --fg:#1a1a1a; --card:#f6f6f7; --accent:#2563eb; --border:#d9d9e0; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#111216; --fg:#e8e8ea; --card:#1b1d23; --accent:#7aa2ff; --border:#2a2d35; }
+}
+body { margin:0; background:var(--bg); color:var(--fg);
+  font:16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding:0 16px 64px; }
+header { position:sticky; top:0; background:var(--bg); padding:12px 0; border-bottom:1px solid var(--border); }
+h1 { font-size:1.2rem; margin:0 0 6px; }
+nav a { color:var(--accent); margin-right:14px; text-decoration:none; font-size:.9rem; }
+section { max-width:980px; margin:28px auto; }
+.card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:14px; overflow-x:auto; }
+.check { border-left:4px solid var(--accent); background:var(--card); margin-top:10px;
+  padding:10px 14px; border-radius:0 10px 10px 0; font-size:.92rem; }
+.check b { color:var(--accent); }
+h2 { font-size:1.05rem; }
+</style>
+</head>
+<body>
+<header><h1>digest-top-stories — Milestone 2h diagrams</h1>
+<nav><a href="#c">1 Components</a><a href="#s">2 One cycle</a><a href="#d">3 Data shapes</a><a href="#k">4 Cleanup</a></nav></header>
+
+<section id="c"><h2>1 Component delta (agents/whathappen)</h2><div class="card">
+<pre class="mermaid">
+flowchart LR
+  MCP["C-77 MCP client + include tone_neg"] --> CY["C-70 DigestCycle"]
+  CY --> GR["C-72 StoryGrouper (lexical)"]
+  GR --> TI["C-71 title tokens"]
+  GR --> SC["C-73 score"]
+  SC --> SE["C-74 selection + sections"]
+  SE --> PR["C-76 prompt"]
+  PR --> OL["Ollama (host)"]
+  SE --> RE["C-75 renderer"]
+  RE --> FI["files: dated .md + latest.md"]
+  CY -->|"after the file"| ACK["ack_cursor"]
+  OLD["removed: themes, baseline, stories"] -.-> CY
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the grouper reachable only through the port (C-72), so platform clustering can replace it?</li>
+<li>Is there any state left between cycles besides the platform's cursor?</li>
+<li>Do the pure modules (C-71 to C-75) do no I/O?</li>
+<li>Is nothing of the theme digest left in the cycle?</li></ul></div></section>
+
+<section id="s"><h2>2 One cycle (F-70, F-71)</h2><div class="card">
+<pre class="mermaid">
+sequenceDiagram
+  participant L as loop
+  participant Y as C-70 cycle
+  participant M as platform (MCP)
+  participant G as grouper + scoring
+  participant O as Ollama
+  participant F as files
+  L->>Y: run_once(now)
+  Y->>M: list_new_articles(limit, cursor?, include tone_neg) pages
+  M-->>Y: articles (tone_neg or absent)
+  alt no rows
+    Y-->>L: nothing written, nothing acked
+  else rows
+    Y->>G: group, score, select
+    G-->>Y: top block + sections
+    loop each listed group with 2+ headlines
+      Y->>O: headlines only
+      O-->>Y: one sentence (or failure -> no line)
+    end
+    Y->>F: write dated file, then latest.md
+    Y->>M: ack_cursor(last cursor)
+  end
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Is the ack still strictly after the file (AC-12)?</li>
+<li>Does an hour with rows but no widely covered story still write and ack (AC-8)?</li>
+<li>Is a model failure confined to one line (AC-10)?</li>
+<li>Is the platform asked for tone only through <code>include</code>, with no other new call?</li></ul></div></section>
+
+<section id="d"><h2>3 Data shapes</h2><div class="card">
+<pre class="mermaid">
+classDiagram
+  class Article {
+    article_id, title, url, domain
+    published_at, themes, source_count
+    tone_neg (optional)
+  }
+  class StoryGroup {
+    seed: Article
+    members: Article[]
+    sources = sum source_count
+    tone_neg = max over members
+    score
+  }
+  class Selection {
+    top: StoryGroup[]
+    sections: label to StoryGroup[]
+    ranking: coverage or coverage and tone
+  }
+  Article "1..*" --> "1" StoryGroup : grouped by StoryGrouper
+  StoryGroup "*" --> "1" Selection : chosen by score, caps, labels
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Does a group's <code>sources</code> add the members' counts without counting any article twice?</li>
+<li>Is <code>tone_neg</code> optional all the way (AC-2)?</li>
+<li>Does a group appear in exactly one place of the file (AC-6)?</li></ul></div></section>
+
+<section id="k"><h2>4 Cleanup of old output (F-72)</h2><div class="card">
+<pre class="mermaid">
+flowchart TD
+  S["clean-old [--dry-run]"] --> L["list files in output_dir"]
+  L --> B{"baseline.json?"}
+  B -->|yes| OLD["old"]
+  B -->|no| M{"first line is the v2 marker?"}
+  M -->|yes| KEEP["keep (new)"]
+  M -->|no| MD{"latest.md or a dated digest?"}
+  MD -->|yes| OLD
+  MD -->|no| KEEP2["keep and list as unknown"]
+  OLD --> D{"dry run?"}
+  D -->|yes| P["print only"]
+  D -->|no| X["delete, drop empty date folders"]
+</pre></div>
+<div class="check"><b>Check:</b>
+<ul><li>Can a v2 file ever be deleted by mistake?</li>
+<li>Does anything outside <code>output_dir</code> get touched?</li>
+<li>Is the cleanup run only on request, never by the loop?</li></ul></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.15.0/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? "dark" : "default" });
+</script>
+</body>
+</html>

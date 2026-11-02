@@ -16,6 +16,9 @@ class Article(BaseModel):
     published_at: datetime
     themes: list[str] = []
     source_count: int = 1
+    # GDELT's negative-tone share; absent when the platform does not return it yet
+    # (the digest then ranks by coverage alone) and null when the article has none.
+    tone_neg: float | None = None
 
     @field_validator("themes", mode="before")
     @classmethod
