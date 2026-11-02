@@ -1,6 +1,6 @@
 # digest-top-stories — Verify
 
-Verified 2026-11-02 on branch `agents-whathappen`, worktree `p2-delivery` (committed through T-06; T-07 to T-09 are in the working copy). **Verdict: pass with follow-ups.** All 14 automatic ACs hold with their named tests passing in this run. AC-15, the owner's read of a real hour on the live platform, is open by design (follow-up F-1). The mechanics were also run on real data with the real model (below), and that run showed what the spike predicted: the pipeline is sound and the ranking is only as good as outlet coverage.
+Verified 2026-11-02 on branch `agents-whathappen`, worktree `p2-delivery` (committed through T-06; T-07 to T-09 are in the working copy). **Verdict: pass with follow-ups.** All 14 automatic ACs hold with their named tests passing in this run. AC-15, the owner's read of a real hour on the live platform, was done on 2026-11-02: it **ran end to end, but the owner judged the summaries and the categories bad** (see "Owner's live read"). That is recorded as a known limitation, not fixed: the agent is a demo and may not be revisited. The mechanics were also run on real data with the real model (below), and that run showed what the spike predicted: the pipeline is sound and the ranking is only as good as outlet coverage.
 
 ## What was run in this session
 
@@ -32,7 +32,11 @@ Not run: a cycle against the live platform (needs the owner's key; AC-15), and t
 | AC-12 file first, then ack | TC-14 | pass | recorded order `list`, `write`, `ack:c1`, one ack; on `OSError` there is no ack and the next cycle re-reads and writes |
 | AC-13 the theme digest is gone | TC-16, TC-9 | pass | `test_removed`: the three modules, the old functions and the nine settings are gone; a text scan of source, tests, README, Makefile, compose, `.env.example` finds no old term; an environment that still sets the old variables starts; a cycle writes only `YYYY-MM-DD/HHMM.md` and `latest.md` |
 | AC-14 old output is removed once, on request | TC-17, TC-18 | pass | `test_cleanup` (13): dry run lists exactly the old files and deletes nothing, the real run deletes exactly those and the emptied folders, new files are byte-identical; unknown, unreadable and symlinked entries are kept; missing and empty folders are a no-op; the loop never calls it. Also done for real on the owner's folder (above) |
-| AC-15 a real hour reads well | TC-20 (manual) | **open** | the owner's read on the live platform; see F-1. Offline evidence below |
+| AC-15 a real hour reads well | TC-20 (manual) | **manual-ok with known gaps** | the owner ran `make once` on the live platform on 2026-11-02: it worked end to end; the owner's verdict was that the **summaries and categories are bad**. The "clearer than the theme digest" part was not confirmed. Accepted as a demo limitation (F-1, F-8) |
+
+## Owner's live read (2026-11-02)
+
+The owner ran a real cycle against the live platform with their own key. Reported: *it worked, but the summary and categories are bad*. Nothing more specific was recorded, and no cause is claimed here. What was already measured offline and is the likely background: theme codes are noisy, so sections misfile stories (about 60% looked right in the sample read), and the small local model writes one sentence from headlines only. The owner's decision: **mark it in the docs, and come back only if there is time, because it is just a demo.**
 
 ## Measurements
 
@@ -69,10 +73,11 @@ Nothing implemented outside the spec. Not built, on purpose: a rolling window, e
 
 | ID | Priority | Follow-up |
 |---|---|---|
-| F-1 | P1 | **AC-15, the owner's live read.** Copy your `.env` into `agents/whathappen/` (it is ignored by version control), run `make -C agents/whathappen once`, open `output/latest.md` and tick the checklist in [tests.md](tests.md) §3. The dev API image predates `tone-in-summary`, so that run ranks by coverage only ("Ranked by outlets covering a story.") until the API is rebuilt from this branch |
+| F-1 | closed | **AC-15, the owner's live read: done 2026-11-02.** It worked end to end; summaries and categories were judged bad (F-8). If you run it again with the platform API rebuilt from `tone-in-summary`, the ranking note will say "and negative tone" |
 | F-2 | P1 | Platform `domain_count` in the article summary, so syndication networks stop inflating coverage (the proper fix for the soft items in the Top 5). A platform spec, not an agent change |
 | F-3 | P2 | If the hourly Top 5 is not satisfying after a day: the rolling 24-hour read (backlog P1). M-5 suggests the hourly view is less affected by late growth than feared, so this is about breadth of coverage, not correctness |
 | F-4 | P2 | Section quality: roughly 60% of sectioned stories look right in the read; try `WHATHAPPEN_SECTION_MIN_HITS=2` (more in "Other", fewer misfiles) or a model-chosen label |
 | F-5 | P3 | A press-release filter by URL path (`/press-releases/`, `newswire`): 1.3% of URLs, 4 of 28 listed stories in one of three hours |
 | F-6 | P2 | A CI job for `agents/whathappen` (path-filtered, `make -C agents/whathappen check`); the root `make check` does not cover it (carried over from the first digest) |
 | F-7 | P3 | Commit the working copy (T-07 to T-09) and open a draft PR; nothing here is pushed |
+| F-8 | P3 | **Summary and category quality (owner's verdict on the live read; demo, may not be revisited).** Things to try first, in order of cost: `WHATHAPPEN_SECTION_MIN_HITS=2`; a larger Ollama model or a stricter prompt; a model-chosen section label; dropping the model sentences and showing headlines only |

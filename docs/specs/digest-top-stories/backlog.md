@@ -9,7 +9,7 @@ Priority: P1 next, P2 soon, P3 later.
 - **Wire and press-release filter (P3):** measured 0.9% of articles by domain pattern and 1.3% of URLs by path on 2026-11-02; in the 08:00 hour 4 of 28 listed stories were press releases, none in a Top 5. A URL-path match (`/press-releases/`, `newswire`) is the better handle than the domain.
 - **Region sections (P2):** needs a region signal; 74% of domains have no country hint, so it needs platform support (locations from GKG) or a model.
 - **Model-chosen section label (P3):** only if the theme-prefix map proves too coarse. Try `WHATHAPPEN_SECTION_MIN_HITS=2` first (verify F-4).
-- **Live read of a real hour (P1, verify F-1):** the owner's manual check AC-15 against the live platform; rebuild the platform API from the `tone-in-summary` code first for tone ranking.
+- **Summary and category quality (P3, verify F-8):** the owner's live read (2026-11-02) judged both bad; a demo, so it may not be revisited. First tries: `WHATHAPPEN_SECTION_MIN_HITS=2`, a larger model or stricter prompt, a model-chosen label, or headlines only without sentences.
 - **Readable labels for unmapped themes (P3):** the old backlog item, still relevant for "Other".
 - **Digest page in the web UI (P2):** needs somewhere to store digests (a table or an endpoint).
 - **Daily roll-up (P3):** a once-a-day digest built from the day's hourly files.

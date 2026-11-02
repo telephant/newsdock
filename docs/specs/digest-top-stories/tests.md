@@ -53,6 +53,8 @@ Run by the owner (or by me with the owner's key), with the platform up and Ollam
 8. Read it against the previous theme digest: is it clearer? (the owner's call, recorded in verify.md).
 9. Run `make -C agents/whathappen clean-old` as a dry run; it lists only old files.
 
+**Result (2026-11-02, the owner):** ran end to end on the live platform; the summaries and the categories were judged bad. Recorded as known limitations in [verify.md](verify.md) (F-8).
+
 ## 4. Measurements (provisional targets: measure first, no pass/fail)
 
 | ID | What | How |

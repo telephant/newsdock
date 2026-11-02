@@ -1,6 +1,6 @@
 # digest-top-stories — Spec (M2h: a story-first digest, "what people worry about")
 
-Status: init approved 2026-11-02 · design approved 2026-11-02 (ADR-0031 Accepted) · plan approved 2026-11-02 (9 tasks, 20 tests) · implemented 2026-11-02 (T-01…T-09 done; all automatic ACs pass; AC-15 is the owner's live read, pending) · verified 2026-11-02 (pass with follow-ups, see [verify.md](verify.md))
+Status: init approved 2026-11-02 · design approved 2026-11-02 (ADR-0031 Accepted) · plan approved 2026-11-02 (9 tasks, 20 tests) · implemented 2026-11-02 (T-01…T-09 done; all automatic ACs pass; AC-15 was the owner's live read: it worked, but summaries and categories were judged bad, kept as known limitations) · verified 2026-11-02 (pass with follow-ups, see [verify.md](verify.md))
 
 ## 0. Review guide
 
@@ -45,6 +45,7 @@ No open decisions.
 3. **Coverage measures syndication reach, and tone is a blunt signal.** Radio-station networks and local-newspaper chains republish one headline on dozens of sites, each counted as a source, so 1 to 2 of 5 Top slots in the spike hours were soft items; among widely covered stories negative tone is mild (§3), so it barely changes the order. Accepted (D-11); the fix belongs in the platform (`domain_count`, backlog).
 4. **Thin hours.** Only about 8% of articles have 2 or more sources, so a quiet hour may list few stories (AC-8 covers the empty case).
 5. **Small models invent.** The sentence is written from headlines only and the file says so; it stays a finding about the model, not a failure of this spec.
+7. **Known limitation (owner, 2026-11-02): the summaries and the categories are bad on a real hour.** Accepted for a demo; see [verify.md](verify.md) F-8 for what to try if the digest is revisited.
 6. **Platform dependency for tone.** The running dev API predates `tone-in-summary`; until its image is rebuilt the digest ranks by coverage alone (AC-2).
 
 Prerequisites the user owns: the agent key and Ollama as before; for tone-based ranking, a platform API rebuilt from the `tone-in-summary` code; confirming the one-time deletion of old output (AC-14).

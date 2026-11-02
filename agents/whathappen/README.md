@@ -31,7 +31,7 @@ You need the platform running (API on port 8000, website on 3000), Ollama runnin
 
 An empty hour writes nothing and acknowledges nothing. An hour with articles but no story carried by 2 or more outlets writes a short note and acknowledges. If Ollama is down, stories show their links without a sentence. The first line of every digest is the invisible marker `<!-- whathappen:story-first -->`.
 
-**Limits to know.** The hourly view sees a story's outlet count early, and the count includes every copy: radio-station networks and local-newspaper chains republish one headline on dozens of sites, so a soft story can rank high. Sections follow GDELT theme codes, which are noisy, so some stories sit under the wrong label. Both are measured in `docs/specs/digest-top-stories/spike.md`.
+**Limits to know.** The hourly view sees a story's outlet count early, and the count includes every copy: radio-station networks and local-newspaper chains republish one headline on dozens of sites, so a soft story can rank high. Sections follow GDELT theme codes, which are noisy, so some stories sit under the wrong label. Both are measured in `docs/specs/digest-top-stories/spike.md`. On a live read the owner also judged the **summaries and categories poor**; this is a demo and that is a known limitation (see `docs/specs/digest-top-stories/verify.md`, F-8).
 
 ## Removing the old theme digest's output
 
