@@ -2,7 +2,7 @@
 
 Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed. The dev stack was running on 5433, 29092, 8000 and 3000, so no module that needs those ports was run.
 
-**Verdict: pass with follow-ups.** AC-1…AC-15 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 (one real slot, the owner's check) and the live measurements are open, so `stage` is `verify` and `gates.verify` stays `pending` until the owner has run the checklist and `/spec-verify body-extraction` is repeated. Follow-ups F-2…F-5 (F-1 closed).
+**Verdict: pass with follow-ups.** AC-1…AC-16 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 was run live (section 1c). The measurements are first readings only (minutes, not a day), so they stay open. `gates.verify` stays `pending` until the owner has looked at the live result. Follow-ups F-2…F-5 (F-1 closed).
 
 ## 1. What was run
 
@@ -20,6 +20,21 @@ The owner asked me to stop the dev stack (containers stopped, not removed; volum
 - **Stale image:** the first `stack` run created 3 topics, not 5, because `make up` runs the `topics` job from the existing `newsdock-processor:dev` image, built before M3c. Rebuilding (`make build`) fixed it. A dev stack needs `make build` before `make up` after this milestone (already in `CLAUDE.md`).
 - **Stale test expectations** in `test_stack.py`: the topic count (3, now 5) and the pinned migration head (`0010`, now derived from the migration files).
 - **Guard bug** in `infra/scripts/dev_stack_guard.py`: it refused every test after the first in a module whose module-scoped fixture starts the stack, so `test_agent_isolation.py` could never pass since the guard was added. It now checks the ports once per module, before the first test starts a container; `test_dev_stack_guard.py` has a test that reproduces it.
+
+### 1c. Live check on a real stack (2026-11-03)
+
+With the dev stack stopped, the images rebuilt (`make build`), `make up`, then `docker compose --profile apps up -d --wait`: all services healthy, `extractor` included. Compose reused the existing project `newsdock` and its data volume, so migrations 0011 and 0012 were applied to the owner's existing dev database (301,508 articles). A new `.env` (ignored by version control, generated admin token) was created in this worktree because the worktree that owned the old one no longer exists; the old admin token is gone, agents made before keep their keys.
+
+Checklist of `tests.md` (TC-26):
+
+1. Stack healthy with the `extractor` service: yes.
+2. The extractor started on the last 6 hours of articles (no back-fill).
+3. `article_bodies` after about 15 minutes: `ok` 508, `blocked_robots` 83, `http_error` 46, `no_text` 5, `too_large` 1, `pending` 10,289. Of the 643 finished, 79% are `ok` (T-01 estimated 69.7%).
+4. `get_article` of an `ok` article returned its text (2,897 characters) over MCP and REST; `include=body` worked on the feed; `article_passages` 2,359, all embedded (about 4.6 passages per `ok` body).
+5. `semantic_search` with a query built from words of a body (not of its title): `scope=titles` did not return the article, `scope=body` returned it first with the matching passage (`matched_by` `body_vector` and `body_keyword`), `scope=all` returned it first with `vector`, `body_vector`, `body_keyword`; `titles` results carry no `passage` key.
+6. Extractor log: every request goes to a public address (the pinned IP), `robots.txt` is read before the page, redirects are followed one hop at a time.
+
+Sizes after the first minutes (small tables overstate the index share): `article_passages` 5.9 MB for 768 passages (about 7.7 kB each), `article_bodies` 4.0 MB for 10.9 k rows.
 
 ## 2. Acceptance criteria
 
@@ -40,7 +55,7 @@ The owner asked me to stop the dev stack (containers stopped, not removed; volum
 | AC-13 titles and text fused | TC-21, TC-22 | pass | `test_semantic_body.py` (title-only, text-only, body-less; `titles` payload keeps its keys; the default-scope setting) |
 | AC-14 degrades like titles | TC-23 | pass | `test_semantic_body.py` (`vector` raises, `hybrid` is `degraded` with the keyword legs, scopes `body` and `all`) |
 | AC-15 platform unaffected | TC-24, TC-25 | pass | `infra/scripts/tests/test_body_pipeline.py`: extractor stopped, then failing on every fetch; ingestion, sink replay, title search and `get_article` as before; the API read path opens no socket; no fetcher or parser imported by `apps/api/src`. TC-25: `test_agent_isolation.py` 11 passed, all ten services healthy including `extractor` |
-| AC-16 one live slot | TC-26 | **open** | manual, the owner's checklist in `tests.md` |
+| AC-16 one live slot | TC-26 | pass (manual, run by the agent with the owner's go-ahead, 2026-11-03) | live stack (section 1c): `article_bodies` by status, `get_article` text, `scope=body`/`all` passages, extractor log with public addresses only |
 
 TC-27…TC-29 (migration, config, tooling lists) pass inside `make check` and the Docker run.
 
@@ -53,7 +68,8 @@ None of M-1…M-7 can be read without the extractor running for a day on the liv
 | ID | Finding | Severity | Decision |
 |---|---|---|---|
 | F-1 | TC-25 and the whole-stack and Kafka modules had not run because the dev stack held their ports. | medium | **closed 2026-11-03**: dev stack stopped, `kafka` 5 passed, `stack` 9 passed, `e2e` 11 passed, `images` 18 passed, `pipeline` 2 passed (§1b) |
-| F-2 | AC-16 and M-1…M-7 need the live stack: `make build`, `make migrate` (0012), `make up`, `ollama pull nomic-embed-text`, then the checklist. Until then the recall of text search is unmeasured (the evaluation set is a backlog item). | medium | the owner's run, then repeat `/spec-verify body-extraction` |
+| F-2 | M-1…M-7 need a day of live running; only first readings exist (section 1c). Recall of text search is unmeasured (the evaluation set is a backlog item). | medium | read them after a day on the live stack |
+| F-6 | **Throughput.** After about 15 minutes 643 pages were processed against a pending queue of 10,289 that was still growing: GDELT delivers about 1,000 new canonical articles per slot, and the extractor (5 s spacing per site, many articles on few sites) does not keep up. Newest-first picking keeps fresh articles first and older ones age out with retention, but a large share of articles will never be fetched. | medium | tune `concurrency` / `per_host_delay_seconds` after a day's reading (M-2), or accept; backlog P2 |
 | F-3 | AC-15 "the API makes no outbound request" is shown for the repo read path (a socket spy) and for the imports of `apps/api/src`, not for a running MCP server under traffic. The query embedder legitimately calls Ollama. | low | accepted; the TC-25 stack run adds the whole-service view |
 | F-4 | The extractor shares the `data` network with Kafka and Postgres (ADR-0034, the owner's choice); the address guard is the only wall against SSRF, and compose connects as the database superuser, so the `extractor_rw` grants document intent only. | low | accepted in ADR-0034; the `crawl` network stays in the backlog |
 | F-5 | `test_head_is_0010` had pinned the migration head and failed since 0011; it now compares against the Alembic script head. | low | fixed in this milestone |

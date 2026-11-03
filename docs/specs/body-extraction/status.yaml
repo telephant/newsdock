@@ -19,4 +19,4 @@ acs:
   AC-13: {status: passing}  # TC-21, TC-22 (golden keys unchanged for titles), 2026-11-03
   AC-14: {status: passing}  # TC-23 (vector fails, hybrid degrades; body and all), 2026-11-03
   AC-15: {status: passing}  # TC-24 (in process) and TC-25 (compose stack, 11 passed, ten services healthy), 2026-11-03
-  AC-16: {status: todo}  # manual: the owner's live slot check (TC-26)
+  AC-16: {status: manual-ok}  # TC-26 run live 2026-11-03 (verify.md section 1c): bodies by status, get_article text, scope body/all passages

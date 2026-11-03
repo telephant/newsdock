@@ -29,7 +29,7 @@ Run 2026-11-02 on branch `agents-whathappen` (worktree `p2-delivery`), nothing c
 | AC-11 Events per article through REST | TC-18, TC-21 | pass | `test_events_rest_api.py` |
 | AC-12 Article with no events | TC-19 | pass | repo, MCP and REST tests return `[]` |
 | AC-13 Invalid include value | TC-20 | pass | MCP `invalid_include` and REST 422 for `bogus`, `events,bogus`, `Events` |
-| AC-14 One live slot end to end | TC-25 | **open** | manual, the owner's checklist in `tests.md`; the in-process TC-24 and the whole-slot load in §3 are the closest evidence so far |
+| AC-14 One live slot end to end | TC-25 | **partly done live (2026-11-03)** | real stack: slot `20261103070000` Events (794 rows) and Mentions (1,954 rows) were published while its GKG file was still 404 (independent fetch, AC-4, seen live); stored: 794 events and 1,918 distinct mention pairs. The step `get_article` returns events waits for that slot's GKG file, which GDELT had not published yet |
 
 TC-22 (migration/models/grants) and TC-23 (config check) also pass (`test_schema.py`, `check_config.py`).
 
