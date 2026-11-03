@@ -2,7 +2,7 @@
 
 Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed. The dev stack was running on 5433, 29092, 8000 and 3000, so no module that needs those ports was run.
 
-**Verdict: pass with follow-ups.** AC-1…AC-16 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 was run live (section 1c). The measurements are first readings only (minutes, not a day), so they stay open as follow-ups (F-2, F-6). `stage` is `done`. Follow-ups F-2…F-5 (F-1 closed).
+**Verdict: pass with follow-ups.** AC-1…AC-16 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 was run live (section 1c). The measurements are first readings only (minutes, not a day), so they stay open as follow-ups (F-2). `stage` is `done`. Follow-ups F-2…F-5 (F-1 closed).
 
 ## 1. What was run
 
@@ -29,10 +29,12 @@ Checklist of `tests.md` (TC-26):
 
 1. Stack healthy with the `extractor` service: yes.
 2. The extractor started on the last 6 hours of articles (no back-fill).
-3. `article_bodies` after about 15 minutes: `ok` 508, `blocked_robots` 83, `http_error` 46, `no_text` 5, `too_large` 1, `pending` 10,289. Of the 643 finished, 79% are `ok` (T-01 estimated 69.7%).
+3. `article_bodies` after about 15 minutes: `ok` 508, `blocked_robots` 83, `http_error` 46, `no_text` 5, `too_large` 1, `pending` 10,289. Of the 643 finished, 79% are `ok` (T-01 estimated 69.7%). Later reading at 08:25 (6,436 finished): `ok` 4,875 (75.8%), `blocked_robots` 1,013 (15.7%), `http_error` 478 (7.4%), `no_text` 66 (1.0%), `failed` 0; pending 6,990.
 4. `get_article` of an `ok` article returned its text (2,897 characters) over MCP and REST; `include=body` worked on the feed; `article_passages` 2,359, all embedded (about 4.6 passages per `ok` body).
 5. `semantic_search` with a query built from words of a body (not of its title): `scope=titles` did not return the article, `scope=body` returned it first with the matching passage (`matched_by` `body_vector` and `body_keyword`), `scope=all` returned it first with `vector`, `body_vector`, `body_keyword`; `titles` results carry no `passage` key.
 6. Extractor log: every request goes to a public address (the pinned IP), `robots.txt` is read before the page, redirects are followed one hop at a time.
+
+Throughput (M-2): 1,640 pages in 5 minutes, about 320 a minute, five times the arrival rate, so the queue drains (F-6 resolved).
 
 Sizes after the first minutes (small tables overstate the index share): `article_passages` 5.9 MB for 768 passages (about 7.7 kB each), `article_bodies` 4.0 MB for 10.9 k rows.
 
@@ -69,7 +71,7 @@ None of M-1…M-7 can be read without the extractor running for a day on the liv
 |---|---|---|---|
 | F-1 | TC-25 and the whole-stack and Kafka modules had not run because the dev stack held their ports. | medium | **closed 2026-11-03**: dev stack stopped, `kafka` 5 passed, `stack` 9 passed, `e2e` 11 passed, `images` 18 passed, `pipeline` 2 passed (§1b) |
 | F-2 | M-1…M-7 need a day of live running; only first readings exist (section 1c). Recall of text search is unmeasured (the evaluation set is a backlog item). | medium | read them after a day on the live stack |
-| F-6 | **Throughput.** After about 15 minutes 643 pages were processed against a pending queue of 10,289 that was still growing: GDELT delivers about 1,000 new canonical articles per slot, and the extractor (5 s spacing per site, many articles on few sites) does not keep up. Newest-first picking keeps fresh articles first and older ones age out with retention, but a large share of articles will never be fetched. | medium | tune `concurrency` / `per_host_delay_seconds` after a day's reading (M-2), or accept; backlog P2 |
+| F-6 | **Throughput (first reading was misleading).** Fifteen minutes after start only 643 pages were done against 10,289 pending, which looked like falling behind. Two later readings show the opposite: 4,796 done at 08:20 and 6,436 at 08:25 (about 320 pages a minute, about 19,000 an hour) against an arrival of about 67 articles a minute (about 1,000 canonical articles per 15-minute slot); the pending queue fell from 10,289 to 6,990 even while two new slots arrived. The early number was start-up (robots.txt for every new site, a cold queue of one day of old articles). | low | resolved by measurement (M-2); recheck after a day, because the first-hour backlog and the per-site spacing may bind harder on a busy day |
 | F-3 | AC-15 "the API makes no outbound request" is shown for the repo read path (a socket spy) and for the imports of `apps/api/src`, not for a running MCP server under traffic. The query embedder legitimately calls Ollama. | low | accepted; the TC-25 stack run adds the whole-service view |
 | F-4 | The extractor shares the `data` network with Kafka and Postgres (ADR-0034, the owner's choice); the address guard is the only wall against SSRF, and compose connects as the database superuser, so the `extractor_rw` grants document intent only. | low | accepted in ADR-0034; the `crawl` network stays in the backlog |
 | F-5 | `test_head_is_0010` had pinned the migration head and failed since 0011; it now compares against the Alembic script head. | low | fixed in this milestone |
