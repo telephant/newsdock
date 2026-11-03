@@ -2,7 +2,7 @@
 
 Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed. The dev stack was running on 5433, 29092, 8000 and 3000, so no module that needs those ports was run.
 
-**Verdict: pass with follow-ups.** AC-1…AC-16 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 was run live (section 1c). The measurements are first readings only (minutes, not a day), so they stay open. `gates.verify` stays `pending` until the owner has looked at the live result. Follow-ups F-2…F-5 (F-1 closed).
+**Verdict: pass with follow-ups.** AC-1…AC-16 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 was run live (section 1c). The measurements are first readings only (minutes, not a day), so they stay open as follow-ups (F-2, F-6). `stage` is `done`. Follow-ups F-2…F-5 (F-1 closed).
 
 ## 1. What was run
 

@@ -1,8 +1,8 @@
 feature: body-extraction
-stage: verify
+stage: done
 updated: 2026-11-03
 decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided, D-6: decided}
-gates: {init: approved, design: approved, plan: approved, implement: approved, verify: pending}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}
 acs:
   AC-1: {status: passing}  # TC-1, TC-2 (robots rules; blocked_robots stored, page never requested), 2026-11-02
   AC-2: {status: passing}  # TC-3, TC-4, TC-5, TC-30 + one-site-at-a-time through the worker, 2026-11-02

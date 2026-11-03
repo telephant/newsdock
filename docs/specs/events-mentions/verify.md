@@ -2,7 +2,7 @@
 
 Run 2026-11-02 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed.
 
-**Verdict: pass with follow-ups, 13 of 14 ACs.** AC-1…AC-13 pass in this run. AC-14 (one real slot on the dev stack, the owner's check) has not been done: it needs `make down`, `make build`, `make up` and `make migrate` on the owner's stack, so `stage` stays `verify` and `gates.verify` stays `pending` until it is run. The follow-ups are F-1…F-4.
+**Verdict: pass with follow-ups, 14 of 14 ACs.** AC-1…AC-13 passed on 2026-11-02; AC-14 (one real slot on a real stack) was run on 2026-11-03 and passed (below). F-3 is closed; the open follow-ups are F-1, F-2 and F-4.
 
 ## 1. What was run
 
@@ -29,7 +29,7 @@ Run 2026-11-02 on branch `agents-whathappen` (worktree `p2-delivery`), nothing c
 | AC-11 Events per article through REST | TC-18, TC-21 | pass | `test_events_rest_api.py` |
 | AC-12 Article with no events | TC-19 | pass | repo, MCP and REST tests return `[]` |
 | AC-13 Invalid include value | TC-20 | pass | MCP `invalid_include` and REST 422 for `bogus`, `events,bogus`, `Events` |
-| AC-14 One live slot end to end | TC-25 | **partly done live (2026-11-03)** | real stack: slot `20261103070000` Events (794 rows) and Mentions (1,954 rows) were published while its GKG file was still 404 (independent fetch, AC-4, seen live); stored: 794 events and 1,918 distinct mention pairs. The step `get_article` returns events waits for that slot's GKG file, which GDELT had not published yet |
+| AC-14 One live slot end to end | TC-25 | pass (manual, 2026-11-03) | real stack: slot `20261103070000` Events (794 rows) and Mentions (1,954 rows) were published while its GKG file was still 404 (independent fetch, AC-4, seen live) and stored (794 events, 1,918 distinct mention pairs); once GDELT published the GKG files (07:16 UTC) 180 articles joined to events (3,882 mention rows); `GET /api/articles/{id}` of one returned 20 events (the cap), most mentioned first, each with CAMEO code, Goldstein, place and `mention_count`; `include=events,tone_neg` on the feed adds the key to every article and the plain feed has no `events` key |
 
 TC-22 (migration/models/grants) and TC-23 (config check) also pass (`test_schema.py`, `check_config.py`).
 
