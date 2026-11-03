@@ -25,6 +25,8 @@ def ensure_topics(
         settings.kafka_topics_raw,
         settings.kafka_topics_clean,
         settings.kafka_topics_dlq,
+        settings.kafka_topics_events_clean,
+        settings.kafka_topics_mentions_clean,
     ]
     missing = [name for name in wanted if name not in existing]
     if not missing:

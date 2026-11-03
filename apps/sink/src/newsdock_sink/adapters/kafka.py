@@ -1,4 +1,8 @@
-"""Kafka loop for the sink: consume the clean topic in batches, write, commit."""
+"""Kafka loop for the sink: consume the clean topics in batches, write, commit.
+
+With a `gdelt_writer` the loop also reads the Events and Mentions topics (ADR-0032);
+offsets are committed once, after all three kinds of rows in the batch are written.
+"""
 
 import logging
 import time
@@ -8,6 +12,7 @@ from confluent_kafka import Consumer, Producer
 from newsdock_core.contracts import DlqMessage
 
 from newsdock_sink.config import Settings
+from newsdock_sink.domain.gdelt import GdeltWriter, process_events, process_mentions
 from newsdock_sink.domain.writer import (
     BatchResult,
     DbUnavailable,
@@ -33,17 +38,29 @@ class KafkaDlqSink:
 
 class KafkaSinkLoop:
     def __init__(
-        self, settings: Settings, writer: StoryWriter, *, group_id: str | None = None
+        self,
+        settings: Settings,
+        writer: StoryWriter,
+        *,
+        group_id: str | None = None,
+        gdelt_writer: GdeltWriter | None = None,
     ) -> None:
         self._settings = settings
         self._writer = writer
+        self._gdelt_writer = gdelt_writer
         self._consumer = Consumer({
             "bootstrap.servers": settings.kafka_bootstrap_servers,
             "group.id": group_id or settings.kafka_group_id,
             "auto.offset.reset": settings.kafka_auto_offset_reset,
             "enable.auto.commit": False,  # invariant: manual commit after write,
         })  # fmt: skip
-        self._consumer.subscribe([settings.kafka_topics_clean])
+        topics = [settings.kafka_topics_clean]
+        if gdelt_writer is not None:
+            topics += [
+                settings.kafka_topics_events_clean,
+                settings.kafka_topics_mentions_clean,
+            ]
+        self._consumer.subscribe(topics)
         self._producer = Producer(
             {"bootstrap.servers": settings.kafka_bootstrap_servers}
         )
@@ -63,16 +80,34 @@ class KafkaSinkLoop:
                     logger.error("consumer error: %s", msg.error())
                 break
             key, value = msg.key(), msg.value()
-            items.append(SinkItem(key=(key or b"").decode(), value=value or b""))
+            items.append(
+                SinkItem(
+                    key=(key or b"").decode(),
+                    value=value or b"",
+                    topic=msg.topic() or "",
+                )
+            )
         if not items:
             return None
+        events_topic = self._settings.kafka_topics_events_clean
+        mentions_topic = self._settings.kafka_topics_mentions_clean
+        articles = [i for i in items if i.topic not in (events_topic, mentions_topic)]
+        events = [i for i in items if i.topic == events_topic]
+        mentions = [i for i in items if i.topic == mentions_topic]
         try:
-            result = process_batch(
-                items,
-                self._writer,
-                self._dlq,
-                window=timedelta(hours=self._settings.story_window_hours),
-            )
+            result = BatchResult(canonicals=0, grouped=0, url_duplicates=0, dlq=0)
+            if articles:
+                result = process_batch(
+                    articles,
+                    self._writer,
+                    self._dlq,
+                    window=timedelta(hours=self._settings.story_window_hours),
+                )
+            if self._gdelt_writer is not None:
+                if events:
+                    process_events(events, self._gdelt_writer, self._dlq)
+                if mentions:
+                    process_mentions(mentions, self._gdelt_writer, self._dlq)
         except DbUnavailable as exc:  # no commit: redelivered after backoff (R-1)
             logger.warning("database unavailable, backing off: %s", exc)
             time.sleep(self._settings.db_backoff_seconds)

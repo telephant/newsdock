@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>events-mentions diagrams</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6570; --card:#f5f7fa; --line:#d5dbe3; --accent:#0a7d5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --fg:#e6e9ed; --muted:#9aa5b1; --card:#1c2229; --line:#2f3842; --accent:#4cc9a0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  nav a { margin-right:12px; color:var(--accent); }
+  section { margin:32px 0; }
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .check { border-left:4px solid var(--accent); background:var(--card); padding:8px 16px; margin-top:8px; border-radius:4px; }
+  .check b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>events-mentions: diagrams</h1>
+<p style="color:var(--muted)">Spec and design: <code>spec.md</code>, <code>design.md</code>. Each diagram has a Check box with questions to answer before approving.</p>
+<nav><a href="#d1">1 Components</a><a href="#d2">2 Sequence</a><a href="#d3">3 Data model</a><a href="#d4">4 File state</a></nav>
+
+<section id="d1">
+<h2>1. Components</h2>
+<pre class="mermaid">
+flowchart LR
+  G[GDELT slot files] --> I[C-1 Ingester]
+  I -->|gkg.raw, kind tag| K[(C-2 Kafka)]
+  K --> P[C-3 Processor]
+  P -->|gkg.clean| K
+  P -->|events.clean| K
+  P -->|mentions.clean| K
+  P -->|gkg.dlq| K
+  K --> S[C-4 Sink]
+  S --> DB[(C-5 Postgres)]
+  I -->|ingest_file| DB
+  DB --> A[C-6 API: MCP and REST]
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Is it acceptable that <code>gkg.raw</code> and <code>gkg.dlq</code> now carry Events and Mentions lines?</li>
+<li>Should the sink really read three topics in one loop?</li>
+<li>Is the web app rightly absent from this milestone?</li>
+</ul></div>
+</section>
+
+<section id="d2">
+<h2>2. Ingest, store and read</h2>
+<pre class="mermaid">
+sequenceDiagram
+  participant I as Ingester
+  participant K as Kafka
+  participant P as Processor
+  participant S as Sink
+  participant D as Postgres
+  participant A as API
+  I->>I: read lastupdate, 3 files per slot
+  I->>K: publish lines (kind = gkg, events, mentions)
+  Note over I: a 404 file stays pending, others go on
+  K->>P: raw line
+  P->>K: events.clean or mentions.clean or gkg.dlq
+  K->>S: clean rows
+  S->>D: upsert events, mentions (dedup in batch)
+  S->>D: hourly delete older than 7 days
+  A->>D: page of articles, then events by url_hash
+  A-->>A: include=events adds events per article
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Does anything here make the GKG path wait for Events or Mentions?</li>
+<li>If the sink is down, what stops and what is replayed?</li>
+<li>Is one extra query per page acceptable for the read path?</li>
+</ul></div>
+</section>
+
+<section id="d3">
+<h2>3. Data model</h2>
+<pre class="mermaid">
+erDiagram
+  ARTICLES ||--o{ MENTIONS : "url_hash, no FK"
+  EVENTS ||--o{ MENTIONS : "event_id, no FK"
+  ARTICLES {
+    char url_hash PK
+    text title
+  }
+  EVENTS {
+    bigint event_id PK
+    date event_date
+    text cameo_code
+    real goldstein
+    int num_mentions
+    char source_url_hash
+    timestamptz date_added
+    timestamptz ingested_at
+  }
+  MENTIONS {
+    bigint event_id PK
+    char url_hash PK
+    text source_name
+    timestamptz mention_time
+    smallint confidence
+    timestamptz ingested_at
+  }
+  INGEST_FILE {
+    text slot PK
+    text kind PK
+    text status
+    int attempts
+  }
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Is "an article's events = events it is mentioned in" the meaning you want?</li>
+<li>Are the 20 events per article and the order by <code>num_mentions</code> sensible?</li>
+<li>Is <code>mention_count</code> (rows we stored) next to GDELT's <code>num_mentions</code> confusing?</li>
+</ul></div>
+</section>
+
+<section id="d4">
+<h2>4. File state (<code>ingest_file</code>)</h2>
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> pending : listed in lastupdate
+  pending --> pending : 404, empty, md5 mismatch (attempts + 1)
+  pending --> published : rows sent
+  pending --> failed : attempts reach max
+  published --> [*]
+  failed --> [*]
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Is "failed after 4 attempts" right for the new files too, same as GKG?</li>
+<li>Should slots missed while the feature was off be back-filled (design says no)?</li>
+</ul></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 """Settings for newsdock-api; the only place env vars are read (DR-9)."""
 
 from datetime import timedelta
+from typing import Literal
 
 from newsdock_config import LayeredSettings
 from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
@@ -41,6 +42,9 @@ class Settings(LayeredSettings):
     # only (NEWSDOCK_ADMIN_TOKEN). Unset = the token opens nothing (admin/owner
     # sessions still manage agents, ui-login); the reset-password route answers 404.
     auth_required: bool = True
+    # Events per article (M3c events-mentions, ADR-0033): most an article returns when
+    # `include` names `events`, most mentioned first
+    events_per_article: int = 20
     rate_limit_per_minute: int = 600
     admin_token: SecretStr | None = None
     # Human accounts (M2 ui-login, ADR-0020): sessions, sign-up, login throttle
@@ -73,6 +77,10 @@ class Settings(LayeredSettings):
     semantic_query_max_length: int = 500
     semantic_ef_search: int = 100
     semantic_ollama_timeout_seconds: float = 10.0
+    # Search in the page text (M3d body-extraction, ADR-0037): the scope used when a
+    # caller gives none (titles | body | all) and the passages fetched per leg
+    semantic_default_scope: Literal["titles", "body", "all"] = "titles"
+    semantic_passage_candidates: int = 150
     # shared with the embedder through `common:` (model and dimension must agree)
     embedding_model: str = "nomic-embed-text"
     embedding_dimension: int = 768

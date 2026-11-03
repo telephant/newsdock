@@ -36,21 +36,32 @@ def settings() -> Settings:
         kafka_topics_raw="t.raw",
         kafka_topics_clean="t.clean",
         kafka_topics_dlq="t.dlq",
+        kafka_topics_events_clean="t.events",
+        kafka_topics_mentions_clean="t.mentions",
         kafka_topic_partitions=2,
         kafka_topic_replication_factor=1,
     )
 
 
-def test_creates_all_three_configured_topics_with_configured_shape() -> None:
+def test_creates_all_five_configured_topics_with_configured_shape() -> None:
     admin = FakeAdmin(existing=set())
     created = ensure_topics(settings(), admin=admin)
-    assert sorted(created) == ["t.clean", "t.dlq", "t.raw"]
+    assert sorted(created) == ["t.clean", "t.dlq", "t.events", "t.mentions", "t.raw"]
     assert {nt.num_partitions for nt in admin.created} == {2}
     assert {nt.replication_factor for nt in admin.created} == {1}
 
 
 def test_second_run_creates_nothing() -> None:
-    admin = FakeAdmin(existing={"t.raw", "t.clean", "t.dlq", "__consumer_offsets"})
+    admin = FakeAdmin(
+        existing={
+            "t.raw",
+            "t.clean",
+            "t.dlq",
+            "t.events",
+            "t.mentions",
+            "__consumer_offsets",
+        }
+    )
     assert ensure_topics(settings(), admin=admin) == []
     assert admin.created == []
 

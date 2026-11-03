@@ -513,14 +513,26 @@ export interface components {
       sources: components["schemas"]["SourceRecord"][];
       /** Source Count */
       source_count: number;
+      /**
+       * Events
+       * @default []
+       */
+      events: components["schemas"]["EventOut"][];
+      /** Body */
+      body?: string | null;
+      /**
+       * Body Status
+       * @default none
+       */
+      body_status: string;
     };
     /**
-     * ArticleSummaryTone
-     * @description Documentation only (ADR-0030): the feed article as it looks when tone is asked
-     *     for. It redeclares the four fields as ordinary optional ones so the OpenAPI schema
-     *     shows them; no handler builds it.
+     * ArticleSummaryEvents
+     * @description Documentation only (ADR-0030, ADR-0033): the feed article as it looks when tone
+     *     and `events` are asked for. `events` is an ordinary optional field here so the
+     *     OpenAPI schema shows it; no handler builds it.
      */
-    ArticleSummaryTone: {
+    ArticleSummaryEvents: {
       /** Article Id */
       article_id: string;
       /** Title */
@@ -553,6 +565,10 @@ export interface components {
       tone_neg?: number | null;
       /** Tone Polarity */
       tone_polarity?: number | null;
+      /** Events */
+      events?: components["schemas"]["EventOut"][] | null;
+      /** Body */
+      body?: string | null;
     };
     /** AuthOptions */
     AuthOptions: {
@@ -567,12 +583,75 @@ export interface components {
       password: string;
     };
     /**
-     * FeedPageTone
+     * EventActor
+     * @description One side of an event; every part may be missing in the GDELT data.
+     */
+    EventActor: {
+      /** Code */
+      code?: string | null;
+      /** Name */
+      name?: string | null;
+      /** Country */
+      country?: string | null;
+      /** Type */
+      type?: string | null;
+    };
+    /** EventLocation */
+    EventLocation: {
+      /** Name */
+      name?: string | null;
+      /** Country */
+      country?: string | null;
+      /** Adm1 */
+      adm1?: string | null;
+      /** Lat */
+      lat?: number | null;
+      /** Lon */
+      lon?: number | null;
+    };
+    /**
+     * EventOut
+     * @description A GDELT event an article is mentioned in (curated fields, D-2).
+     *
+     *     `num_mentions` is GDELT's own count; `mention_count` is the mention rows we stored.
+     */
+    EventOut: {
+      /** Event Id */
+      event_id: number;
+      /**
+       * Date
+       * Format: date
+       */
+      date: string;
+      /** Cameo Code */
+      cameo_code: string;
+      /** Cameo Root */
+      cameo_root: string | null;
+      /** Goldstein */
+      goldstein: number | null;
+      /** Quad Class */
+      quad_class: number | null;
+      /** Num Mentions */
+      num_mentions: number;
+      /** Num Sources */
+      num_sources: number;
+      /** Avg Tone */
+      avg_tone: number | null;
+      actor1: components["schemas"]["EventActor"];
+      actor2: components["schemas"]["EventActor"];
+      location: components["schemas"]["EventLocation"] | null;
+      /** Source Url */
+      source_url: string;
+      /** Mention Count */
+      mention_count: number;
+    };
+    /**
+     * FeedPageEvents
      * @description Documentation only: the schema of `GET /api/articles`.
      */
-    FeedPageTone: {
+    FeedPageEvents: {
       /** Articles */
-      articles: components["schemas"]["ArticleSummaryTone"][];
+      articles: components["schemas"]["ArticleSummaryEvents"][];
       /** Next Before */
       next_before: string | null;
     };
@@ -1429,7 +1508,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["FeedPageTone"];
+          "application/json": components["schemas"]["FeedPageEvents"];
         };
       };
       /** @description Validation Error */

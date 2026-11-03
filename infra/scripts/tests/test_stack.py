@@ -116,7 +116,7 @@ def test_down_then_up_recovers_and_keeps_data(env_file: Path) -> None:  # TC-22
     assert psql("select id from survive") == "7"
 
 
-TOPICS = ["gkg.raw", "gkg.clean", "gkg.dlq"]
+TOPICS = ["gkg.raw", "gkg.clean", "gkg.dlq", "events.clean", "mentions.clean"]
 
 
 def describe_topics() -> list[str]:
@@ -135,10 +135,10 @@ def describe_topics() -> list[str]:
     )
 
 
-def test_up_creates_the_three_single_partition_topics(env_file: Path) -> None:  # TC-23
+def test_up_creates_the_five_single_partition_topics(env_file: Path) -> None:  # TC-23
     assert make("up").returncode == 0
     described = describe_topics()
-    assert len(described) == 3
+    assert len(described) == 5
     for topic in TOPICS:
         row = next(d for d in described if d.startswith(f"Topic: {topic} "))
         assert "1 ReplicationFactor: 1" in row, row

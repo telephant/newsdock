@@ -5,23 +5,27 @@ hand-written (infra/migrations/versions/0002_articles.py) and TC-34 proves
 they do not drift from these models. Apps use them only in `adapters/`.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
-from pgvector.sqlalchemy import Vector
+from pgvector.sqlalchemy import HALFVEC, Vector
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     ForeignKey,
     Identity,
     Index,
     Integer,
+    SmallInteger,
     Text,
     Uuid,
     text,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, JSONB, REAL
+from sqlalchemy import text as sql_text  # `text` is also a column name below
+from sqlalchemy.dialects.postgresql import ARRAY, DOUBLE_PRECISION, JSONB, REAL
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from newsdock_db.metadata import metadata
@@ -319,3 +323,206 @@ class PasswordReset(Base):
     )
 
     __table_args__ = (Index("ix_password_resets_expires_at", "expires_at"),)
+
+
+class Event(Base):
+    """A GDELT event (M3c events-mentions, ADR-0033): curated subset of the 61 columns.
+
+    No foreign keys: the three files of a slot arrive in any order. `source_url_hash`
+    is the `url_hash` of the article the event was coded from.
+    """
+
+    __tablename__ = "events"
+
+    event_id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=False
+    )
+    event_date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_root: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    actor1_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor1_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor1_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor1_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor2_code: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor2_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor2_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actor2_type: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cameo_code: Mapped[str] = mapped_column(Text, nullable=False)
+    cameo_base: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cameo_root: Mapped[str | None] = mapped_column(Text, nullable=True)
+    quad_class: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    goldstein: Mapped[float | None] = mapped_column(REAL, nullable=True)
+    num_mentions: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    num_sources: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    num_articles: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    avg_tone: Mapped[float | None] = mapped_column(REAL, nullable=True)
+    geo_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    geo_country: Mapped[str | None] = mapped_column(Text, nullable=True)
+    geo_adm1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    geo_lat: Mapped[float | None] = mapped_column(DOUBLE_PRECISION, nullable=True)
+    geo_lon: Mapped[float | None] = mapped_column(DOUBLE_PRECISION, nullable=True)
+    date_added: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    source_url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_url_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (
+        Index("ix_events_ingested_at", "ingested_at"),
+        Index("ix_events_source_url_hash", "source_url_hash"),
+    )
+
+
+class Mention(Base):
+    """One article mentioning one event (M3c events-mentions, ADR-0033).
+
+    Key `(event_id, url_hash)`; `url_hash` joins to `articles.url_hash` with no foreign
+    key, and `event_id` to `events.event_id` the same way.
+    """
+
+    __tablename__ = "mentions"
+
+    event_id: Mapped[int] = mapped_column(
+        BigInteger, primary_key=True, autoincrement=False
+    )
+    url_hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    source_name: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mention_time: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    confidence: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (
+        Index("ix_mentions_url_hash", "url_hash", "event_id"),
+        Index("ix_mentions_ingested_at", "ingested_at"),
+    )
+
+
+class IngestFile(Base):
+    """Fetch state of the Events or Mentions file of a slot (ADR-0032).
+
+    Same lifecycle as `IngestSlot` (pending, published, failed); GKG stays in
+    `ingest_slot`, so a missing file never blocks it.
+    """
+
+    __tablename__ = "ingest_file"
+
+    slot: Mapped[str] = mapped_column(Text, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, primary_key=True)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    attempts: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("0")
+    )
+    row_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=text("now()")
+    )
+
+    __table_args__ = (CheckConstraint("kind IN ('events', 'mentions')", name="kind"),)
+
+
+class ArticleBody(Base):
+    """The fetched text of one canonical article and the queue row for it (M3d
+    body-extraction, ADR-0036).
+
+    The extractor creates a `pending` row for each new article (discovery by `seq`),
+    then fills `status`, `text` and the retry fields. Deleted with the article.
+    """
+
+    __tablename__ = "article_bodies"
+
+    url_hash: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("articles.url_hash", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    seq: Mapped[int] = mapped_column(BigInteger, nullable=False)  # = articles.seq
+    status: Mapped[str] = mapped_column(
+        Text, nullable=False, server_default=sql_text("'pending'")
+    )
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    http_status: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    attempts: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, server_default=sql_text("0")
+    )
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=sql_text("now()")
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=sql_text("now()")
+    )
+    fetched_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'ok', 'blocked_robots', 'blocked_address', "
+            "'http_error', 'not_html', 'too_large', 'no_text', 'failed')",
+            name="status",
+        ),
+        # discovery cursor: max(seq)
+        Index("ix_article_bodies_seq", "seq"),
+        # the extractor's queue: rows still waiting (read newest first, backwards)
+        Index(
+            "ix_article_bodies_pending",
+            "seq",
+            postgresql_where=sql_text("status = 'pending'"),
+        ),
+    )
+
+
+class ArticlePassage(Base):
+    """A piece of a body (about 1,000 characters) with its vector (ADR-0036).
+
+    The extractor writes the rows with no vector; the embedder fills `embedding` and
+    `embedding_model`. `halfvec(768)` halves the storage of `vector(768)`.
+    """
+
+    __tablename__ = "article_passages"
+
+    url_hash: Mapped[str] = mapped_column(
+        Text,
+        ForeignKey("articles.url_hash", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    idx: Mapped[int] = mapped_column(SmallInteger, primary_key=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(HALFVEC(768), nullable=True)
+    embedding_model: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_article_passages_embedding_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "halfvec_cosine_ops"},
+        ),
+        Index(
+            "ix_article_passages_text_fts",
+            sql_text("to_tsvector('english', text)"),
+            postgresql_using="gin",
+        ),
+        # the embedder's queue: passages still waiting for a vector
+        Index(
+            "ix_article_passages_unembedded",
+            "url_hash",
+            postgresql_where=sql_text("embedding IS NULL"),
+        ),
+    )

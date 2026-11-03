@@ -14,9 +14,9 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from newsdock_db.engine import make_engine
-from newsdock_embedder.adapters.db import SqlEmbedRepo
+from newsdock_embedder.adapters.db import SqlEmbedRepo, SqlPassageRepo
 from newsdock_embedder.adapters.ollama import OllamaDocumentEmbedder
-from newsdock_embedder.domain.loop import EmbedWorker
+from newsdock_embedder.domain.loop import EmbedWorker, PassageWorker
 from newsdock_embedder.domain.selection import SkipList
 from newsdock_embedding.testing import FakeOllama
 from sqlalchemy import Engine, event, text
@@ -239,3 +239,93 @@ def test_the_batch_query_uses_the_partial_index_with_most_rows_embedded(
                     "(embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64)"
                 )
             )
+
+
+# --- TC-19 (body-extraction AC-11): the passage pass -------------------------------
+
+
+def insert_passages(engine: Engine, url_hash: str, count: int) -> None:
+    with engine.begin() as conn:
+        for i in range(count):
+            conn.execute(
+                text(
+                    "INSERT INTO article_passages (url_hash, idx, text) "
+                    "VALUES (:k, :i, :t)"
+                ),
+                {"k": url_hash, "i": i, "t": f"passage {url_hash} {i}"},
+            )
+
+
+def passage_state(engine: Engine) -> list[tuple[str, int, int | None, str | None]]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                "SELECT url_hash, idx, vector_dims(embedding), embedding_model "
+                "FROM article_passages ORDER BY url_hash, idx"
+            )
+        ).all()
+    return [(r[0], r[1], r[2], r[3]) for r in rows]
+
+
+def make_passage_worker(
+    engine: Engine, fake: FakeOllama, *, model: str = MODEL
+) -> PassageWorker:
+    embedder = OllamaDocumentEmbedder(
+        url="http://ollama.test:11434",
+        model=model,
+        dimension=768,
+        prefix=PREFIX,
+        timeout=5.0,
+        client=httpx.Client(transport=fake.transport()),
+    )
+    return PassageWorker(
+        SqlPassageRepo(engine),
+        embedder,
+        model=model,
+        batch_size=4,
+        skip=SkipList(max_failures=3, max_entries=100),
+    )
+
+
+def test_passages_get_vectors_once_with_the_document_prefix(engine: Engine) -> None:
+    insert(engine, 2)
+    insert_passages(engine, "h0000", 3)
+    insert_passages(engine, "h0001", 2)
+    fake = FakeOllama()
+    worker = make_passage_worker(engine, fake)
+    outcomes = []
+    while (outcome := worker.run_pass().outcome) != "idle":
+        outcomes.append(outcome)
+    assert outcomes == ["embedded", "embedded"]
+    assert all(
+        dims == 768 and model == MODEL for _, _, dims, model in passage_state(engine)
+    )
+    first = json.loads(fake.requests[0].content)["input"]
+    assert first[0] == PREFIX + "passage h0001 0"  # newest article first
+    sent = sum(len(json.loads(r.content)["input"]) for r in fake.requests)
+    assert sent == 5  # each passage embedded exactly once
+
+
+def test_passages_of_another_model_are_cleared_and_reembedded(engine: Engine) -> None:
+    insert(engine, 1)
+    insert_passages(engine, "h0000", 2)
+    old = make_passage_worker(engine, FakeOllama(), model="old-model")
+    while old.run_pass().outcome != "idle":
+        pass
+    assert {m for *_, m in passage_state(engine)} == {"old-model"}
+    new = make_passage_worker(engine, FakeOllama())
+    while new.run_pass().outcome != "idle":
+        pass
+    assert {m for *_, m in passage_state(engine)} == {MODEL}
+
+
+def test_ollama_outage_backs_off_and_recovery_fills_passages(engine: Engine) -> None:
+    insert(engine, 1)
+    insert_passages(engine, "h0000", 2)
+    fake = FakeOllama(mode="refuse")
+    worker = make_passage_worker(engine, fake)
+    assert worker.run_pass().outcome == "unavailable"
+    assert [d for _, _, d, _ in passage_state(engine)] == [None, None]
+    fake.mode = "ok"
+    assert worker.run_pass().outcome == "embedded"
+    assert [d for _, _, d, _ in passage_state(engine)] == [768, 768]

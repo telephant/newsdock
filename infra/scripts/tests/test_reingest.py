@@ -98,7 +98,7 @@ def test_reingest_is_idempotent_end_to_end(clean_db: str) -> None:
         def fetch_index(self) -> str | None:
             return None
 
-        def fetch_gkg(self, url: str) -> bytes | None:
+        def fetch(self, url: str) -> bytes | None:
             return zip_bytes
 
     class Collect:

@@ -19,6 +19,8 @@ NEW_DEFAULTS = {
     "http_timeout_seconds": 60.0,
     "max_attempts": 4,
     "kafka_topics_raw": "gkg.raw",
+    "fetch_events": True,
+    "fetch_mentions": True,
     "heartbeat_max_age_seconds": 1200,
 }
 

@@ -8,10 +8,10 @@ from newsdock_config.health import write_heartbeat
 from newsdock_db.config import Settings as DbSettings
 from newsdock_db.engine import make_engine
 
-from newsdock_embedder.adapters.db import SqlEmbedRepo
+from newsdock_embedder.adapters.db import SqlEmbedRepo, SqlPassageRepo
 from newsdock_embedder.adapters.ollama import OllamaDocumentEmbedder
 from newsdock_embedder.config import Settings
-from newsdock_embedder.domain.loop import EmbedWorker, run
+from newsdock_embedder.domain.loop import EmbedWorker, PassageWorker, Round, run
 from newsdock_embedder.domain.selection import Backoff, SkipList
 
 logger = logging.getLogger(__name__)
@@ -22,20 +22,35 @@ def main() -> int:
     logging.basicConfig(level=settings.log_level)
     log_effective_config(logger, settings)
     logger.info("newsdock-embedder starting")
-    worker = EmbedWorker(
-        SqlEmbedRepo(make_engine(DbSettings())),
-        OllamaDocumentEmbedder(
-            url=settings.embedding_ollama_url,
-            model=settings.embedding_model,
-            dimension=settings.embedding_dimension,
-            prefix=settings.embedding_document_prefix,
-            timeout=settings.ollama_timeout_seconds,
-        ),
+    engine = make_engine(DbSettings())
+    embedder = OllamaDocumentEmbedder(
+        url=settings.embedding_ollama_url,
         model=settings.embedding_model,
-        batch_size=settings.batch_size,
-        skip=SkipList(
+        dimension=settings.embedding_dimension,
+        prefix=settings.embedding_document_prefix,
+        timeout=settings.ollama_timeout_seconds,
+    )
+
+    def skip() -> SkipList:
+        return SkipList(
             max_failures=settings.skip_after_failures,
             max_entries=settings.skip_table_max_entries,
+        )
+
+    worker = Round(
+        EmbedWorker(
+            SqlEmbedRepo(engine),
+            embedder,
+            model=settings.embedding_model,
+            batch_size=settings.batch_size,
+            skip=skip(),
+        ),
+        PassageWorker(
+            SqlPassageRepo(engine),
+            embedder,
+            model=settings.embedding_model,
+            batch_size=settings.passage_batch_size,
+            skip=skip(),
         ),
     )
     run(

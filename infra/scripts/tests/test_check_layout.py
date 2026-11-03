@@ -128,3 +128,9 @@ def build_clean(tree: Path) -> Path:
 def test_real_repo_passes() -> None:
     found = [str(v) for v in check_layout.check(REPO)]
     assert found == [], found
+
+
+def test_extractor_is_a_known_app() -> None:
+    """body-extraction (ADR-0034): a new app folder must be in the layout check."""
+    assert "extractor" in check_layout.PYTHON_APPS
+    assert (REPO / "apps" / "extractor" / "src" / "newsdock_extractor").is_dir()

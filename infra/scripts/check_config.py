@@ -27,6 +27,7 @@ from newsdock_config.secrets import is_secret_name
 from newsdock_config.source import flatten
 from newsdock_db.config import Settings as DbSettings
 from newsdock_embedder.config import Settings as EmbedderSettings
+from newsdock_extractor.config import Settings as ExtractorSettings
 from newsdock_ingester.config import Settings as IngesterSettings
 from newsdock_processor.config import Settings as ProcessorSettings
 from newsdock_sink.config import Settings as SinkSettings
@@ -40,6 +41,7 @@ SERVICES: dict[str, type[BaseSettings]] = {
     "api": ApiSettings,
     "agent": AgentSettings,
     "embedder": EmbedderSettings,
+    "extractor": ExtractorSettings,
 }
 # newsdock_db has no section of its own: its pool keys live under `common`.
 COMMON_ONLY: list[type[BaseSettings]] = [DbSettings]
@@ -51,7 +53,7 @@ WEB_KEYS = {
     "login_required": True,
 }
 
-BANNED_STRINGS = {"gkg.raw", "gkg.clean", "gkg.dlq"}
+BANNED_STRINGS = {"gkg.raw", "gkg.clean", "gkg.dlq", "events.clean", "mentions.clean"}
 BANNED_NAMES = {
     "MAX_ATTEMPTS",
     "RETENTION_DAYS",

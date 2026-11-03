@@ -8,6 +8,7 @@ from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from newsdock_db.engine import make_engine
 from newsdock_db.metadata import metadata
 from sqlalchemy import Engine, text
@@ -147,10 +148,11 @@ def test_the_orm_model_matches_the_migration(engine: Engine) -> None:
     assert diff == [], f"schema drift between models and migrations: {diff}"
 
 
-def test_head_is_0010(engine: Engine) -> None:
+def test_upgrade_reaches_the_script_head(engine: Engine) -> None:
+    """Was pinned to 0010 and went stale with every later migration."""
     command.upgrade(_config(), "head")
     with engine.connect() as conn:
         version = conn.execute(
             text("SELECT version_num FROM alembic_version")
         ).scalar_one()
-    assert version == "0010"
+    assert version == ScriptDirectory.from_config(_config()).get_current_head()

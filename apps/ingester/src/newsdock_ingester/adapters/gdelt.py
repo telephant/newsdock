@@ -24,11 +24,11 @@ class HttpGdeltSource:
             logger.warning("index fetch failed: %s", exc)
             return None
 
-    def fetch_gkg(self, url: str) -> bytes | None:
+    def fetch(self, url: str) -> bytes | None:
         try:
             response = self._client.get(url)
         except httpx.HTTPError as exc:
-            logger.warning("gkg fetch failed: %s", exc)
+            logger.warning("fetch failed: %s", exc)
             return None
         if response.status_code != 200 or not response.content:
             return None  # 404 or empty body: retry later (spec §3)

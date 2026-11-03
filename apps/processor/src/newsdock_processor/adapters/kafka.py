@@ -1,4 +1,4 @@
-"""Kafka consumer/producer loop: raw → clean / dlq (topic names from config).
+"""Kafka consumer/producer loop: raw → clean, events, mentions or dlq (config names).
 
 Manual offset commits after flush (at-least-once; downstream is idempotent).
 A message whose JSON envelope itself is broken goes to the dlq as `bad_field`.
@@ -48,6 +48,8 @@ class KafkaProcessorLoop:
                     raw,
                     self._settings.kafka_topics_clean,
                     self._settings.kafka_topics_dlq,
+                    events_topic=self._settings.kafka_topics_events_clean,
+                    mentions_topic=self._settings.kafka_topics_mentions_clean,
                 )
             except ValidationError:
                 slot, _, row_no = (key or b"?:0").decode().partition(":")

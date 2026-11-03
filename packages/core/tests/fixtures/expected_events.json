@@ -1,0 +1,42 @@
+[
+ {
+  "row_no": 0,
+  "event_id": 1331041275,
+  "event_date": "2026-10-26",
+  "actor1": {"code": null, "name": null, "country": null, "type1": null},
+  "actor2": {"code": "GOV", "name": "PRESIDENT", "country": null, "type1": "GOV"},
+  "is_root": false,
+  "cameo_code": "040",
+  "cameo_base": "040",
+  "cameo_root": "04",
+  "quad_class": 1,
+  "goldstein": 1.0,
+  "num_mentions": 5,
+  "num_sources": 1,
+  "num_articles": 5,
+  "avg_tone": -2.74771024146544,
+  "geo": {"name": "Saint Thomas, Illinois, United States", "country": "US", "adm1": "USIL", "lat": 38.762, "lon": -90.1171},
+  "date_added": "2026-11-02T11:00:00Z",
+  "source_url": "https://crisismagazine.com/opinion/meet-the-rising-young-catholic-group-pressing-for-tougher-immigration-enforcement"
+ },
+ {
+  "row_no": 1,
+  "event_id": 1331041278,
+  "event_date": "2026-11-02",
+  "actor1": {"code": null, "name": null, "country": null, "type1": null},
+  "actor2": {"code": "AFR", "name": "AFRICA", "country": "AFR", "type1": null},
+  "is_root": false,
+  "cameo_code": "010",
+  "cameo_base": "010",
+  "cameo_root": "01",
+  "quad_class": 1,
+  "goldstein": 0.0,
+  "num_mentions": 6,
+  "num_sources": 1,
+  "num_articles": 6,
+  "avg_tone": -2.17539089055064,
+  "geo": {"name": "Burkina Faso", "country": "UV", "adm1": "UV", "lat": 13.0, "lon": -2.0},
+  "date_added": "2026-11-02T11:00:00Z",
+  "source_url": "https://www.scidev.net/global/explainer/malaria-control-who-decides-africas-gene-drive-future"
+ }
+]

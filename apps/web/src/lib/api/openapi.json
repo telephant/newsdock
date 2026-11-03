@@ -985,7 +985,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FeedPageTone"
+                  "$ref": "#/components/schemas/FeedPageEvents"
                 }
               }
             }
@@ -1302,6 +1302,30 @@
           "source_count": {
             "type": "integer",
             "title": "Source Count"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventOut"
+            },
+            "type": "array",
+            "title": "Events",
+            "default": []
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
+          },
+          "body_status": {
+            "type": "string",
+            "title": "Body Status",
+            "default": "none"
           }
         },
         "type": "object",
@@ -1324,7 +1348,7 @@
         ],
         "title": "ArticleDetail"
       },
-      "ArticleSummaryTone": {
+      "ArticleSummaryEvents": {
         "properties": {
           "article_id": {
             "type": "string",
@@ -1423,6 +1447,31 @@
               }
             ],
             "title": "Tone Polarity"
+          },
+          "events": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EventOut"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Events"
+          },
+          "body": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body"
           }
         },
         "type": "object",
@@ -1434,8 +1483,8 @@
           "published_at",
           "themes"
         ],
-        "title": "ArticleSummaryTone",
-        "description": "Documentation only (ADR-0030): the feed article as it looks when tone is asked\nfor. It redeclares the four fields as ordinary optional ones so the OpenAPI schema\nshows them; no handler builds it."
+        "title": "ArticleSummaryEvents",
+        "description": "Documentation only (ADR-0030, ADR-0033): the feed article as it looks when tone\nand `events` are asked for. `events` is an ordinary optional field here so the\nOpenAPI schema shows it; no handler builds it."
       },
       "AuthOptions": {
         "properties": {
@@ -1465,11 +1514,235 @@
         "required": ["email", "password"],
         "title": "Credentials"
       },
-      "FeedPageTone": {
+      "EventActor": {
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "title": "EventActor",
+        "description": "One side of an event; every part may be missing in the GDELT data."
+      },
+      "EventLocation": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "adm1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Adm1"
+          },
+          "lat": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lat"
+          },
+          "lon": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lon"
+          }
+        },
+        "type": "object",
+        "title": "EventLocation"
+      },
+      "EventOut": {
+        "properties": {
+          "event_id": {
+            "type": "integer",
+            "title": "Event Id"
+          },
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "cameo_code": {
+            "type": "string",
+            "title": "Cameo Code"
+          },
+          "cameo_root": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cameo Root"
+          },
+          "goldstein": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goldstein"
+          },
+          "quad_class": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quad Class"
+          },
+          "num_mentions": {
+            "type": "integer",
+            "title": "Num Mentions"
+          },
+          "num_sources": {
+            "type": "integer",
+            "title": "Num Sources"
+          },
+          "avg_tone": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Tone"
+          },
+          "actor1": {
+            "$ref": "#/components/schemas/EventActor"
+          },
+          "actor2": {
+            "$ref": "#/components/schemas/EventActor"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventLocation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "mention_count": {
+            "type": "integer",
+            "title": "Mention Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event_id",
+          "date",
+          "cameo_code",
+          "cameo_root",
+          "goldstein",
+          "quad_class",
+          "num_mentions",
+          "num_sources",
+          "avg_tone",
+          "actor1",
+          "actor2",
+          "location",
+          "source_url",
+          "mention_count"
+        ],
+        "title": "EventOut",
+        "description": "A GDELT event an article is mentioned in (curated fields, D-2).\n\n`num_mentions` is GDELT's own count; `mention_count` is the mention rows we stored."
+      },
+      "FeedPageEvents": {
         "properties": {
           "articles": {
             "items": {
-              "$ref": "#/components/schemas/ArticleSummaryTone"
+              "$ref": "#/components/schemas/ArticleSummaryEvents"
             },
             "type": "array",
             "title": "Articles"
@@ -1488,7 +1761,7 @@
         },
         "type": "object",
         "required": ["articles", "next_before"],
-        "title": "FeedPageTone",
+        "title": "FeedPageEvents",
         "description": "Documentation only: the schema of `GET /api/articles`."
       },
       "ForgotBody": {

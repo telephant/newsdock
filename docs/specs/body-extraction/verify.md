@@ -1,0 +1,63 @@
+# Verify — body-extraction (M3d)
+
+Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed. The dev stack was running on 5433, 29092, 8000 and 3000, so no module that needs those ports was run.
+
+**Verdict: pass with follow-ups.** AC-1…AC-14 pass in this run. AC-15 passes in process (TC-24); its compose half (TC-25) is written but unrun. AC-16 (one real slot, the owner's check) and the live measurements are open, so `stage` is `verify` and `gates.verify` stays `pending` until the owner has run the checklist and `/spec-verify body-extraction` is repeated. Follow-ups F-1…F-5.
+
+## 1. What was run
+
+| Run | Result |
+|---|---|
+| `make check` (ruff, format, mypy strict, import-linter, layout, config, docs, web lint/format/typecheck/tests, non-Docker pytest) | exit 0; 1,145 Python tests passed (510 Docker/rules tests deselected), 182 web tests passed |
+| Every module that uses its own throwaway Postgres (`side_db`) in one run: `apps/extractor/tests`, `apps/embedder/tests`, `apps/api/tests`, `packages/db/tests`, `infra/scripts/tests/{test_body_pipeline,test_migration_files,test_events_pipeline}.py`, with `-m "docker or not docker"` | **1,219 passed in 378 s**; the side containers were removed afterwards |
+| **Not run** (they need the dev stack stopped): TC-25 (`test_agent_isolation.py`, the compose stack with the `extractor` service healthy), `test_stack.py`, the Kafka modules | open, F-1 |
+| `docker compose --profile apps config --services` | lists `extractor` next to the other services |
+
+## 2. Acceptance criteria
+
+| AC | Test cases | Result | Evidence (this run) |
+|---|---|---|---|
+| AC-1 robots.txt respected | TC-1, TC-2 | pass | `apps/extractor/tests/unit/test_robots.py`, `integration/test_loop_db.py` (a `blocked_robots` row, the page never requested) |
+| AC-2 one site at a time, spaced | TC-3, TC-4, TC-5, TC-30 | pass | `unit/test_schedule.py`, `integration/test_fetch.py` (no `Cookie` header on the second request), `test_loop_db.py` |
+| AC-3 non-public addresses refused | TC-6, TC-7, TC-8 | pass | `unit/test_resolve.py`, `integration/test_fetch.py` (redirect hops re-checked), `blocked_address` stored |
+| AC-4 text extracted and stored | TC-9, TC-10 | pass | `unit/test_extract.py`, `unit/test_passages.py`, `integration/test_loop_db.py` |
+| AC-5 failures get a status and bounded retries | TC-10, TC-11, TC-12 | pass | `unit/test_retry.py`, `unit/test_status.py`, `integration/test_loop_db.py` |
+| AC-6 one row per article, no refetch | TC-13, TC-27 | pass | `integration/test_repo.py`, `packages/db/tests/integration/test_schema.py` |
+| AC-7 newest first, window, discovery | TC-14 | pass | `unit/test_picking.py`, `integration/test_repo.py` |
+| AC-8 retention cascades | TC-15, TC-27 | pass | `test_schema.py`, `test_repo.py` (body and passages deleted with the article) |
+| AC-9 text of one article | TC-16, TC-31 | pass | `apps/api/tests/integration/test_body_api.py` (REST detail, MCP `get_article`; `ok`, `pending`, `blocked_robots`, `none`), `test_openapi_contract.py` |
+| AC-10 opt-in text in lists | TC-17, TC-31 | pass | `test_body_api.py` (feed, `search_articles`, `list_new_articles`, `semantic_search`; golden keys without it; unknown name still 422 / `invalid_include`) |
+| AC-11 passages are embedded | TC-18, TC-19 | pass | `apps/extractor/tests/unit/test_passages.py`, `apps/embedder/tests/unit/test_passages.py`, `integration/test_embedder_db.py` (once only, model change re-embeds, outage recovers) |
+| AC-12 search over the text | TC-20, TC-21 | pass | `apps/api/tests/integration/test_semantic_body.py`, `unit/test_semantic_scope.py` (`vector` and `hybrid`, time, theme, domain and `min_negativity` filters) |
+| AC-13 titles and text fused | TC-21, TC-22 | pass | `test_semantic_body.py` (title-only, text-only, body-less; `titles` payload keeps its keys; the default-scope setting) |
+| AC-14 degrades like titles | TC-23 | pass | `test_semantic_body.py` (`vector` raises, `hybrid` is `degraded` with the keyword legs, scopes `body` and `all`) |
+| AC-15 platform unaffected | TC-24, TC-25 | **pass in process; compose half unrun** | `infra/scripts/tests/test_body_pipeline.py`: extractor stopped, then failing on every fetch; ingestion, sink replay, title search and `get_article` as before; the API read path opens no socket; no fetcher or parser imported by `apps/api/src`. TC-25 not run (F-1) |
+| AC-16 one live slot | TC-26 | **open** | manual, the owner's checklist in `tests.md` |
+
+TC-27…TC-29 (migration, config, tooling lists) pass inside `make check` and the Docker run.
+
+## 3. Measurements
+
+None of M-1…M-7 can be read without the extractor running for a day on the live stack, so they are open. Closest evidence so far is from the T-01 spike (2026-11-02): 69.7% usable on 320 article-weighted URLs, 6–8.5 GB estimated for 7 days of `halfvec` passages (both still to be confirmed live, plan R-2).
+
+## 4. Findings
+
+| ID | Finding | Severity | Decision |
+|---|---|---|---|
+| F-1 | TC-25 and the whole-stack and Kafka modules (including the two new Events/Mentions topics) have not run, because the dev stack holds their ports. | medium | run with `make down` first (`make test-infra SCENE=stack`, `SCENE=kafka`); same open item as the M3c verify |
+| F-2 | AC-16 and M-1…M-7 need the live stack: `make build`, `make migrate` (0012), `make up`, `ollama pull nomic-embed-text`, then the checklist. Until then the recall of text search is unmeasured (the evaluation set is a backlog item). | medium | the owner's run, then repeat `/spec-verify body-extraction` |
+| F-3 | AC-15 "the API makes no outbound request" is shown for the repo read path (a socket spy) and for the imports of `apps/api/src`, not for a running MCP server under traffic. The query embedder legitimately calls Ollama. | low | accepted; the TC-25 stack run adds the whole-service view |
+| F-4 | The extractor shares the `data` network with Kafka and Postgres (ADR-0034, the owner's choice); the address guard is the only wall against SSRF, and compose connects as the database superuser, so the `extractor_rw` grants document intent only. | low | accepted in ADR-0034; the `crawl` network stays in the backlog |
+| F-5 | `test_head_is_0010` had pinned the migration head and failed since 0011; it now compares against the Alembic script head. | low | fixed in this milestone |
+
+## 5. Doc drift and scope
+
+`CLAUDE.md` (status, app list, C-80…C-87, tables, the scraping rule, fixed names), `docs/roadmap.md` and the extractor README were updated at T-12. Names checked identical across code, docs and tests by grep: statuses (`pending`, `ok`, `blocked_robots`, `blocked_address`, `http_error`, `not_html`, `too_large`, `no_text`, `failed`), scopes (`titles`, `body`, `all`), leg names (`vector`, `keyword`, `body_vector`, `body_keyword`), `invalid_scope`, `passage`, `include=body`, settings `semantic_default_scope` / `semantic_passage_candidates` / `passage_batch_size`, tables `article_bodies` / `article_passages`, migration 0012. ADR-0034…0037 were not re-read line by line in this run. `docs/README.md` still says "ADR-0001 to ADR-0010" (stale before this milestone, not touched). The regenerated `openapi.json` and `types.ts` also carry the earlier M3c fields, because both are generated from the one app.
+
+Scope: nothing from `backlog.md` was implemented (no evaluation set, `scope=all` is not the default, no copy fetching, no digest change, no `crawl` network).
+
+## 6. Next
+
+1. The owner stops the dev stack and runs F-1, then the live checklist (F-2) for both M3c (AC-14 of `events-mentions`) and M3d (AC-16).
+2. Repeat `/spec-verify events-mentions` and `/spec-verify body-extraction` to close both.
+3. Candidates after that, from `backlog.md`: the text-search evaluation set (P2), then `scope=all` as the default.

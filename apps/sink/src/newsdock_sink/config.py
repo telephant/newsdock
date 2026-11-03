@@ -26,5 +26,7 @@ class Settings(LayeredSettings):
     )
     kafka_topics_clean: str = "gkg.clean"
     kafka_topics_dlq: str = "gkg.dlq"
+    kafka_topics_events_clean: str = "events.clean"
+    kafka_topics_mentions_clean: str = "mentions.clean"
     kafka_group_id: str = "sink"
     kafka_auto_offset_reset: str = "earliest"

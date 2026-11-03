@@ -59,7 +59,7 @@ from newsdock_api.domain.ratelimit import FixedWindowLimiter
 from newsdock_api.domain.records import (
     ArticleDetail,
     FeedPage,
-    FeedPageTone,
+    FeedPageEvents,
     HealthStatus,
     NewArticlesPage,
     dump_page,
@@ -68,6 +68,7 @@ from newsdock_api.domain.resetlimit import ResetAttemptLimiter, ResetRequestLimi
 from newsdock_api.domain.semantic import (
     EmbeddingUnavailable,
     InvalidQuery,
+    InvalidScope,
     QueryEmbedder,
     SemanticService,
 )
@@ -122,7 +123,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     engine = make_engine(DbSettings())
-    repo = SqlArticleRepo(engine)
+    repo = SqlArticleRepo(engine, events_per_article=settings.events_per_article)
     sql_agents = SqlAgentsRepo(engine)
     registry: AgentRegistry = agents_repo or sql_agents
     keys: KeyLookup = key_lookup or sql_agents
@@ -143,8 +144,14 @@ def create_app(
         return ANONYMOUS
 
     service = ArticleService(repo, limits=settings.limits())
+    semantic_repo = SqlSemanticRepo(
+        engine,
+        ef_search=settings.semantic_ef_search,
+        events_per_article=settings.events_per_article,
+        passage_candidates=settings.semantic_passage_candidates,
+    )
     semantic = SemanticService(
-        SqlSemanticRepo(engine, ef_search=settings.semantic_ef_search),
+        semantic_repo,
         query_embedder
         or OllamaQueryEmbedder(
             url=settings.embedding_ollama_url,
@@ -159,6 +166,8 @@ def create_app(
         max_query_length=settings.semantic_query_max_length,
         default_limit=settings.search_page_default,
         max_limit=settings.search_page_max,
+        default_scope=settings.semantic_default_scope,
+        passages=semantic_repo,
     )
 
     mcp = MCPServer("newsdock")
@@ -178,9 +187,13 @@ def create_app(
 
         `min_negativity` (0 to 100) keeps only articles whose GDELT negative-tone
         share is at least that value; articles without tone never match it.
-        `include` adds tone numbers to each article: any of "tone", "tone_pos",
-        "tone_neg", "tone_polarity" (null when the article has none). Without it
-        the articles carry no tone fields.
+        `include` adds optional fields to each article: tone numbers ("tone",
+        "tone_pos", "tone_neg", "tone_polarity", null when the article has none)
+        and "events", the GDELT events the article is mentioned in (at most 20,
+        most mentioned first; an empty list when there are none), each with its
+        CAMEO code, actors, place, Goldstein impact and `mention_count`; and "body",
+        the fetched page text (null while it is pending, failed or not fetched).
+        Without it the articles carry none of these.
         """
         tone, floor = _tone_arguments(include, min_negativity)
         articles = service.search(
@@ -201,8 +214,9 @@ def create_app(
         limit: int | None = None,
         min_negativity: Negativity = None,
         include: list[str] | None = None,
+        scope: str | None = None,
     ) -> dict[str, Any]:
-        """Search article titles by meaning, not only by words.
+        """Search articles by meaning, not only by words.
 
         `query` is plain language ("interest rate hike" finds "Central bank lifts
         borrowing costs"). `mode` is "hybrid" (default: meaning plus words, fused) or
@@ -210,17 +224,23 @@ def create_app(
         a `score` and `matched_by`. If the embedding service is down, "hybrid" falls
         back to word matching and sets `degraded`; "vector" returns the error
         `embedding_unavailable`. `min_negativity` and `include` work as in
-        search_articles, in both modes.
+        search_articles, in both modes. `scope` says what is searched: "titles"
+        (the default), "body" (the fetched page text, split in passages) or "all"
+        (both, fused). With "body" or "all" each result also has `passage`, the best
+        matching passage (null when only the title matched), and `matched_by` may
+        name "body_vector" and "body_keyword". An unknown scope is `invalid_scope`.
         """
         tone, floor = _tone_arguments(include, min_negativity)
         try:
             result = semantic.search(
                 query, mode=mode, time_from=time_from, time_to=time_to,
                 theme=theme, domain=domain, limit=limit,
-                min_negativity=floor, include=tone,
+                min_negativity=floor, include=tone, scope=scope,
             )  # fmt: skip
         except InvalidQuery as exc:
             raise ToolError(f"invalid_query: {exc}") from exc
+        except InvalidScope as exc:
+            raise ToolError(f"invalid_scope: {exc}") from exc
         except EmbeddingUnavailable as exc:
             logger.warning("semantic_search: query could not be embedded: %s", exc)
             raise ToolError(
@@ -231,7 +251,12 @@ def create_app(
 
     @mcp.tool(name="get_article")
     def get_article_tool(article_id: str) -> dict[str, Any]:
-        """Fetch one article with all its analyses. article_id = url_hash."""
+        """Fetch one article with all its analyses and the GDELT events it is
+        mentioned in (`events`: at most 20, most mentioned first), its page text
+        (`body`, null unless `body_status` is "ok"; other values: "pending", a
+        failure reason, or "none" when no fetch was ever queued).
+        article_id = url_hash.
+        """
         try:
             return get_article(repo, article_id).model_dump(mode="json")
         except NotFoundError as exc:
@@ -248,8 +273,9 @@ def create_app(
 
         Without a cursor an authenticated agent resumes from the position it last
         acknowledged with ack_cursor; a new agent gets the last hour. `include` adds
-        tone numbers to each article ("tone", "tone_pos", "tone_neg",
-        "tone_polarity"); it does not change which articles or which cursor you get.
+        optional fields to each article (tone numbers "tone", "tone_pos", "tone_neg",
+        "tone_polarity", "events" and "body"); it does not change which articles or
+        which cursor you get.
         """
         agent = current_agent(ctx)
         tone, _ = _tone_arguments(include, None)
@@ -452,12 +478,12 @@ def create_app(
         )
     )
 
-    # Returns a JSONResponse built by `dump_page` so tone is written only when asked
-    # for (ADR-0030); `responses` documents the shape for OpenAPI.
+    # Returns a JSONResponse built by `dump_page` so tone and events are written only
+    # when asked for (ADR-0030, ADR-0033); `responses` documents the shape for OpenAPI.
     @app.get(
         "/api/articles",
         response_model=None,
-        responses={200: {"model": FeedPageTone}},
+        responses={200: {"model": FeedPageEvents}},
         dependencies=[Depends(guards.read)],
     )
     def rest_articles(

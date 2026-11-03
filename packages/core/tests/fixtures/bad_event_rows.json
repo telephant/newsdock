@@ -1,0 +1,42 @@
+[
+ {
+  "name": "bad_column_count_60",
+  "expect": "bad_column_count",
+  "line": "1331041263\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000"
+ },
+ {
+  "name": "bad_column_count_62",
+  "expect": "bad_column_count",
+  "line": "1331041263\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\tx"
+ },
+ {
+  "name": "missing_event_id",
+  "expect": "missing_event_id",
+  "line": "\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/"
+ },
+ {
+  "name": "non_numeric_event_id",
+  "expect": "missing_event_id",
+  "line": "abc\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/"
+ },
+ {
+  "name": "missing_url",
+  "expect": "missing_url",
+  "line": "1331041263\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\t"
+ },
+ {
+  "name": "bad_sqldate",
+  "expect": "bad_field",
+  "line": "1331041263\t2026-11-02\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/"
+ },
+ {
+  "name": "bad_goldstein",
+  "expect": "bad_field",
+  "line": "1331041263\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\thigh\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t20261102110000\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/"
+ },
+ {
+  "name": "bad_date_added",
+  "expect": "bad_field",
+  "line": "1331041263\t20251102\t202511\t2025\t2025.8274\tCOP\tBORDER PATROL\t\t\t\t\t\tCOP\t\t\tUSA\tTEXAS\tUSA\t\t\t\t\t\t\t\t0\t043\t043\t04\t1\t2.8\t10\t1\t10\t-3.30129544504806\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\t2\tTexas, United States\tUS\tUSTX\t\t31.106\t-97.6475\tTX\tyesterday\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/"
+ }
+]

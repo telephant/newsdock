@@ -32,7 +32,7 @@ class FakeSource:
     def fetch_index(self) -> str | None:
         return self.index
 
-    def fetch_gkg(self, url: str) -> bytes | None:
+    def fetch(self, url: str) -> bytes | None:
         self.fetches.append(url)
         return self.files.get(url)
 
@@ -128,7 +128,7 @@ def test_published_slot_is_skipped_unless_forced() -> None:
 
 # TC-3: 404/empty → nothing published, pending, attempts+1, no crash
 def test_missing_file_stays_pending_with_attempt_counted() -> None:
-    ing, _, publisher, repo = make({})  # fetch_gkg returns None
+    ing, _, publisher, repo = make({})  # fetch returns None
     assert ing.process_slot(SLOT) is False
     assert publisher.events == []
     state = repo.states[SLOT]
