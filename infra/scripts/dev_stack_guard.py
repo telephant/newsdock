@@ -10,6 +10,10 @@ Tests that take the `side_db` fixture start their own Postgres on a free port an
 are exempt. Every other test marked `docker` must find these ports free, otherwise
 it fails in setup, before any fixture starts a container, with a message that says
 why. Stop the dev stack (`make down`) to run them.
+
+The ports are checked once per test module, before its first test starts anything. A
+module-scoped fixture (`compose up` once for the whole module) then legitimately holds
+the ports for the module's later tests, which must not be refused because of it.
 """
 
 import socket
@@ -48,12 +52,19 @@ def refusal(busy: list[int]) -> str:
     )
 
 
+_cleared_modules: set[str] = set()
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_runtest_setup(item: pytest.Item) -> None:
     if item.get_closest_marker("docker") is None:
         return
     if EXEMPT_FIXTURE in getattr(item, "fixturenames", ()):
         return
+    module = item.nodeid.split("::", 1)[0]
+    if module in _cleared_modules:
+        return  # the ports were free before this module started its own stack
     busy = ports_in_use(FIXED_PORTS)
     if busy:
         pytest.fail(refusal(busy), pytrace=False)
+    _cleared_modules.add(module)

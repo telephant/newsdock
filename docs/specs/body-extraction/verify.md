@@ -2,7 +2,7 @@
 
 Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed. The dev stack was running on 5433, 29092, 8000 and 3000, so no module that needs those ports was run.
 
-**Verdict: pass with follow-ups.** AC-1…AC-14 pass in this run. AC-15 passes in process (TC-24); its compose half (TC-25) is written but unrun. AC-16 (one real slot, the owner's check) and the live measurements are open, so `stage` is `verify` and `gates.verify` stays `pending` until the owner has run the checklist and `/spec-verify body-extraction` is repeated. Follow-ups F-1…F-5.
+**Verdict: pass with follow-ups.** AC-1…AC-15 pass in this run (AC-15: TC-24 in process, and TC-25 on the real compose stack after the dev stack was stopped, see §1b). AC-16 (one real slot, the owner's check) and the live measurements are open, so `stage` is `verify` and `gates.verify` stays `pending` until the owner has run the checklist and `/spec-verify body-extraction` is repeated. Follow-ups F-2…F-5 (F-1 closed).
 
 ## 1. What was run
 
@@ -12,6 +12,14 @@ Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing c
 | Every module that uses its own throwaway Postgres (`side_db`) in one run: `apps/extractor/tests`, `apps/embedder/tests`, `apps/api/tests`, `packages/db/tests`, `infra/scripts/tests/{test_body_pipeline,test_migration_files,test_events_pipeline}.py`, with `-m "docker or not docker"` | **1,219 passed in 378 s**; the side containers were removed afterwards |
 | **Not run** (they need the dev stack stopped): TC-25 (`test_agent_isolation.py`, the compose stack with the `extractor` service healthy), `test_stack.py`, the Kafka modules | open, F-1 |
 | `docker compose --profile apps config --services` | lists `extractor` next to the other services |
+
+### 1b. Run with the dev stack stopped (2026-11-03)
+
+The owner asked me to stop the dev stack (containers stopped, not removed; volumes kept). Then: `make test-infra SCENE=kafka` 5 passed (includes `test_topics.py` with the five topics and the ingester file repo); `SCENE=stack` 9 passed; `SCENE=e2e` (TC-25) 11 passed; `SCENE=images` 18 passed; `SCENE=pipeline` 2 passed; `make check` exit 0. This run found and fixed three defects that were not in the feature:
+
+- **Stale image:** the first `stack` run created 3 topics, not 5, because `make up` runs the `topics` job from the existing `newsdock-processor:dev` image, built before M3c. Rebuilding (`make build`) fixed it. A dev stack needs `make build` before `make up` after this milestone (already in `CLAUDE.md`).
+- **Stale test expectations** in `test_stack.py`: the topic count (3, now 5) and the pinned migration head (`0010`, now derived from the migration files).
+- **Guard bug** in `infra/scripts/dev_stack_guard.py`: it refused every test after the first in a module whose module-scoped fixture starts the stack, so `test_agent_isolation.py` could never pass since the guard was added. It now checks the ports once per module, before the first test starts a container; `test_dev_stack_guard.py` has a test that reproduces it.
 
 ## 2. Acceptance criteria
 
@@ -31,7 +39,7 @@ Run 2026-11-03 on branch `agents-whathappen` (worktree `p2-delivery`), nothing c
 | AC-12 search over the text | TC-20, TC-21 | pass | `apps/api/tests/integration/test_semantic_body.py`, `unit/test_semantic_scope.py` (`vector` and `hybrid`, time, theme, domain and `min_negativity` filters) |
 | AC-13 titles and text fused | TC-21, TC-22 | pass | `test_semantic_body.py` (title-only, text-only, body-less; `titles` payload keeps its keys; the default-scope setting) |
 | AC-14 degrades like titles | TC-23 | pass | `test_semantic_body.py` (`vector` raises, `hybrid` is `degraded` with the keyword legs, scopes `body` and `all`) |
-| AC-15 platform unaffected | TC-24, TC-25 | **pass in process; compose half unrun** | `infra/scripts/tests/test_body_pipeline.py`: extractor stopped, then failing on every fetch; ingestion, sink replay, title search and `get_article` as before; the API read path opens no socket; no fetcher or parser imported by `apps/api/src`. TC-25 not run (F-1) |
+| AC-15 platform unaffected | TC-24, TC-25 | pass | `infra/scripts/tests/test_body_pipeline.py`: extractor stopped, then failing on every fetch; ingestion, sink replay, title search and `get_article` as before; the API read path opens no socket; no fetcher or parser imported by `apps/api/src`. TC-25: `test_agent_isolation.py` 11 passed, all ten services healthy including `extractor` |
 | AC-16 one live slot | TC-26 | **open** | manual, the owner's checklist in `tests.md` |
 
 TC-27…TC-29 (migration, config, tooling lists) pass inside `make check` and the Docker run.
@@ -44,7 +52,7 @@ None of M-1…M-7 can be read without the extractor running for a day on the liv
 
 | ID | Finding | Severity | Decision |
 |---|---|---|---|
-| F-1 | TC-25 and the whole-stack and Kafka modules (including the two new Events/Mentions topics) have not run, because the dev stack holds their ports. | medium | run with `make down` first (`make test-infra SCENE=stack`, `SCENE=kafka`); same open item as the M3c verify |
+| F-1 | TC-25 and the whole-stack and Kafka modules had not run because the dev stack held their ports. | medium | **closed 2026-11-03**: dev stack stopped, `kafka` 5 passed, `stack` 9 passed, `e2e` 11 passed, `images` 18 passed, `pipeline` 2 passed (§1b) |
 | F-2 | AC-16 and M-1…M-7 need the live stack: `make build`, `make migrate` (0012), `make up`, `ollama pull nomic-embed-text`, then the checklist. Until then the recall of text search is unmeasured (the evaluation set is a backlog item). | medium | the owner's run, then repeat `/spec-verify body-extraction` |
 | F-3 | AC-15 "the API makes no outbound request" is shown for the repo read path (a socket spy) and for the imports of `apps/api/src`, not for a running MCP server under traffic. The query embedder legitimately calls Ollama. | low | accepted; the TC-25 stack run adds the whole-service view |
 | F-4 | The extractor shares the `data` network with Kafka and Postgres (ADR-0034, the owner's choice); the address guard is the only wall against SSRF, and compose connects as the database superuser, so the `extractor_rw` grants document intent only. | low | accepted in ADR-0034; the `crawl` network stays in the backlog |

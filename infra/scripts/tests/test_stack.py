@@ -157,7 +157,7 @@ def test_topics_job_waits_for_a_restarting_kafka(env_file: Path) -> None:  # TC-
     assert compose("--env-file", ".env.example", "restart", "kafka").returncode == 0
     result = make("topics")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert len(describe_topics()) == 3
+    assert len(describe_topics()) == 5  # raw, clean, dlq, events.clean, mentions.clean
 
 
 def test_migrate_twice_keeps_one_revision_and_the_extension(
@@ -166,7 +166,10 @@ def test_migrate_twice_keeps_one_revision_and_the_extension(
     assert make("up").returncode == 0  # includes the first migrate run
     second = make("migrate")
     assert second.returncode == 0, second.stdout + second.stderr
-    assert psql("select version_num from alembic_version") == "0010"  # M2f head
+    head = max(
+        p.name[:4] for p in (ROOT / "infra" / "migrations" / "versions").glob("0*.py")
+    )
+    assert psql("select version_num from alembic_version") == head
     assert psql("select extname from pg_extension where extname='vector'") == "vector"
 
 
