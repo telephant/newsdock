@@ -238,17 +238,19 @@ def test_also_is_limited_and_collapses_titles_that_differ_only_by_outlet(
 
 
 # --- the model line ----------------------------------------------------------------
-def test_a_model_line_appears_only_for_groups_with_two_headlines(
+def test_every_summary_in_the_map_is_shown_whatever_the_headline_count(
     make_article: MakeArticle,
 ) -> None:
+    """The cycle decides which groups get a sentence (a single headline gets one only
+    with stored article text); render shows whatever the cycle wrote."""
     two = two_headlines(make_article)
     single = StoryGroup((story(make_article, 3, "A single headline here", 7, "c.com"),))
     text = render(
         Selection(top=(scored(two), scored(single)), sections=()),
-        summaries={two.key: "Floods hit towns.", single.key: "Should never show."},
+        summaries={two.key: "Floods hit towns.", single.key: "A grounded sentence."},
     )
     assert "Floods hit towns." in text
-    assert "Should never show." not in text
+    assert "A grounded sentence." in text
 
 
 @pytest.mark.parametrize("bad", [None, "", "   \n "])

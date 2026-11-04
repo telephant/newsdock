@@ -51,10 +51,12 @@ class OllamaSummariser:
             base_url=base_url, timeout=timeout_seconds, transport=transport
         )
 
-    def summarise(self, titles: Sequence[str]) -> str | None:
+    def summarise(
+        self, titles: Sequence[str], excerpt: str | None = None
+    ) -> str | None:
         body: dict[str, Any] = {
             "model": self._model,
-            "messages": [{"role": "user", "content": group_prompt(titles)}],
+            "messages": [{"role": "user", "content": group_prompt(titles, excerpt)}],
             "stream": False,
             "options": {"temperature": self._temperature},
         }

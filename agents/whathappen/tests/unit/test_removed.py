@@ -158,9 +158,12 @@ class OnePage:
     def ack_cursor(self, cursor: str) -> None:
         self.acked.append(cursor)
 
+    def get_article(self, article_id: str) -> dict[str, object]:
+        return {"body_status": "none", "body": None}  # never called: grounding is off
+
 
 class NoModel:
-    def summarise(self, titles: object) -> str | None:
+    def summarise(self, titles: object, excerpt: object = None) -> str | None:
         return None
 
 

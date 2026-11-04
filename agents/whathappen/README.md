@@ -1,10 +1,10 @@
 # whathappen
 
-An independent agent server for newsdock. It plays the part of an outside user: it reads the news through the platform's **MCP** endpoint with its own key, merges headlines about the same event, ranks the stories by how many outlets carry them and how negative they are, asks a local **Ollama** model for one sentence per story with several headlines, and writes an hourly markdown digest in which every story is a link. Running it shows that the whole flow works: website account, agent key, MCP, cursor, local model.
+An independent agent server for newsdock. It plays the part of an outside user: it reads the news through the platform's **MCP** endpoint with its own key, merges headlines about the same event, ranks the stories by how many outlets carry them and how negative they are, asks a local **Ollama** model for one sentence per listed story, and writes an hourly markdown digest in which every story is a link. Running it shows that the whole flow works: website account, agent key, MCP, cursor, local model.
 
 It is **not part of the platform**. It imports no newsdock code, has its own `pyproject.toml`, lockfile, Dockerfile, compose file and `.env`, and talks to the platform only over HTTP. It could be moved into its own repository by copying this folder.
 
-Headlines only: the data has no article text, so the sentences describe headlines and can be wrong. Open the links.
+The sentences are grounded in the article where possible: for each listed story the agent asks `get_article` for the stored page text (the platform's extractor fetches it, M3d) and gives the model the first `WHATHAPPEN_SUMMARY_BODY_CHARS` of it next to the headlines. A story whose text is not stored (yet) falls back to headlines only, where the sentence can be wrong — open the links.
 
 ## Quick start
 
@@ -26,7 +26,7 @@ You need the platform running (API on port 8000, website on 3000), Ollama runnin
 2. **Groups** headlines about the same event with a lexical title match (shared significant words, within 48 hours, never two pages of one domain). Trailing outlet names (`| WKZO`) are dropped first.
 3. **Scores** each group as `sources × (1 + tone_neg / 10)`: `sources` is how many outlets carry the story, `tone_neg` how negative GDELT scores it. If the platform does not return tone yet, the score is the source total and the file says "Ranked by outlets covering a story."
 4. **Selects** groups carried by at least 2 outlets: the best 5 become **Top stories**, the rest go under plain labels (Conflict & Security, Politics & Government, Business & Markets, Crime & Courts, Health, Disasters & Accidents, Other) chosen by a vote over their GDELT theme codes.
-5. Asks Ollama for one sentence, only for a story with two or more distinct headlines, from those headlines alone.
+5. Asks Ollama for one sentence per listed story. It first asks `get_article` for the story's stored page text (the shown headline's article, then up to `WHATHAPPEN_BODY_LOOKUPS_PER_GROUP` distinct headlines) and puts the first `WHATHAPPEN_SUMMARY_BODY_CHARS` characters of it in the prompt next to the headlines; without stored text the prompt is headlines only, and a story with a single headline then gets no sentence (it would only repeat it). A failed `get_article` costs the excerpt, never the digest.
 6. Writes `output/YYYY-MM-DD/HHMM.md` (UTC) and `output/latest.md`, **then** acknowledges the cursor. A crash in between re-reads the window (a second file) and never loses articles.
 
 An empty hour writes nothing and acknowledges nothing. An hour with articles but no story carried by 2 or more outlets writes a short note and acknowledges. If Ollama is down, stories show their links without a sentence. The first line of every digest is the invisible marker `<!-- whathappen:story-first -->`.
@@ -62,6 +62,8 @@ All environment variables with the prefix `WHATHAPPEN_`, also read from `agents/
 | `WHATHAPPEN_ALSO_PER_GROUP` | `3` | other headlines shown (and sent to the model) per story |
 | `WHATHAPPEN_GROUP_WINDOW_HOURS` | `48` | a headline joins a story within this of its first |
 | `WHATHAPPEN_TONE_DIVISOR` | `10` | score = sources × (1 + tone_neg / divisor) |
+| `WHATHAPPEN_SUMMARY_BODY_CHARS` | `1200` | stored article text given to the model per story; `0` = headlines only |
+| `WHATHAPPEN_BODY_LOOKUPS_PER_GROUP` | `3` | distinct headlines asked (`get_article`) for a stored body, per story |
 | `WHATHAPPEN_SECTION_MIN_HITS` | `1` | theme hits a label needs to claim a story |
 | `WHATHAPPEN_SECTION_LABELS` | built-in map | JSON `{"Label": ["THEME_PREFIX", …]}`, in priority order |
 
@@ -72,7 +74,8 @@ The full list with every default is in `src/whathappen/config.py`. In Docker, `W
 - **"the platform rejected this agent's key (HTTP 401)"**: the key is wrong or revoked, or has a stray space or quote in `.env`. Create a new one in the website.
 - **`421 Invalid Host header` / "unhandled errors in a TaskGroup"** from a container: the platform's MCP accepts only the Host names `localhost`, `127.0.0.1` and `api`. The compose file maps `api` to your host for that reason. For another host name, add it to the platform's `NEWSDOCK_API_MCP_ALLOWED_HOSTS`.
 - **"empty window"**: nothing new since the last cycle; normal. The platform ingests every 15 minutes.
-- **A story has no sentence under its headline**: it has a single headline (no sentence is asked for), or Ollama is not reachable or the model is not pulled.
+- **A story has no sentence under its headline**: it has a single headline and no stored page text yet (the extractor fetches politely, so fresh articles lag), or Ollama is not reachable or the model is not pulled.
+- **Sentences read like reworded headlines**: the platform has no stored text for those articles — check the `extractor` service is running and `get_article` returns `body_status: ok`; headlines-only is the fallback.
 - **"Ranked by outlets covering a story." without "and negative tone"**: the platform did not return `tone_neg`; rebuild its API from the `tone-in-summary` code.
 - **`missing .env`**: run `cp .env.example .env` and set the key.
 

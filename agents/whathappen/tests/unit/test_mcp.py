@@ -63,6 +63,21 @@ def test_list_sends_the_cursor_only_when_given(monkeypatch: pytest.MonkeyPatch) 
     ]
 
 
+def test_get_article_calls_the_tool_with_the_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def fake(self: McpClient, tool: str, arguments: dict[str, Any]) -> Any:
+        calls.append((tool, arguments))
+        return {"article_id": "a", "body_status": "ok", "body": "The page text."}
+
+    monkeypatch.setattr(McpClient, "_raw_call", fake)
+    article = McpClient("http://api/mcp", api_key=None).get_article("a")
+    assert article["body"] == "The page text."
+    assert calls == [("get_article", {"article_id": "a"})]
+
+
 def test_list_sends_include_only_when_given(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, dict[str, Any]]] = []
 

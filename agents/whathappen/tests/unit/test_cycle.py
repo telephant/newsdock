@@ -41,12 +41,21 @@ class Events(list[str]):
 
 
 class FakeMcp:
-    """Scripted pages; page i has cursor f'c{i + 1}'. Beyond the script: empty."""
+    """Scripted pages; page i has cursor f'c{i + 1}'. Beyond the script: empty.
+    `bodies` scripts `get_article` by article id; an unknown id has no body row."""
 
-    def __init__(self, events: Events, pages: list[list[dict[str, object]]]) -> None:
+    def __init__(
+        self,
+        events: Events,
+        pages: list[list[dict[str, object]]],
+        bodies: dict[str, dict[str, object]] | None = None,
+    ) -> None:
         self.events = events
         self.pages = pages
+        self.bodies = bodies or {}
+        self.get_fails = False
         self.list_calls: list[tuple[int, str | None, Sequence[str] | None]] = []
+        self.article_calls: list[str] = []
         self.acks: list[str] = []
 
     def list_new_articles(
@@ -61,6 +70,13 @@ class FakeMcp:
         if i < len(self.pages):
             return self.pages[i], f"c{i + 1}"
         return [], cursor or "c0"
+
+    def get_article(self, article_id: str) -> dict[str, object]:
+        self.events.append(f"get:{article_id}")
+        self.article_calls.append(article_id)
+        if self.get_fails:
+            raise RuntimeError("platform down")
+        return self.bodies.get(article_id, {"body_status": "none", "body": None})
 
     def ack_cursor(self, cursor: str) -> None:
         self.events.append(f"ack:{cursor}")
@@ -90,9 +106,13 @@ class FakeSummariser:
         self.raises = raises or set()
         self.nothing = nothing or set()
         self.calls: list[list[str]] = []
+        self.excerpts: list[str | None] = []
 
-    def summarise(self, titles: Sequence[str]) -> str | None:
+    def summarise(
+        self, titles: Sequence[str], excerpt: str | None = None
+    ) -> str | None:
         self.calls.append(list(titles))
+        self.excerpts.append(excerpt)
         first = titles[0]
         if first in self.raises:
             raise RuntimeError("model exploded")
@@ -137,10 +157,11 @@ def run(
     *,
     summariser: FakeSummariser | None = None,
     sink_fails: bool = False,
+    bodies: dict[str, dict[str, object]] | None = None,
     **overrides: object,
 ) -> tuple[FakeMcp, FakeSink, FakeSummariser, Events, Digest | None]:
     events = Events()
-    mcp, sink = FakeMcp(events, pages), FakeSink(events, fail=sink_fails)
+    mcp, sink = FakeMcp(events, pages, bodies), FakeSink(events, fail=sink_fails)
     model = summariser or FakeSummariser()
     grouper = LexicalGrouper(MatchParams(), timedelta(hours=48))
     cycle = DigestCycle(mcp, grouper, model, sink, params(**overrides))
@@ -365,3 +386,97 @@ def test_the_cycle_returns_the_digest_it_wrote(make_article: MakeArticle) -> Non
     assert result is not None
     assert result.text == sink.writes[0][1]
     assert result.path == Path("/digests/fake.md")
+
+
+# ---- body-grounded summaries (get_article; body-extraction backlog) ------------------
+def body(text: str) -> dict[str, object]:
+    return {"body_status": "ok", "body": text}
+
+
+def test_the_summary_is_grounded_in_the_shown_articles_stored_text(
+    make_article: MakeArticle,
+) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5])
+    mcp, sink, model, _, _ = run(
+        [[raw(a) for a in flood]],
+        bodies={"id1": body("Rivers burst their banks after days of rain. " * 5)},
+        summary_body_chars=80,
+    )
+    assert mcp.article_calls == ["id1"]  # the shown headline's article, found at once
+    (excerpt,) = model.excerpts
+    assert excerpt is not None and excerpt.startswith("Rivers burst their banks")
+    assert len(excerpt) <= 80 and excerpt.endswith("…")  # clipped at a word boundary
+    assert f"About: {flood[0].title}" in sink.writes[0][1]
+
+
+def test_a_pending_body_falls_back_to_the_next_distinct_headline(
+    make_article: MakeArticle,
+) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5, 3])
+    bodies: dict[str, dict[str, object]] = {
+        "id1": {"body_status": "pending", "body": None},
+        "id2": body("The valley towns were evacuated overnight."),
+    }
+    mcp, _, model, _, _ = run(
+        [[raw(a) for a in flood]], bodies=bodies, summary_body_chars=400
+    )
+    assert mcp.article_calls == ["id1", "id2"]
+    assert model.excerpts == ["The valley towns were evacuated overnight."]
+
+
+def test_the_lookup_stops_at_body_lookups_per_group(make_article: MakeArticle) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5, 3, 2])
+    mcp, _, model, _, _ = run(
+        [[raw(a) for a in flood]], summary_body_chars=400, body_lookups_per_group=2
+    )
+    assert mcp.article_calls == ["id1", "id2"]  # no body anywhere: give up after 2
+    assert model.excerpts == [None]  # the headlines are still summarised
+
+
+def test_a_failing_get_article_costs_only_the_excerpt_never_the_digest(
+    make_article: MakeArticle,
+) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5])
+    events = Events()
+    mcp = FakeMcp(events, [[raw(a) for a in flood]])
+    mcp.get_fails = True
+    sink, model = FakeSink(events), FakeSummariser()
+    grouper = LexicalGrouper(MatchParams(), timedelta(hours=48))
+    cycle = DigestCycle(mcp, grouper, model, sink, params(summary_body_chars=400))
+    result = cycle.run_once(NOW)
+    assert result is not None and len(sink.writes) == 1 and mcp.acks == ["c1"]
+    assert mcp.article_calls == ["id1"]  # one failure gives the whole group up
+    assert model.excerpts == [None]
+    assert f"About: {flood[0].title}" in sink.writes[0][1]
+
+
+def test_zero_summary_body_chars_never_calls_get_article(
+    make_article: MakeArticle,
+) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5])
+    mcp, _, model, _, _ = run([[raw(a) for a in flood]])  # params default: 0 = off
+    assert mcp.article_calls == []
+    assert model.excerpts == [None]
+
+
+def test_a_single_headline_story_with_stored_text_now_gets_a_sentence(
+    make_article: MakeArticle,
+) -> None:
+    single = [make_article(1, title="A single widely covered headline", source_count=7)]
+    mcp, sink, model, _, _ = run(
+        [[raw(a) for a in single]],
+        bodies={"id1": body("The agency confirmed the result on Monday.")},
+        summary_body_chars=400,
+    )
+    assert "About: A single widely covered headline" in sink.writes[0][1]
+    assert model.excerpts == ["The agency confirmed the result on Monday."]
+
+
+def test_the_notice_names_article_text_only_when_grounding_is_on(
+    make_article: MakeArticle,
+) -> None:
+    flood = event(make_article, 1, FLOOD, [9, 5])
+    _, plain, _, _, _ = run([[raw(a) for a in flood]])
+    _, grounded, _, _, _ = run([[raw(a) for a in flood]], summary_body_chars=400)
+    assert "from headlines only" in plain.writes[0][1]
+    assert "from headlines and stored article text" in grounded.writes[0][1]

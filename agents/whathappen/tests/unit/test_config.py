@@ -101,6 +101,7 @@ def test_story_digest_defaults_match_the_design() -> None:
     assert (s.group_window_hours, s.match_min_shared) == (48, 3)
     assert (s.match_overlap, s.match_jaccard) == (0.75, 0.5)
     assert (s.tone_divisor, s.section_min_hits) == (10.0, 1)
+    assert (s.summary_body_chars, s.body_lookups_per_group) == (1200, 3)
 
 
 def test_the_default_section_map_is_used_when_nothing_is_set() -> None:
