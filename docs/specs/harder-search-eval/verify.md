@@ -55,7 +55,7 @@ Run 2026-11-04. **Verdict: pass with follow-ups, all 13 ACs.** The eval now sepa
 
 | ID | Priority | Finding | Decision |
 |---|---|---|---|
-| F-1 | P2 | The set cannot tell vector from hybrid or the three settings apart: the relevant articles are mostly rewordings of one headline and the full-text leg rarely fires (16 relevant hits) | backlog: add keyword-heavy and entity queries whose relevant articles share few words with the seed, then rerun the sweep |
+| F-1 | P2 | The set cannot tell vector from hybrid or the three settings apart: the relevant articles are mostly rewordings of one headline and the full-text leg rarely fires (16 relevant hits) | **addressed 2026-11-04** by M3g `hybrid-eval-set`: entity and low-overlap queries make the full-text leg matter (recall 0.46 on entity queries); hybrid 0.606 vs vector 0.579 recall@5, not a clear win; the sweep still shows no effect of `rrf_k` or `candidates` (ADR-0039) |
 | F-2 | P3 | The judge is strict (8.5% yes) and the 3B model's queries sometimes drift; a larger local model (`qwen3:4b-instruct` is pulled) could raise yield and quality | backlog |
 | F-3 | P3 | The corpus is a little over the size target (469 KB) | accepted; lower `--distractors` if it matters |
 | F-4 | P3 | `embed()` sends a whole list in one request and Ollama failed on 1,557 titles at once; the harness batches by 64, the shared client does not | accepted; the embedder app already batches |
