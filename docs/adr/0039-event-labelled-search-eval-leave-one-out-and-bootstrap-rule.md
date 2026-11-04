@@ -35,6 +35,23 @@ Sweep (24 rows, prefix on/off × `semantic_rrf_k` 10/30/60/100 × `semantic_cand
 
 Decision per setting (nothing changed): **prefix: kept** (`search_document: ` / `search_query: `; on is slightly better on MRR, not a clear win either way); **`semantic_rrf_k`: kept at 60**; **`semantic_candidates`: kept at 50**. The numbers cannot tell these settings apart, which is a statement about this set, not a proof that they do not matter: the relevant articles are mostly rewordings of one headline (the judge keeps near-duplicates), so vector search finds them alike under any setting. A set with more keyword-heavy and entity queries would be needed to test the hybrid weighting (backlog of `harder-search-eval`).
 
+## Result of the M3g set (2026-11-04, real model, `events-hard`: 42 entity and 32 low-overlap queries over the same 1,557 articles)
+
+| Method | recall@5 | MRR |
+|---|---|---|
+| keyword (substring) | 0.041 | 0.041 |
+| fulltext (hybrid's keyword leg) | 0.261 | 0.222 |
+| vector | 0.579 | 0.449 |
+| hybrid | 0.606 | 0.454 |
+
+By kind (recall@5): `entity` keyword 0.07, full-text **0.46**, vector 0.64, hybrid 0.69; `lowoverlap` keyword 0.00, full-text 0.00, vector 0.50, hybrid 0.50. The full-text leg now matters (AC-8): name queries give it 0.46 where paraphrase queries gave 0.01.
+
+Does hybrid differ from vector? A little, not clearly. Only 7 of 74 queries differ: hybrid fixes 2 recall misses (full-text found the name), is never worse on recall, and is better on 3 and worse on 4 queries by MRR. Paired bootstrap, hybrid minus vector: MRR [-0.033, +0.048] (includes 0); recall [0.000, +0.068] on all queries and [0.000, +0.119] on entity queries (lower bound at 0). Hybrid noise: of 45 relevant vector top-5 hits it dropped 0, of 21 relevant full-text hits it dropped 1 (0 without prefixes).
+
+Sweep (24 rows, same grid): `semantic_rrf_k` and `semantic_candidates` still change nothing with the prefixes on; without prefixes `rrf_k` 10 gives hybrid 0.441 MRR against 0.445 for the others. **Clear wins over the defaults under the bootstrap rule: 0.**
+
+Decision per setting (nothing changed): **prefix: kept**; **`semantic_rrf_k`: kept at 60**; **`semantic_candidates`: kept at 50**. Hybrid earns its keep on name queries (recall +0.05 on `entity`, from two queries) and costs nothing elsewhere, so it stays the `semantic_search` default; a weighted fusion or an OR-style keyword leg (the leg ANDs every word) would be a search-code change with its own spec, and this set cannot yet justify it (backlog of `hybrid-eval-set`). Caveats: the entity names come from a heuristic extractor (about 12 of 15 read were clean), the low-overlap subset has 32 queries, and intervals are wide.
+
 ## Consequences
 + Objective, repeatable labels without hand work; confusable by construction (same topic, different events).
 + Leave-one-out keeps the benchmark from saturating; the bootstrap keeps a handful of queries from steering defaults.
