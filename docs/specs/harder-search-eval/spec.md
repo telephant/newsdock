@@ -25,7 +25,7 @@ flowchart LR
 | D-3 | What the eval may change | Decided: report, then change a default in `newsdock.yaml` only on a clear win, recorded in an ADR; otherwise keep and document (2026-11-04) |
 | D-4 | Body scope | Decided: titles only here; body recall stays a live check (body-extraction F-2), goes to the backlog (2026-11-04) |
 | D-5 | Corpus size: several consecutive slots frozen as one fixture | Decided: default, not asked; the number of slots is set by the builder until enough clusters exist (2026-11-04) |
-| D-6 | What counts as a "clear win" | Decided: default, not asked; MRR and recall@5 both improve and no kind of query gets worse; the margin is set in `/spec-design` from how much the numbers move between neighbouring settings (2026-11-04) |
+| D-6 | What counts as a "clear win" | Decided: default, not asked; MRR and recall@5 both improve and no kind of query gets worse; the rule is a paired bootstrap over queries: the 95% interval of the MRR difference excludes 0 (set in `/spec-design`, ADR-0039) (2026-11-04) |
 
 **Open risks:** a 1B-parameter paraphraser may write poor or near-copy queries (mitigated by AC-3 and by reading a sample); event labels say "same event", not "same wording", so some relevant articles are not title-similar (that is realistic, and it lowers every method equally); the fixture holds real headlines (attribution is the same as `docs/research.md`).
 **Prerequisites the user owns:** Ollama with `nomic-embed-text` and a small chat model (`llama3.2:1b` is pulled) for the builder; network access to GDELT once.
@@ -82,7 +82,7 @@ AC-3  Queries are not the titles
 AC-4  Queries point at the corpus
   Given the fixture
   When  every query's expected ids are looked up
-  Then  all exist in the corpus and are all members of the query's cluster
+  Then  all exist in the corpus, are members of the query's cluster, and none is the query's seed (the seed is removed from results and from `expected`, leave-one-out)
   Verify: auto
 
 AC-5  Harness runs on the fixture
