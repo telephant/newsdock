@@ -20,12 +20,12 @@
 
 | Task | Title | Implements | Depends on |
 |---|---|---|---|
-| T-01 | Spike: size and time of the link statement (read-only) | measurements | none |
-| T-02 | Migration 0013 `derived` column + backfill, model field | AC-3 | T-01 |
-| T-03 | Sink adapter: link statement, real-beats-derived upsert | AC-1, AC-2, AC-5, AC-7, AC-8 | T-02 |
-| T-04 | Sink domain wiring (ports and calls) | AC-1, AC-2, AC-7 | T-03 |
-| T-05 | API: `mention_count` ignores derived rows; MCP and REST checks | AC-4, AC-5, AC-6, AC-9, AC-10 | T-02 |
-| T-06 | Docs: events-mentions spec/design notes, `CLAUDE.md`, roadmap, ADR-0033 link | all | T-05 |
+| T-01 | Spike: size and time of the link statement (read-only) — done 2026-11-04 (dev DB down, live reading deferred to verify) | measurements | none |
+| T-02 | Migration 0013 `derived` column + backfill, model field — done 2026-11-04 (forward-only per DR-11) | AC-3 | T-01 |
+| T-03 | Sink adapter: link statement, real-beats-derived upsert — done 2026-11-04 | AC-1, AC-2, AC-5, AC-7, AC-8 | T-02 |
+| T-04 | Sink domain wiring (ports and calls) — done 2026-11-04 | AC-1, AC-2, AC-7 | T-03 |
+| T-05 | API: `mention_count` ignores derived rows; MCP and REST checks — done 2026-11-04 | AC-4, AC-5, AC-6, AC-9, AC-10 | T-02 |
+| T-06 | Docs: events-mentions spec/design notes, `CLAUDE.md`, roadmap, ADR-0033 link — done 2026-11-04 | all | T-05 |
 
 Milestones: after T-02 backfill works (AC-3); after T-04 new data links itself (AC-1, AC-2, AC-7, AC-8); after T-05 agents see it (AC-4, AC-5, AC-6, AC-9, AC-10).
 

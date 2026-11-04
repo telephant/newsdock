@@ -405,7 +405,8 @@ class SqlArticleRepo:
 
         Joins `mentions` to `events` on `event_id` (no foreign key, so an event we have
         not stored yet is simply absent). Per article: most mentioned first, then by
-        id, cut to `events_per_article`. `mention_count` counts the stored mentions.
+        id, cut to `events_per_article`. `mention_count` counts the stored real
+        mentions; the sink's derived rows for copies are not counted (ADR-0038).
         """
         if not article_ids:
             return {}
@@ -413,7 +414,7 @@ class SqlArticleRepo:
         mention_count = (
             select(func.count())
             .select_from(others)
-            .where(others.event_id == Event.event_id)
+            .where(others.event_id == Event.event_id, others.derived.is_(False))
             .scalar_subquery()
         )
         rows = session.execute(

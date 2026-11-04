@@ -87,6 +87,9 @@ class GdeltRecorder:
         self.mentions.extend(mentions)
         return len(mentions)
 
+    def link_copy_mentions(self, mentions: list[CleanMention]) -> None:
+        pass
+
 
 def _payloads() -> tuple[bytes, bytes]:
     ev = parse_event_row(

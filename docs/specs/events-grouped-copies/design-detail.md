@@ -36,7 +36,7 @@ Two copies of one story mentioning the same event collapse to one derived row (s
 ## 5. Sink wiring
 
 - `domain/gdelt.py` mention path: after `upsert_mentions`, call `writer.link_copy_mentions(batch)` (new port method).
-- `domain/writer.py`: after a **new** copy source (`insert_source` returned true and `article_id <> url_hash`), call `link_mentions_of(copy_hash)`.
+- `domain/writer.py`: for every copy (`canonical_id <> url_hash`), also on a redelivery, call `link_mentions_of(copy_hash)` after `insert_source`. Refined 2026-11-04 during T-04: linking only when the source is new would never heal a crash between the source commit and the link; the statement is idempotent and cheap.
 - Domain stays pure; both are port methods implemented in `adapters/db.py`.
 
 ## 6. Failure table
@@ -50,3 +50,7 @@ Two copies of one story mentioning the same event collapse to one derived row (s
 ## 7. Security
 
 SQL parameterized; no new input surface; no API change.
+
+## 8. Spike result (T-01, 2026-11-04)
+
+The dev database was not running (no containers up), and starting the owner's stack for a read-only count is the owner's call, so **no live reading was taken**. What exists: the sample slot of events-mentions verify F-1, 727 of 2,514 mentions name a copy, so at most about 29% more rows **[verified 2026-11-02, one slot]**; a 7-day total would be about 1.3–2.0 M real rows plus up to about 0.4–0.6 M derived **[assumption]**. The live count and the backfill `SELECT` time move to `/spec-verify` (tests.md Measurements); the link join uses the existing primary key on `article_sources.url_hash` and `ix_mentions_url_hash`, so no new index is planned **[assumption]**.

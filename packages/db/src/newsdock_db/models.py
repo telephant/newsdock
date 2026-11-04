@@ -406,6 +406,11 @@ class Mention(Base):
     ingested_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=text("now()")
     )
+    # M3e (ADR-0038): true = written by the sink for the canonical because a copy of
+    # its story was mentioned; `mention_count` counts only the rows where it is false
+    derived: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
 
     __table_args__ = (
         Index("ix_mentions_url_hash", "url_hash", "event_id"),
