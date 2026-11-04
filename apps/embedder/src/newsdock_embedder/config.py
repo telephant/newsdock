@@ -14,6 +14,11 @@ class Settings(LayeredSettings):
     # longer than one worst-case loop: Ollama timeout plus the largest backoff
     heartbeat_max_age_seconds: int = 360
     batch_size: int = 32
+    # Off until a body-scope evaluation shows passage vectors beat the passages'
+    # keyword leg (ADR-0036 amendment 2026-11-04): the passage pass is most of the
+    # embedder's compute and vector storage. Off, `scope=body|all` still works
+    # through the GIN full-text index on `article_passages`.
+    embed_passages: bool = False
     passage_batch_size: int = 32  # body passages per Ollama request
     poll_interval_seconds: float = 10.0  # pause when nothing is left to embed
     ollama_timeout_seconds: float = 60.0

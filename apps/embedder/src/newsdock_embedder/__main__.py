@@ -11,7 +11,13 @@ from newsdock_db.engine import make_engine
 from newsdock_embedder.adapters.db import SqlEmbedRepo, SqlPassageRepo
 from newsdock_embedder.adapters.ollama import OllamaDocumentEmbedder
 from newsdock_embedder.config import Settings
-from newsdock_embedder.domain.loop import EmbedWorker, PassageWorker, Round, run
+from newsdock_embedder.domain.loop import (
+    EmbedWorker,
+    PassageWorker,
+    Passes,
+    Round,
+    run,
+)
 from newsdock_embedder.domain.selection import Backoff, SkipList
 
 logger = logging.getLogger(__name__)
@@ -38,22 +44,27 @@ def main() -> int:
             max_entries=settings.skip_table_max_entries,
         )
 
-    worker = Round(
-        EmbedWorker(
-            SqlEmbedRepo(engine),
-            embedder,
-            model=settings.embedding_model,
-            batch_size=settings.batch_size,
-            skip=skip(),
-        ),
-        PassageWorker(
-            SqlPassageRepo(engine),
-            embedder,
-            model=settings.embedding_model,
-            batch_size=settings.passage_batch_size,
-            skip=skip(),
-        ),
+    titles = EmbedWorker(
+        SqlEmbedRepo(engine),
+        embedder,
+        model=settings.embedding_model,
+        batch_size=settings.batch_size,
+        skip=skip(),
     )
+    worker: Passes = titles
+    if settings.embed_passages:
+        worker = Round(
+            titles,
+            PassageWorker(
+                SqlPassageRepo(engine),
+                embedder,
+                model=settings.embedding_model,
+                batch_size=settings.passage_batch_size,
+                skip=skip(),
+            ),
+        )
+    else:
+        logger.info("embed_passages is off: body search uses the passages' keyword leg")
     run(
         worker,
         poll_interval=settings.poll_interval_seconds,
