@@ -9,7 +9,7 @@ relevance from GDELT events confirmed by a local model, frozen by
 
 import json
 import random
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from statistics import mean
@@ -70,9 +70,14 @@ class QueryRun:
     found: dict[str, list[str]] = field(default_factory=dict)
 
 
+def without(ids: Sequence[str], drop: Collection[str], *, k: int = K) -> list[str]:
+    """Drop the seed and the ignored members, then keep the first k."""
+    return [i for i in ids if i not in drop][:k]
+
+
 def without_seed(ids: Sequence[str], seed: str | None, *, k: int = K) -> list[str]:
     """Leave-one-out: drop the query's seed article, then keep the first k."""
-    return [i for i in ids if i != seed][:k]
+    return without(ids, set() if seed is None else {seed}, k=k)
 
 
 def metrics(runs: Sequence[QueryRun], method: str) -> tuple[float, float]:
@@ -167,15 +172,21 @@ def _json(path: Path) -> Any:
 
 
 def load_dataset(name: str) -> Dataset:
+    """`easy`, `events` (M3f) or `events-hard` (M3g: same corpus, entity and
+    low-overlap queries with ignored members). Every row has `seed` and `ignore`."""
     if name == "easy":
-        queries = [{**q, "seed": None} for q in _json(HERE / "queries.json")]
+        queries = [
+            {**q, "seed": None, "ignore": []} for q in _json(HERE / "queries.json")
+        ]
         return Dataset("easy", _json(HERE / "corpus.json"), queries)
+    corpus = _json(FIXTURES / "search_eval_corpus.json")
     if name == "events":
-        corpus = _json(FIXTURES / "search_eval_corpus.json")
-        return Dataset(
-            "events", corpus, _json(FIXTURES / "search_eval_queries.json")["queries"]
-        )
-    raise ValueError(f"unknown dataset {name!r} (easy, events)")
+        frozen = _json(FIXTURES / "search_eval_queries.json")["queries"]
+        return Dataset("events", corpus, [{**q, "ignore": []} for q in frozen])
+    if name == "events-hard":
+        hard = _json(FIXTURES / "search_eval_hard_queries.json")["queries"]
+        return Dataset("events-hard", corpus, hard)
+    raise ValueError(f"unknown dataset {name!r} (easy, events, events-hard)")
 
 
 # --- running (needs Postgres and an embedder) ---------------------------------------
@@ -253,7 +264,9 @@ def run_queries(
     plain = SqlArticleRepo(engine)
     runs: list[QueryRun] = []
     for q in dataset.queries:
-        query, seed = q["query"], q["seed"]
+        query = q["query"]
+        drop = set(q["ignore"]) | ({q["seed"]} if q["seed"] else set())
+        fetch = K + len(drop)  # room for what is dropped, so K results remain
         raw: dict[str, list[str]] = {}
         if "keyword" in methods:
             raw["keyword"] = [
@@ -264,25 +277,25 @@ def run_queries(
                     theme=None,
                     domain=None,
                     text=query,
-                    limit=K + 1,
+                    limit=fetch,
                 )  # fmt: skip
             ]
         if "fulltext" in methods:
             raw["fulltext"] = [
                 h.id
                 for h in repo.keyword_leg(
-                    query=query, filters=SearchFilters(), limit=K + 1
+                    query=query, filters=SearchFilters(), limit=fetch
                 )
             ]
         for mode in ("vector", "hybrid"):
             if mode in methods:
-                hits = service.search(query, mode=mode, limit=K + 1).articles
+                hits = service.search(query, mode=mode, limit=fetch).articles
                 raw[mode] = [a.article_id for a in hits]
         runs.append(
             QueryRun(
                 q["kind"],
                 list(q["expected"]),
-                {m: without_seed(ids, seed) for m, ids in raw.items()},
+                {m: without(ids, drop) for m, ids in raw.items()},
             )  # fmt: skip
         )
     return runs

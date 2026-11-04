@@ -20,6 +20,40 @@ def test_the_events_dataset_loads_from_the_frozen_fixture() -> None:
         assert q["seed"] not in q["expected"]
 
 
+def test_the_events_hard_dataset_has_both_kinds_and_ignored_members() -> None:
+    hard = h.load_dataset("events-hard")
+    ids = {c["id"] for c in hard.corpus}
+    assert {q["kind"] for q in hard.queries} == {"entity", "lowoverlap"}
+    assert len(hard.corpus) == len(h.load_dataset("events").corpus)  # same corpus
+    for q in hard.queries:
+        assert (
+            q["seed"] in ids and set(q["expected"]) <= ids and set(q["ignore"]) <= ids
+        )
+        assert not set(q["expected"]) & set(q["ignore"])
+    assert any(q["ignore"] for q in hard.queries if q["kind"] == "lowoverlap")
+    # the earlier datasets have no ignored members
+    assert all(q["ignore"] == [] for q in h.load_dataset("events").queries)
+    assert all(q["ignore"] == [] for q in h.load_dataset("easy").queries)
+
+
+# --- TC-6: ignored members are left out like the seed -----------------------------
+def test_ignored_ids_and_the_seed_are_removed_before_the_first_k() -> None:
+    got = h.without(["s", "i1", "b", "i2", "c", "d", "e", "f"], {"s", "i1", "i2"}, k=5)
+    assert got == ["b", "c", "d", "e", "f"]
+    assert h.without(["a", "b"], set(), k=5) == ["a", "b"]
+
+
+def test_an_ignored_article_neither_hits_nor_pushes_a_graded_one_down() -> None:
+    ranked = [
+        "seed",
+        "ignored",
+        "graded",
+    ]  # the reworded member outranks the graded one
+    found = h.without(ranked, {"seed", "ignored"}, k=5)
+    assert h.reciprocal_rank(["graded"], found) == 1.0  # rank 1, not 3
+    assert h.recall_at_k(["graded"], found) == 1.0
+
+
 def test_an_unknown_dataset_is_an_error() -> None:
     with pytest.raises(ValueError):
         h.load_dataset("nope")

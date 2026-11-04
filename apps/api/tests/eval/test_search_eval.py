@@ -51,12 +51,13 @@ def test_recall_at_k_needs_something_to_find() -> None:
 
 
 def test_the_labelled_queries_point_at_articles_in_the_corpus() -> None:
-    for name in ("easy", "events"):
+    for name in ("easy", "events", "events-hard"):
         dataset = h.load_dataset(name)
         corpus = {c["id"] for c in dataset.corpus}
         assert len(corpus) == len(dataset.corpus)
         for q in dataset.queries:
             assert q["expected"] and set(q["expected"]) <= corpus, q["query"]
+            assert set(q["ignore"]) <= corpus, q["query"]
     assert len(h.load_dataset("easy").corpus) == 40
     assert len(h.load_dataset("easy").queries) == 12
 
@@ -137,6 +138,26 @@ def test_the_events_eval_prints_overall_by_kind_and_noise(
     assert set(scores) == set(h.METHODS)
 
 
+# TC-7 (hybrid-eval-set AC-7): events-hard prints entity and lowoverlap by kind
+@pytest.mark.docker
+def test_the_events_hard_eval_prints_entity_and_lowoverlap_kinds(
+    engine: Engine, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = FakeOllama()
+    with httpx.Client(transport=fake.transport()) as client:
+        scores = run_eval(
+            engine, label="fake embedder", dataset="events-hard",
+            doc_prefix="search_document: ", query_prefix="search_query: ",
+            client=client, url=FAKE_URL,
+        )  # fmt: skip
+    out = capsys.readouterr().out
+    assert "dataset=events-hard" in out and "by kind of query" in out
+    for kind in ("entity", "lowoverlap"):
+        assert kind in out
+    assert "hybrid noise" in out
+    assert set(scores) == set(h.METHODS)
+
+
 # TC-11 (AC-9): the same fixture and settings give the same numbers
 @pytest.mark.docker
 def test_two_runs_print_identical_numbers(engine: Engine) -> None:
@@ -158,13 +179,14 @@ def test_two_runs_print_identical_numbers(engine: Engine) -> None:
     assert results[0] == results[1]
 
 
-# TC-8 (AC-6): the sweep prints one row per combination
+# TC-8 (AC-6, and hybrid-eval-set AC-9): the sweep prints one row per combination
 @pytest.mark.docker
+@pytest.mark.parametrize("dataset", ["events", "events-hard"])
 def test_the_sweep_has_one_row_per_combination(
-    engine: Engine, capsys: pytest.CaptureFixture[str]
+    engine: Engine, capsys: pytest.CaptureFixture[str], dataset: str
 ) -> None:
     fake = FakeOllama()
-    data = h.load_dataset("events")
+    data = h.load_dataset(dataset)
     with httpx.Client(transport=fake.transport()) as client:
         rows = h.sweep(engine, data, client=client, url=FAKE_URL)
     assert len(rows) == 2 * len(h.GRID_RRF_K) * len(h.GRID_CANDIDATES) == 24
@@ -196,7 +218,7 @@ def _ollama_has_the_model() -> bool:
 def test_the_eval_with_the_real_model(engine: Engine) -> None:
     if not _ollama_has_the_model():
         pytest.skip(f"Ollama with {h.MODEL} is not reachable at {OLLAMA}")
-    for dataset in ("easy", "events"):
+    for dataset in ("easy", "events", "events-hard"):
         for label, prefixed in (("prefixes search_document/search_query", True),
                                 ("no prefixes", False)):  # fmt: skip
             doc, query = h.PREFIXES[prefixed]
@@ -213,6 +235,8 @@ def test_the_eval_with_the_real_model(engine: Engine) -> None:
 def test_the_sweep_with_the_real_model(engine: Engine) -> None:
     if not _ollama_has_the_model():
         pytest.skip(f"Ollama with {h.MODEL} is not reachable at {OLLAMA}")
-    rows = h.sweep(engine, h.load_dataset("events"), client=None, url=OLLAMA)
-    h.print_sweep(rows)
-    assert len(rows) == 24
+    for dataset in ("events", "events-hard"):
+        print(f"\n#### sweep on dataset {dataset}")
+        rows = h.sweep(engine, h.load_dataset(dataset), client=None, url=OLLAMA)
+        h.print_sweep(rows)
+        assert len(rows) == 24
