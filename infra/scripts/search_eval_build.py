@@ -7,6 +7,7 @@ seed article per cluster is the source of the query. `build_search_eval.py` wrap
 with the network and Ollama.
 """
 
+import html
 import random
 import re
 from collections import Counter, defaultdict
@@ -200,3 +201,136 @@ def check_fixture(
         in_clusters.update(members)
     if not set(ids) - in_clusters:
         raise FixtureError("the corpus has no distractor articles")
+
+
+# --- hybrid-eval-set (M3g): the hard queries, built offline from the frozen files -----
+GRADE_OVERLAP = 0.5  # a relevant member below this word overlap with the seed is graded
+# title-case words that are not names; a starting list tuned on the frozen seeds
+TITLE_WORDS = frozenset(
+    {
+        "wins", "win", "four", "what's", "just", "live", "updates", "breaking", "ap",
+        "after", "over", "first", "new", "election", "results", "says", "midterms",
+        "democratic", "democrat", "democrats", "republican", "republicans",
+    }
+)  # fmt: skip
+_EDGE = ".,:;!?\"'()[]—–-‘’“”"
+
+
+def extract_names(title: str, *, limit: int = 3) -> list[str]:
+    """Proper names of a title: capitalised words and acronyms, at most `limit`.
+
+    The outlet suffix (` | Outlet`), HTML entities, punctuation and possessives are
+    cut; the first word of the title and of each sentence is skipped (it is
+    capitalised anyway), as are `TITLE_WORDS`. A stand-in for a name recogniser.
+    """
+    text = re.split(r"\s+\|\s+", html.unescape(title))[0]
+    text = re.sub(r"\s+-\s+[A-Z][^-]*$", "", text)
+    names: list[str] = []
+    sentence_start = True
+    for raw in text.split():
+        token = re.sub(r"['’]s$", "", raw.strip(_EDGE))
+        initial, sentence_start = sentence_start, raw[-1:] in ".?!:"
+        if not token or initial or token.lower() in TITLE_WORDS or token in names:
+            continue
+        if (token[0].isupper() and len(token) >= 3) or (
+            token.isupper() and len(token) >= 2
+        ):
+            names.append(token)
+    return names[:limit]
+
+
+def grade_members(
+    seed: str,
+    members: Sequence[str],
+    titles: Mapping[str, str],
+    *,
+    threshold: float = GRADE_OVERLAP,
+) -> tuple[list[str], list[str]]:
+    """Split relevant members into (graded, ignored) by word overlap with the seed.
+
+    Graded members share under `threshold` of their words with the seed title; the
+    others are relevant but are only rewordings, so they are ignored (left out of the
+    result lists, neither a hit nor a miss).
+    """
+    graded: list[str] = []
+    ignored: list[str] = []
+    for member in members:
+        low = word_overlap(titles[seed], titles[member]) < threshold
+        (graded if low else ignored).append(member)
+    return graded, ignored
+
+
+def build_hard_queries(
+    corpus: Sequence[Mapping[str, Any]], queries: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Entity and low-overlap queries for the clusters of the frozen queries."""
+    titles = {str(c["id"]): str(c["title"]) for c in corpus}
+    lowered = [t.casefold() for t in titles.values()]
+    clusters: dict[int, dict[str, Any]] = {}
+    paraphrase: dict[int, str] = {}
+    for q in queries:
+        clusters.setdefault(int(q["cluster"]), dict(q))
+        if q["kind"] == "paraphrase":
+            paraphrase.setdefault(int(q["cluster"]), str(q["query"]))
+    rows: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for cluster in sorted(clusters):
+        q = clusters[cluster]
+        seed = str(q["seed"])
+        members = sorted(str(m) for m in q["members"])
+        others = [m for m in members if m != seed]
+        names = extract_names(titles[seed])
+        text = " ".join(names)
+        if len(names) >= 2 and query_ok(text, lowered) and ("entity", text) not in seen:
+            seen.add(("entity", text))
+            rows.append(
+                {"query": text, "kind": "entity", "cluster": cluster, "seed": seed,
+                 "members": members, "expected": others, "ignore": []}
+            )  # fmt: skip
+        graded, ignored = grade_members(seed, others, titles)
+        text = paraphrase.get(cluster, "")
+        if graded and text and ("lowoverlap", text) not in seen:
+            seen.add(("lowoverlap", text))
+            rows.append(
+                {"query": text, "kind": "lowoverlap", "cluster": cluster, "seed": seed,
+                 "members": members, "expected": graded, "ignore": ignored}
+            )  # fmt: skip
+    return sorted(rows, key=lambda r: (r["kind"], r["cluster"]))
+
+
+def check_hard_fixture(
+    corpus: Sequence[Mapping[str, Any]], rows: Sequence[Mapping[str, Any]]
+) -> None:
+    """Raise `FixtureError` if the hard queries break AC-2 or AC-4."""
+    titles = {str(c["id"]): str(c["title"]) for c in corpus}
+    lowered = [t.casefold() for t in titles.values()]
+    seen: set[tuple[str, str]] = set()
+    for r in rows:
+        kind, cluster = str(r["kind"]), r["cluster"]
+        members = [str(m) for m in r["members"]]
+        expected = [str(e) for e in r["expected"]]
+        ignore = [str(i) for i in r["ignore"]]
+        seed = str(r["seed"])
+        if kind == "entity" and len(str(r["query"]).split()) < 2:
+            raise FixtureError(f"entity query of cluster {cluster} needs 2+ names")
+        if not query_ok(str(r["query"]), lowered):
+            raise FixtureError(f"query is empty or a title: {r['query']!r}")
+        if (kind, str(r["query"])) in seen:
+            raise FixtureError(f"query text repeated within {kind}: {r['query']!r}")
+        seen.add((kind, str(r["query"])))
+        unknown = [i for i in {seed, *members, *expected, *ignore} if i not in titles]
+        if unknown or seed not in members:
+            raise FixtureError(f"cluster {cluster}: unknown ids or seed not a member")
+        others = {m for m in members if m != seed}
+        if set(expected) & set(ignore):
+            raise FixtureError(f"cluster {cluster}: expected and ignore overlap")
+        if not (set(expected) | set(ignore)) <= others or not expected:
+            raise FixtureError(
+                f"cluster {cluster}: expected or ignore leave the cluster"
+            )
+        if kind == "entity" and (ignore or set(expected) != others):
+            raise FixtureError(
+                f"cluster {cluster}: an entity query grades every member"
+            )
+        if kind == "lowoverlap" and set(expected) | set(ignore) != others:
+            raise FixtureError(f"cluster {cluster}: graded and ignored must cover it")

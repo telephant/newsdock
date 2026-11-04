@@ -312,3 +312,140 @@ def test_a_cluster_with_no_verified_member_makes_no_queries() -> None:
     assert {"a1", "a2", "a3"} <= {
         c["id"] for c in corpus
     }  # candidates stay as negatives
+
+
+# --- hybrid-eval-set (M3g): names, grading, the hard queries -------------------------
+@pytest.mark.parametrize(
+    ("title", "names"),
+    [
+        # names, a sentence-initial word and a trailing clause cut by the limit
+        ("Democrat Amy Acton wins race for Ohio governor, AP projects",
+         ["Amy", "Acton", "Ohio"]),
+        # outlet suffix after " | " is cut; "Wins" is a title-case non-name
+        ("Abdul El-Sayed Wins Michigan Senate Race | NewsRadio 910 WLTP",
+         ["El-Sayed", "Michigan", "Senate"]),
+        # HTML entity, acronyms kept, sentence-initial words after a colon skipped
+        ("REFORMS: Oil output has grown by 600,000bpd since PIA &#x2014; NNPC",
+         ["PIA", "NNPC"]),
+        # possessive loses its 's
+        ("Republican Byron Donalds is elected Florida's first Black governor",
+         ["Byron", "Donalds", "Florida"]),
+        # a word after a full stop starts a sentence: skipped
+        ("Democrats just took back control of Congress. What's next?", ["Congress"]),
+        # filler acronym AP is not a name
+        ("Hochul elected to second full-term as NY governor, AP projects", ["NY"]),
+        # no names at all
+        ("oil prices fall again after the storm", []),
+        # distinct, in title order, at most 3
+        ("Paris Berlin Rome Madrid Paris", ["Berlin", "Rome", "Madrid"]),
+    ],
+)  # fmt: skip
+def test_names_are_cut_cleanly_from_a_title(
+    title: str, names: list[str]
+) -> None:  # TC-1
+    assert build.extract_names(title) == names
+
+
+def test_the_name_limit_can_be_lowered() -> None:
+    assert build.extract_names("Said Berlin Rome Madrid", limit=2) == ["Berlin", "Rome"]
+
+
+def test_members_are_graded_by_their_word_overlap_with_the_seed() -> None:  # TC-3
+    titles = {
+        "seed": "Democrat Amy Acton wins Ohio governor race",
+        "same": "Amy Acton wins race for Ohio governor",
+        "other": "Voters pick new leader in Columbus runoff",
+    }
+    graded, ignored = build.grade_members("seed", ["same", "other"], titles)
+    assert graded == ["other"] and ignored == ["same"]
+    assert build.grade_members("seed", ["same"], titles) == ([], ["same"])
+
+
+def _frozen() -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    titles = {
+        "a1": "Democrat Amy Acton wins Ohio governor race",
+        "a2": "Amy Acton wins race for Ohio governor",
+        "a3": "Voters pick new leader in Columbus runoff",
+        "b1": "Wildfire spreads across Oregon hills",
+        "b2": "Oregon wildfire spreads across hills quickly",
+        "d1": "Central bank holds interest rates",
+    }
+    corpus = [{"id": k, "title": t, "url": f"https://{k}", "slot": "s"}
+              for k, t in titles.items()]  # fmt: skip
+    queries: list[dict[str, object]] = [
+        {"query": "who runs Columbus now", "kind": "paraphrase", "cluster": 1,
+         "seed": "a1", "members": ["a1", "a2", "a3"], "expected": ["a2", "a3"]},
+        {"query": "state blaze news", "kind": "paraphrase", "cluster": 2,
+         "seed": "b1", "members": ["b1", "b2"], "expected": ["b2"]},
+    ]  # fmt: skip
+    return corpus, queries
+
+
+def test_hard_queries_have_entity_and_low_overlap_rows() -> None:  # TC-3, TC-4
+    corpus, queries = _frozen()
+    rows = build.build_hard_queries(corpus, queries)
+    by_kind = {(r["kind"], r["cluster"]): r for r in rows}
+    entity = by_kind[("entity", 1)]
+    assert entity["query"] == "Amy Acton Ohio"  # names of the seed title
+    assert entity["expected"] == ["a2", "a3"] and entity["ignore"] == []
+    low = by_kind[("lowoverlap", 1)]
+    assert low["query"] == "who runs Columbus now"  # the cluster's paraphrase text
+    assert low["expected"] == ["a3"] and low["ignore"] == ["a2"]
+    # cluster 2: one name only ("Oregon"), and its member is a near rewording
+    assert ("entity", 2) not in by_kind and ("lowoverlap", 2) not in by_kind
+    build.check_hard_fixture(corpus, rows)  # valid by the spec's rules
+
+
+def test_a_repeated_entity_text_is_kept_once() -> None:
+    corpus, queries = _frozen()
+    corpus += [
+        {"id": "c1", "title": "Reports say Amy Acton visits Ohio schools", "url": "u",
+         "slot": "s"},
+        {"id": "c2", "title": "Plan for Columbus transit unveiled", "url": "u",
+         "slot": "s"},
+    ]  # fmt: skip
+    queries.append(
+        {"query": "transit plan news", "kind": "paraphrase", "cluster": 3,
+         "seed": "c1", "members": ["c1", "c2"], "expected": ["c2"]}
+    )  # fmt: skip
+    rows = build.build_hard_queries(corpus, queries)
+    texts = [(r["kind"], r["query"]) for r in rows]
+    assert len(texts) == len(set(texts))  # "Amy Acton Ohio" from cluster 1 only
+    assert [r["cluster"] for r in rows if r["kind"] == "entity"] == [1]
+
+
+def _hard_rows() -> tuple[list[dict[str, str]], list[dict[str, object]]]:
+    corpus, queries = _frozen()
+    return corpus, build.build_hard_queries(corpus, queries)
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"expected": ["nope"]},  # unknown id
+        {"ignore": ["a3"]},  # overlaps expected (lowoverlap row, a3 is graded)
+        {"expected": ["a3", "d1"]},  # a member outside the cluster
+        {"query": ""},  # empty text
+        {"query": "Amy Acton wins Ohio governor race"},  # equals a title
+    ],
+)
+def test_check_hard_fixture_rejects_broken_rows(changes: dict[str, object]) -> None:
+    corpus, rows = _hard_rows()
+    low = next(r for r in rows if r["kind"] == "lowoverlap")
+    broken = [{**low, **changes}]
+    with pytest.raises(build.FixtureError):
+        build.check_hard_fixture(corpus, broken)
+
+
+def test_check_hard_fixture_rejects_a_repeated_text_within_a_kind() -> None:
+    corpus, rows = _hard_rows()
+    entity = next(r for r in rows if r["kind"] == "entity")
+    with pytest.raises(build.FixtureError, match="repeated"):
+        build.check_hard_fixture(corpus, [entity, {**entity, "cluster": 9}])
+
+
+def test_check_hard_fixture_needs_two_names_in_an_entity_query() -> None:
+    corpus, rows = _hard_rows()
+    entity = next(r for r in rows if r["kind"] == "entity")
+    with pytest.raises(build.FixtureError, match="names"):
+        build.check_hard_fixture(corpus, [{**entity, "query": "Ohio"}])
