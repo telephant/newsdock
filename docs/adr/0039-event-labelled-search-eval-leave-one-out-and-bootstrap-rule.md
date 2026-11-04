@@ -16,6 +16,10 @@ The 40-title hand-labelled eval scores 1.000 for vector and hybrid, so it cannot
 
 **Clean-up rules (T-03, 2026-11-04):** a rejected candidate whose title shares 80% or more of the significant words with the seed is left out of the corpus (the judge often refuses near-identical headlines, so it is ambiguous, not a negative); one cluster per seed; one query text per kind. Measured: the judge said yes to 95 of 1,119 pairs; 73 clusters and 146 queries remain.
 
+## M3g extension (2026-11-04, spec `hybrid-eval-set`, approved by the user during `/spec-design`)
+
+The first result left vector and hybrid tied: the full-text leg ANDs every query word, so paraphrases rarely match it, and most relevant articles reword one headline. A second query set over the same frozen corpus tests what that one could not: `entity` queries (2 to 3 proper names cut from the seed title, so exact words matter) and `lowoverlap` queries (the existing paraphrase queries graded only on relevant members sharing under half their words with the seed). Relevant members that are not graded are **ignored**: removed from the result lists like the seed, so they neither count as hits nor as wrong. The set lives in its own file (`search_eval_hard_queries.json`), built offline by `make eval-search-build-hard`; the earlier fixtures stay byte-identical. A tie between vector and hybrid on this set is recorded as a finding and the defaults stay.
+
 ## Result (2026-11-04, real model `nomic-embed-text`, `events` dataset: 146 queries, 1,557 articles)
 
 | Method | recall@5 | MRR |
