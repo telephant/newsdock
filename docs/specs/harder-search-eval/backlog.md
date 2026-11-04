@@ -6,3 +6,4 @@
 - **Graded relevance (P3):** weight clusters by `num_mentions` instead of the 0/1 label.
 - **Hybrid weighting (P3):** if the noise measure shows keyword hits displacing good vector hits, try a weighted fusion; a search-code change, so a spec of its own.
 - **Rebuild automation (P3):** a CI or scheduled rebuild of the fixture from fresh slots.
+- **Stronger judge and queries (P3, verify F-2):** try `qwen3:4b-instruct` for the judge and the query writer; compare yield (8.5% with `llama3.2:3b`) and drift.
