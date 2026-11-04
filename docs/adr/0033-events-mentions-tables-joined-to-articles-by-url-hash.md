@@ -18,7 +18,7 @@ An event has an id and one `SOURCEURL`; a mention links an event id to a URL. In
 + Tolerates late and out-of-order rows; replays are harmless.
 + One indexed join; the same data later supports "which articles cover this event".
 − About 1.3–2.0 M mention rows in 7 days (measured on 7 real slots, spec-verify 2026-11-02), 0.35–1.1 GB with indexes; the join adds about 2 ms to a page of 50 articles (3.4 ms plain, 5.4–6.3 ms with `events`).
-− Added at verify (2026-11-02): only the canonical article of a story is in `articles`, so events and mentions whose URL is a grouped copy (`article_sources`) do not appear on the canonical article. In the sample slot that is 26 of 996 events and 727 of 2,514 mentions, but only 5 of 778 canonical articles would gain an event through their copies (`docs/specs/events-mentions/verify.md` F-1, backlog).
+− Added at verify (2026-11-02; **amended by ADR-0038, 2026-11-04**: derived mention rows now link copies to the canonical): only the canonical article of a story is in `articles`, so events and mentions whose URL is a grouped copy (`article_sources`) do not appear on the canonical article. In the sample slot that is 26 of 996 events and 727 of 2,514 mentions, but only 5 of 778 canonical articles would gain an event through their copies (`docs/specs/events-mentions/verify.md` F-1, backlog).
 − Orphans exist (mentions of events we never stored); they expire with retention and are hidden by the inner join.
 − `mention_count` counts the mentions we stored, not GDELT's `NumMentions` (both are returned and can differ).
 − The meaning "events a page is mentioned in" is broader than "events it reports"; it is documented in the tool description.

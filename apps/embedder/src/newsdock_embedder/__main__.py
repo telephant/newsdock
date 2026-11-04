@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 def main() -> int:
     settings = load_settings(Settings)
     logging.basicConfig(level=settings.log_level)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     log_effective_config(logger, settings)
     logger.info("newsdock-embedder starting")
     engine = make_engine(DbSettings())

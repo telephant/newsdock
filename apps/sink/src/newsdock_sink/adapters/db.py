@@ -1,13 +1,15 @@
 """Postgres writer (role: sink_rw): canonical/source upserts, retention delete."""
 
+from collections.abc import Callable
 from datetime import datetime, timedelta
+from typing import Any
 
 from newsdock_core.contracts import CleanArticle, CleanEvent, CleanMention
 from newsdock_db.models import Article, ArticleSource, Event, Mention
-from sqlalchemy import Engine, delete, func, select
+from sqlalchemy import ColumnElement, Engine, delete, func, literal, or_, select, tuple_
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import DataError, IntegrityError, OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 from sqlalchemy.sql.expression import Executable
 
 from newsdock_sink.domain.writer import Candidate, DbUnavailable, RowRejected
@@ -44,6 +46,48 @@ def _source_values(article: CleanArticle, canonical_id: str) -> dict[str, object
         "gkg_record_id": article.gkg_record_id,
         "published_at": article.published_at,
     }
+
+
+def _link_statement(pick: Callable[[Any], ColumnElement[bool]]) -> Executable:
+    """Derived mention rows for the canonical of each copy that was mentioned.
+
+    One row per (event, canonical), copied from the mention of the copy with its
+    `ingested_at`, so retention removes both together. Existing rows win, which makes
+    every call idempotent (ADR-0038). `pick(real)` filters the real mentions to look at.
+    """
+    real = aliased(Mention)
+    chosen = (
+        select(
+            real.event_id, ArticleSource.article_id, real.url, real.source_name,
+            real.mention_time, real.confidence, real.ingested_at, literal(True),
+        )
+        .join(ArticleSource, ArticleSource.url_hash == real.url_hash)
+        .where(
+            ArticleSource.article_id != real.url_hash,
+            real.derived.is_(False),
+            pick(real),
+        )
+    )  # fmt: skip
+    return (
+        insert(Mention)
+        .from_select(
+            ["event_id", "url_hash", "url", "source_name", "mention_time",
+             "confidence", "ingested_at", "derived"],
+            chosen,
+        )
+        .on_conflict_do_nothing(index_elements=["event_id", "url_hash"])
+    )  # fmt: skip
+
+
+def _run_link(engine: Engine, statement: Executable) -> None:
+    try:
+        with Session(engine) as session:
+            session.execute(statement)
+            session.commit()
+    except OperationalError as exc:  # connection-level: back off, no commit
+        raise DbUnavailable(str(exc)) from exc
+    except (DataError, IntegrityError, ValueError) as exc:
+        raise RowRejected(str(exc)) from exc
 
 
 class SqlArticleWriter:
@@ -109,6 +153,10 @@ class SqlArticleWriter:
             raise DbUnavailable(str(exc)) from exc
         except (DataError, IntegrityError, ValueError) as exc:
             raise RowRejected(str(exc)) from exc
+
+    def link_mentions_of(self, copy_hash: str) -> None:
+        """A URL just became a copy: link the mentions already stored for it."""
+        _run_link(self._engine, _link_statement(lambda m: m.url_hash == copy_hash))
 
     def delete_ingested_before(self, cutoff: datetime) -> int:
         try:
@@ -209,10 +257,24 @@ class SqlGdeltWriter:
                 "mention_time": insert_statement.excluded.mention_time,
                 "confidence": insert_statement.excluded.confidence,
                 "ingested_at": func.now(),
+                "derived": False,  # a real mention of the canonical beats a link
             },
-            where=Mention.mention_time < insert_statement.excluded.mention_time,
+            where=or_(
+                Mention.derived,
+                Mention.mention_time < insert_statement.excluded.mention_time,
+            ),
         ).returning(Mention.event_id)
         return self._execute_returning_count(statement)
+
+    def link_copy_mentions(self, mentions: list[CleanMention]) -> None:
+        """Mentions of copies in this batch: add their derived rows (ADR-0038)."""
+        if not mentions:
+            return
+        keys = [(m.event_id, m.url_hash) for m in mentions]
+        _run_link(
+            self._engine,
+            _link_statement(lambda m: tuple_(m.event_id, m.url_hash).in_(keys)),
+        )
 
     def _execute_returning_count(self, statement: Executable) -> int:
         try:

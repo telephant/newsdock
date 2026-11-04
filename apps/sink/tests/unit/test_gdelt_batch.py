@@ -36,6 +36,7 @@ class FakeWriter:
     def __init__(self, *, reject_ids: set[int] | None = None, down: bool = False):
         self.event_calls: list[list[CleanEvent]] = []
         self.mention_calls: list[list[CleanMention]] = []
+        self.link_calls: list[list[CleanMention]] = []
         self._reject = reject_ids or set()
         self._down = down
 
@@ -54,6 +55,11 @@ class FakeWriter:
         if any(m.event_id in self._reject for m in mentions):
             raise RowRejected("bad value")
         return len(mentions)
+
+    def link_copy_mentions(self, mentions: list[CleanMention]) -> None:
+        if self._down:
+            raise DbUnavailable("down")
+        self.link_calls.append(list(mentions))
 
 
 class FakeDlq:
@@ -130,3 +136,24 @@ def test_empty_batch_does_not_touch_the_writer() -> None:
     writer = FakeWriter()
     assert process_events([], writer, FakeDlq()).written == 0
     assert writer.event_calls == [] and writer.mention_calls == []
+
+
+def test_mentions_are_linked_once_after_the_upsert() -> None:  # TC-9 (mention path)
+    writer, dlq = FakeWriter(), FakeDlq()
+    rows = [mention(0), mention(1)]
+
+    process_mentions([item(m, key=str(i)) for i, m in enumerate(rows)], writer, dlq)
+
+    assert len(writer.mention_calls) == 1 and len(writer.link_calls) == 1
+    assert {m.url_hash for m in writer.link_calls[0]} == {m.url_hash for m in rows}
+
+
+def test_no_link_when_the_database_is_down_or_the_batch_is_empty() -> None:  # TC-9
+    down = FakeWriter(down=True)
+    with pytest.raises(DbUnavailable):
+        process_mentions([item(mention(0))], down, FakeDlq())
+    assert down.link_calls == []
+
+    quiet = FakeWriter()
+    process_mentions([], quiet, FakeDlq())
+    assert quiet.link_calls == []

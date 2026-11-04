@@ -66,6 +66,10 @@ class StoryWriter(Protocol):
 
     def insert_source(self, article: CleanArticle, canonical_id: str) -> bool: ...
 
+    def link_mentions_of(self, copy_hash: str) -> None:
+        """Add derived rows for the mentions already stored for a copy (ADR-0038)."""
+        ...
+
 
 class DlqSink(Protocol):
     def send(self, key: str, message: DlqMessage) -> None: ...
@@ -138,6 +142,9 @@ def process_batch(
                 writer.insert_source(article, canonical.canonical_id)  # own source
             else:
                 source_is_new = writer.insert_source(article, canonical.canonical_id)
+                if canonical.canonical_id != article.url_hash:
+                    # idempotent, and also on a redelivery so a lost link heals
+                    writer.link_mentions_of(article.url_hash)
                 if source_is_new and canonical.canonical_id != article.url_hash:
                     grouped += 1
                 else:  # redelivered copy, or healing the canonical's own source

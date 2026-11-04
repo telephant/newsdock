@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>events-grouped-copies diagrams</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6570; --card:#f5f7fa; --line:#d5dbe3; --accent:#0a7d5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --fg:#e6e9ed; --muted:#9aa5b1; --card:#1c2229; --line:#2f3842; --accent:#4cc9a0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  nav a { margin-right:12px; color:var(--accent); }
+  section { margin:32px 0; }
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .check { border-left:4px solid var(--accent); background:var(--card); padding:8px 16px; margin-top:8px; border-radius:4px; }
+  .check b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>events-grouped-copies: diagrams</h1>
+<p style="color:var(--muted)">Spec and design: <code>spec.md</code>, <code>design.md</code>, ADR-0038.</p>
+<nav><a href="#d1">1 Components</a><a href="#d2">2 Sequence</a><a href="#d3">3 Data model</a></nav>
+
+<section id="d1">
+<h2>1. Components</h2>
+<pre class="mermaid">
+flowchart LR
+  K[(Kafka mentions.clean / gkg.clean)] --> S[C-4 Sink]
+  S -->|upsert mentions, insert_source| DB[(C-5 Postgres)]
+  S -->|link statement| DB
+  M[Migration 0013 backfill] --> DB
+  DB --> A[C-6 API _events_for]
+  A --> AG[Agent: get_article, include=events]
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Is the sink the only writer of derived rows (plus the migration)?</li>
+<li>Does the API change only in the count filter?</li>
+<li>Is anything missing that also reads <code>mentions</code>?</li></ul></div>
+</section>
+
+<section id="d2">
+<h2>2. Both arrival orders</h2>
+<pre class="mermaid">
+sequenceDiagram
+  participant K as Kafka
+  participant S as Sink
+  participant DB as Postgres
+  Note over K,DB: A: mention after grouping
+  K->>S: mention (event 7, copy URL)
+  S->>DB: upsert mention (derived=false)
+  S->>DB: link: copy is in article_sources, add (7, canonical, derived=true)
+  Note over K,DB: B: mention before grouping
+  K->>S: mention (event 8, URL X)
+  S->>DB: upsert mention, no link yet
+  K->>S: article X arrives as copy of canonical C
+  S->>DB: insert_source(X to C), then link (also on a redelivery)
+  S->>DB: link: stored mentions of X get (8, C, derived=true)
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Does every arrival order end with the derived row?</li>
+<li>What if the link statement runs twice? (DO NOTHING)</li>
+<li>What if the canonical's own mention comes later? (flag flips to real)</li></ul></div>
+</section>
+
+<section id="d3">
+<h2>3. Data model</h2>
+<pre class="mermaid">
+erDiagram
+  ARTICLES ||--o{ ARTICLE_SOURCES : "article_id"
+  ARTICLE_SOURCES }o--o{ MENTIONS : "url_hash (no FK)"
+  EVENTS ||--o{ MENTIONS : "event_id (no FK)"
+  MENTIONS {
+    bigint event_id PK
+    text url_hash PK
+    boolean derived "new, default false"
+    timestamptz ingested_at "copied for derived"
+  }
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Is one boolean on <code>mentions</code> acceptable vs a side table?</li>
+<li>Does copying <code>ingested_at</code> make retention need no change?</li></ul></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+</body>
+</html>

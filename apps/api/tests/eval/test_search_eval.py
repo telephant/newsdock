@@ -1,101 +1,65 @@
-"""TC-15 and TC-16 (AC-14): recall@5 of keyword, vector and hybrid search.
+"""TC-15/16 (semantic-search AC-14) and TC-6, TC-8, TC-10, TC-11, TC-13 (M3f).
 
-A hand-written corpus (`corpus.json`, 40 titles, 8 topics) and labelled queries
-(`queries.json`) are loaded into a throwaway Postgres; each query is run through
-the substring search `search_articles` uses, the full-text leg, the vector leg and
-the hybrid fusion. The run prints the numbers and asserts no threshold (AC-14: measure
-first). TC-15 uses a deterministic fake embedder, so it checks that the harness runs;
-TC-16 uses the real model (`make eval-search`) and is read by the owner.
+Two datasets (`search_eval_harness`): `easy`, the original 40 hand-written titles,
+and `events`, real titles whose relevance comes from GDELT events confirmed by a local
+model (frozen by `make eval-search-build`, ADR-0039). Each run loads a dataset into a
+throwaway Postgres and runs every query through the substring search `search_articles`
+uses, the full-text leg, the vector leg and the hybrid fusion, with the query's seed
+removed from the results (leave-one-out). The numbers are printed; no threshold is
+asserted (measure first). The fake-embedder tests check the harness; the real-model
+tests (`make eval-search`, `make eval-search-sweep`) are read by a person.
 """
 
 import json
 import urllib.request
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator
 from pathlib import Path
-from statistics import mean
-from typing import Any
 
 import httpx
 import pytest
+import search_eval_harness as h
 from alembic import command
 from alembic.config import Config
-from newsdock_api.adapters.query_embedder import OllamaQueryEmbedder
-from newsdock_api.adapters.repo import SqlArticleRepo
-from newsdock_api.adapters.semantic_repo import SqlSemanticRepo
 from newsdock_api.config import Settings
-from newsdock_api.domain.semantic import QueryEmbedder, SearchFilters, SemanticService
 from newsdock_db.engine import make_engine
-from newsdock_db.testing import article
-from newsdock_embedding import document_text, embed
 from newsdock_embedding.testing import FakeOllama
-from sqlalchemy import Engine, text
-from sqlalchemy.orm import Session
+from sqlalchemy import Engine
 
-HERE = Path(__file__).parent
 ROOT = Path(__file__).resolve().parents[4]
-K = 5
-MODEL = "nomic-embed-text"
 OLLAMA = "http://127.0.0.1:11434"
 FAKE_URL = "http://ollama.test:11434"
-METHODS = ("keyword", "fulltext", "vector", "hybrid")
-LABELS = {
-    "keyword": "keyword (search_articles substring)",
-    "fulltext": "fulltext (hybrid's keyword leg)",
-    "vector": "vector",
-    "hybrid": "hybrid",
-}
-
-
-def recall_at_k(expected: Sequence[str], got: Sequence[str], k: int = K) -> float:
-    """Share of the expected ids found among the first k results."""
-    wanted = set(expected)
-    if not wanted:
-        raise ValueError("a query needs at least one expected article")
-    return len(wanted & set(got[:k])) / len(wanted)
-
-
-def reciprocal_rank(expected: Sequence[str], got: Sequence[str]) -> float:
-    """1 / rank of the first expected id in the results; 0 when none is there."""
-    wanted = set(expected)
-    for rank, article_id in enumerate(got, start=1):
-        if article_id in wanted:
-            return 1.0 / rank
-    return 0.0
 
 
 def test_reciprocal_rank_is_one_over_the_first_hit() -> None:
-    assert reciprocal_rank(["a", "b"], ["a", "x"]) == 1.0
-    assert reciprocal_rank(["a", "b"], ["x", "b", "a"]) == 0.5
-    assert reciprocal_rank(["a"], ["x", "y"]) == 0.0
-    assert reciprocal_rank(["a"], []) == 0.0
+    assert h.reciprocal_rank(["a", "b"], ["a", "x"]) == 1.0
+    assert h.reciprocal_rank(["a", "b"], ["x", "b", "a"]) == 0.5
+    assert h.reciprocal_rank(["a"], ["x", "y"]) == 0.0
+    assert h.reciprocal_rank(["a"], []) == 0.0
 
 
 def test_recall_at_k_counts_expected_ids_in_the_top_k() -> None:
-    assert recall_at_k(["a", "b"], ["a", "x", "b"]) == 1.0
-    assert recall_at_k(["a", "b"], ["a", "x", "y"]) == 0.5
-    assert recall_at_k(["a", "b"], ["x", "y", "z"]) == 0.0
-    assert recall_at_k(["a"], ["x", "y", "z", "q", "r", "a"], k=5) == 0.0  # sixth place
-    assert recall_at_k(["a", "a"], ["a"]) == 1.0  # duplicates in the label count once
+    assert h.recall_at_k(["a", "b"], ["a", "x", "b"]) == 1.0
+    assert h.recall_at_k(["a", "b"], ["a", "x", "y"]) == 0.5
+    assert h.recall_at_k(["a", "b"], ["x", "y", "z"]) == 0.0
+    assert h.recall_at_k(["a"], ["x", "y", "z", "q", "r", "a"], k=5) == 0.0  # sixth
+    assert h.recall_at_k(["a", "a"], ["a"]) == 1.0  # duplicates in the label count once
 
 
 def test_recall_at_k_needs_something_to_find() -> None:
     with pytest.raises(ValueError):
-        recall_at_k([], ["a"])
+        h.recall_at_k([], ["a"])
 
 
 def test_the_labelled_queries_point_at_articles_in_the_corpus() -> None:
-    corpus = {c["id"] for c in _load("corpus.json")}
-    queries = _load("queries.json")
-    assert len(corpus) == len(_load("corpus.json")) == 40
-    assert len(queries) == 12
-    for q in queries:
-        assert q["expected"] and set(q["expected"]) <= corpus, q["query"]
-
-
-def _load(name: str) -> list[dict[str, Any]]:
-    data = json.loads((HERE / name).read_text())
-    assert isinstance(data, list)
-    return data
+    for name in ("easy", "events", "events-hard"):
+        dataset = h.load_dataset(name)
+        corpus = {c["id"] for c in dataset.corpus}
+        assert len(corpus) == len(dataset.corpus)
+        for q in dataset.queries:
+            assert q["expected"] and set(q["expected"]) <= corpus, q["query"]
+            assert set(q["ignore"]) <= corpus, q["query"]
+    assert len(h.load_dataset("easy").corpus) == 40
+    assert len(h.load_dataset("easy").queries) == 12
 
 
 @pytest.fixture(scope="module")
@@ -110,104 +74,28 @@ def run_eval(
     engine: Engine,
     *,
     label: str,
+    dataset: str,
     doc_prefix: str,
     query_prefix: str,
     client: httpx.Client | None,
     url: str,
 ) -> dict[str, float]:
-    """Embed and load the corpus, run every query through the four methods, print."""
-    corpus, queries = _load("corpus.json"), _load("queries.json")
+    """Embed and load a dataset, run every query through the four methods, print."""
+    data = h.load_dataset(dataset)
     settings = Settings()
-    vectors = embed(
-        [document_text(c["title"], doc_prefix) for c in corpus],
-        model=MODEL,
-        url=url,
-        timeout=120.0,
-        client=client,
-    )
-    with engine.begin() as conn:
-        conn.execute(text("TRUNCATE articles CASCADE"))
-    with Session(engine) as session:
-        session.add_all(
-            article(c["id"], c["title"], vec=v, model=MODEL)
-            for c, v in zip(corpus, vectors, strict=True)
-        )
-        session.commit()
-
-    embedder: QueryEmbedder = OllamaQueryEmbedder(
-        url=url, model=MODEL, dimension=768, prefix=query_prefix, timeout=120.0,
-        client=client,
-    )  # fmt: skip
-    repo = SqlSemanticRepo(engine, ef_search=settings.semantic_ef_search)
-    service = SemanticService(
-        repo,
-        embedder,
-        model=MODEL,
+    h.load_corpus(engine, data, doc_prefix=doc_prefix, client=client, url=url)
+    embedder = h.make_embedder(query_prefix=query_prefix, client=client, url=url)
+    runs = h.run_queries(
+        engine, data, embedder, rrf_k=settings.semantic_rrf_k,
         candidates=settings.semantic_candidates,
-        rrf_k=settings.semantic_rrf_k,
-        max_query_length=settings.semantic_query_max_length,
-        default_limit=K,
-        max_limit=100,
-    )
-    plain = SqlArticleRepo(engine)
-
-    per_query: dict[str, list[tuple[str, float, float]]] = {m: [] for m in METHODS}
-    for q in queries:
-        text_query, expected = q["query"], q["expected"]
-        found = {
-            "keyword": [
-                a.article_id
-                for a in plain.search(
-                    time_from=None,
-                    time_to=None,
-                    theme=None,
-                    domain=None,
-                    text=text_query,
-                    limit=K,
-                )  # fmt: skip
-            ],
-            "fulltext": [
-                h.id
-                for h in repo.keyword_leg(
-                    query=text_query, filters=SearchFilters(), limit=K
-                )
-            ],
-            "vector": [
-                a.article_id
-                for a in service.search(text_query, mode="vector", limit=K).articles
-            ],
-            "hybrid": [
-                a.article_id
-                for a in service.search(text_query, mode="hybrid", limit=K).articles
-            ],
-        }
-        for method in METHODS:
-            per_query[method].append(
-                (q["kind"], recall_at_k(expected, found[method]),
-                 reciprocal_rank(expected, found[method]))
-            )  # fmt: skip
-
-    scores = {m: mean(r for _, r, _ in per_query[m]) for m in METHODS}
-    ranks = {m: mean(rr for _, _, rr in per_query[m]) for m in METHODS}
-    kinds = sorted({q["kind"] for q in queries})
-    print(
-        f"\n== recall@{K} [{label}]: {len(queries)} queries, {len(corpus)} articles, "
-        f"rrf_k={settings.semantic_rrf_k}, candidates={settings.semantic_candidates}"
-    )
-    print(f"  {'':<38} recall@{K}   MRR")
-    for method in METHODS:
-        print(f"  {LABELS[method]:<38} {scores[method]:.3f}    {ranks[method]:.3f}")
-    print("  by kind of query (recall@5):")
-    for kind in kinds:
-        row = "  ".join(
-            f"{m} {mean(r for k, r, _ in per_query[m] if k == kind):.2f}"
-            for m in METHODS
-        )
-        print(f"    {kind:<11} {row}")
-    return scores
+    )  # fmt: skip
+    return h.print_report(
+        label, data, runs, rrf_k=settings.semantic_rrf_k,
+        candidates=settings.semantic_candidates,
+    )  # fmt: skip
 
 
-# TC-15 (AC-14): the harness runs and prints three recalls, with a fake embedder
+# TC-15 (semantic-search AC-14): the harness runs, with a fake embedder
 @pytest.mark.docker
 def test_the_eval_prints_recall_for_keyword_vector_and_hybrid(
     engine: Engine, capsys: pytest.CaptureFixture[str]
@@ -215,20 +103,103 @@ def test_the_eval_prints_recall_for_keyword_vector_and_hybrid(
     fake = FakeOllama()
     with httpx.Client(transport=fake.transport()) as client:
         scores = run_eval(
-            engine,
-            label="fake embedder",
-            doc_prefix="search_document: ",
-            query_prefix="search_query: ",
-            client=client,
-            url=FAKE_URL,
-        )
+            engine, label="fake embedder", dataset="easy",
+            doc_prefix="search_document: ", query_prefix="search_query: ",
+            client=client, url=FAKE_URL,
+        )  # fmt: skip
     out = capsys.readouterr().out
     for method in ("keyword", "vector", "hybrid"):
-        assert LABELS[method] in out
-    assert set(scores) == set(METHODS)
+        assert h.LABELS[method] in out
+    assert set(scores) == set(h.METHODS)
     assert all(0.0 <= v <= 1.0 for v in scores.values())
     # no threshold on quality (AC-14), but the baselines must have found something
     assert scores["keyword"] > 0.0 and scores["fulltext"] > 0.0
+
+
+# TC-6 (AC-5) and TC-10 (AC-8): the events dataset, by kind, with the noise line
+@pytest.mark.docker
+def test_the_events_eval_prints_overall_by_kind_and_noise(
+    engine: Engine, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = FakeOllama()
+    with httpx.Client(transport=fake.transport()) as client:
+        scores = run_eval(
+            engine, label="fake embedder", dataset="events",
+            doc_prefix="search_document: ", query_prefix="search_query: ",
+            client=client, url=FAKE_URL,
+        )  # fmt: skip
+    out = capsys.readouterr().out
+    assert "dataset=events" in out and "by kind of query" in out
+    for method in h.METHODS:
+        assert h.LABELS[method] in out
+    for kind in ("paraphrase", "keywords"):
+        assert kind in out
+    assert "hybrid noise" in out
+    assert set(scores) == set(h.METHODS)
+
+
+# TC-7 (hybrid-eval-set AC-7): events-hard prints entity and lowoverlap by kind
+@pytest.mark.docker
+def test_the_events_hard_eval_prints_entity_and_lowoverlap_kinds(
+    engine: Engine, capsys: pytest.CaptureFixture[str]
+) -> None:
+    fake = FakeOllama()
+    with httpx.Client(transport=fake.transport()) as client:
+        scores = run_eval(
+            engine, label="fake embedder", dataset="events-hard",
+            doc_prefix="search_document: ", query_prefix="search_query: ",
+            client=client, url=FAKE_URL,
+        )  # fmt: skip
+    out = capsys.readouterr().out
+    assert "dataset=events-hard" in out and "by kind of query" in out
+    for kind in ("entity", "lowoverlap"):
+        assert kind in out
+    assert "hybrid noise" in out
+    assert set(scores) == set(h.METHODS)
+
+
+# TC-11 (AC-9): the same fixture and settings give the same numbers
+@pytest.mark.docker
+def test_two_runs_print_identical_numbers(engine: Engine) -> None:
+    fake = FakeOllama()
+    results = []
+    for _ in range(2):
+        with httpx.Client(transport=fake.transport()) as client:
+            results.append(
+                run_eval(
+                    engine,
+                    label="repeat",
+                    dataset="events",
+                    doc_prefix="search_document: ",
+                    query_prefix="search_query: ",
+                    client=client,
+                    url=FAKE_URL,
+                )  # fmt: skip
+            )
+    assert results[0] == results[1]
+
+
+# TC-8 (AC-6, and hybrid-eval-set AC-9): the sweep prints one row per combination
+@pytest.mark.docker
+@pytest.mark.parametrize("dataset", ["events", "events-hard"])
+def test_the_sweep_has_one_row_per_combination(
+    engine: Engine, capsys: pytest.CaptureFixture[str], dataset: str
+) -> None:
+    fake = FakeOllama()
+    data = h.load_dataset(dataset)
+    with httpx.Client(transport=fake.transport()) as client:
+        rows = h.sweep(engine, data, client=client, url=FAKE_URL)
+    assert len(rows) == 2 * len(h.GRID_RRF_K) * len(h.GRID_CANDIDATES) == 24
+    assert {(r.prefix, r.rrf_k, r.candidates) for r in rows} == {
+        (p, k, c)
+        for p in (True, False)
+        for k in h.GRID_RRF_K
+        for c in h.GRID_CANDIDATES
+    }
+    h.print_sweep(rows)
+    out = capsys.readouterr().out
+    assert out.count("\n  on ") + out.count("\n  off") == 24
+    assert "clear wins over the defaults" in out
 
 
 def _ollama_has_the_model() -> bool:
@@ -237,29 +208,35 @@ def _ollama_has_the_model() -> bool:
             names = [m["name"] for m in json.load(response)["models"]]
     except OSError:
         return False
-    return any(n.split(":")[0] == MODEL for n in names)
+    return any(n.split(":")[0] == h.MODEL for n in names)
 
 
-# TC-16 (AC-14): with the real model, with and without the task prefixes
+# TC-16 (AC-14) and TC-13 (AC-7): the real model, both datasets, with and without
+# the task prefixes; read by a person
 @pytest.mark.docker
 @pytest.mark.ollama
 def test_the_eval_with_the_real_model(engine: Engine) -> None:
     if not _ollama_has_the_model():
-        pytest.skip(f"Ollama with {MODEL} is not reachable at {OLLAMA}")
-    results = {
-        label: run_eval(
-            engine,
-            label=label,
-            doc_prefix=doc,
-            query_prefix=query,
-            client=None,
-            url=OLLAMA,
-        )
-        for label, doc, query in (
-            ("real model, prefixes search_document/search_query",
-             "search_document: ", "search_query: "),
-            ("real model, no prefixes", "", ""),
-        )
-    }  # fmt: skip
-    for scores in results.values():
-        assert all(0.0 <= v <= 1.0 for v in scores.values())  # no threshold
+        pytest.skip(f"Ollama with {h.MODEL} is not reachable at {OLLAMA}")
+    for dataset in ("easy", "events", "events-hard"):
+        for label, prefixed in (("prefixes search_document/search_query", True),
+                                ("no prefixes", False)):  # fmt: skip
+            doc, query = h.PREFIXES[prefixed]
+            scores = run_eval(
+                engine, label=f"real model, {label}", dataset=dataset,
+                doc_prefix=doc, query_prefix=query, client=None, url=OLLAMA,
+            )  # fmt: skip
+            assert all(0.0 <= v <= 1.0 for v in scores.values())  # no threshold
+
+
+# the sweep with the real model (`make eval-search-sweep`); read by a person
+@pytest.mark.docker
+@pytest.mark.ollama
+def test_the_sweep_with_the_real_model(engine: Engine) -> None:
+    if not _ollama_has_the_model():
+        pytest.skip(f"Ollama with {h.MODEL} is not reachable at {OLLAMA}")
+    for dataset in ("events", "events-hard"):
+        print(f"\n#### sweep on dataset {dataset}")
+        rows = h.sweep(engine, h.load_dataset(dataset), client=None, url=OLLAMA)
+        h.print_sweep(rows)
+        assert len(rows) == 24

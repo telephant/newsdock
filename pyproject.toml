@@ -26,7 +26,7 @@ dev = [
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -m 'not rules and not docker'"
 testpaths = ["apps", "packages", "infra/scripts"]
-pythonpath = ["infra/scripts"]
+pythonpath = ["infra/scripts", "apps/api/tests/eval"]
 markers = [
     "rules: mutation tests that prove each enforced rule fails when violated (make test-rules)",
     "docker: tests that need Docker (make test-infra)",
@@ -61,6 +61,7 @@ mypy_path = [
     "packages/db/src",
     "packages/embedding/src",
     "infra/scripts",
+    "apps/api/tests/eval",
 ]
 
 [tool.importlinter]

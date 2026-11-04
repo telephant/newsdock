@@ -34,6 +34,10 @@ class GdeltWriter(Protocol):
 
     def upsert_mentions(self, mentions: list[CleanMention]) -> int: ...
 
+    def link_copy_mentions(self, mentions: list[CleanMention]) -> None:
+        """Add the canonical's derived rows for mentions that name a copy (ADR-0038)."""
+        ...
+
 
 @dataclass(frozen=True)
 class GdeltBatchResult:
@@ -61,6 +65,12 @@ def process_mentions(
     items: list[SinkItem], writer: GdeltWriter, dlq: DlqSink
 ) -> GdeltBatchResult:
     """Write one batch of mentions. Raises DbUnavailable; never raises on bad rows."""
+
+    def upsert(rows: list[CleanMention]) -> int:
+        written = writer.upsert_mentions(rows)
+        writer.link_copy_mentions(rows)  # idempotent, so a replay heals a lost link
+        return written
+
     return _process(
         items,
         dlq,
@@ -68,7 +78,7 @@ def process_mentions(
         model=CleanMention,
         key_of=lambda m: f"{m.event_id}:{m.url_hash}",
         newer=lambda a, b: a.mention_time >= b.mention_time,
-        upsert=writer.upsert_mentions,
+        upsert=upsert,
     )
 
 

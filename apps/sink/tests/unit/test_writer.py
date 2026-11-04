@@ -59,6 +59,7 @@ class FakeStoryWriter:
             str, tuple[str | None, str]
         ] = {}  # hash -> (domain, url)
         self.find_calls = 0
+        self.links: list[str] = []
 
     def _guard(self, url_hash: str) -> None:
         if self.down:
@@ -95,6 +96,11 @@ class FakeStoryWriter:
         self.sources[article.url_hash] = canonical_id
         self.source_info[article.url_hash] = (article.domain, article.url)
         return True
+
+    def link_mentions_of(self, copy_hash: str) -> None:
+        if self.down:
+            raise DbUnavailable("connection refused")
+        self.links.append(copy_hash)
 
 
 class FakeDlq:
@@ -230,3 +236,24 @@ def test_tc15_redelivery_of_the_second_story_stays_idempotent() -> None:
     again = process_batch([item(b)], writer, dlq, window=WINDOW)  # cold cache
     assert (again.canonicals, again.grouped, again.url_duplicates) == (0, 0, 1)
     assert len(writer.canonicals) == 2 and len(writer.sources) == 2
+
+
+def test_a_copy_links_its_stored_mentions_but_the_canonical_does_not() -> None:  # TC-9
+    base = fixture_articles(1)[0]
+    copy = copy_of(base, url="https://other-site.example/same-story", hours=1)
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+
+    process_batch([item(base), item(copy)], writer, dlq, window=WINDOW)
+
+    assert writer.links == [copy.url_hash]  # the canonical's own source is no copy
+
+
+def test_a_redelivered_copy_links_again_so_a_missed_link_heals() -> None:  # TC-9
+    base = fixture_articles(1)[0]
+    copy = copy_of(base, url="https://other-site.example/same-story", hours=1)
+    writer, dlq = FakeStoryWriter(), FakeDlq()
+    process_batch([item(base), item(copy)], writer, dlq, window=WINDOW)
+
+    process_batch([item(copy)], writer, dlq, window=WINDOW)
+
+    assert writer.links == [copy.url_hash, copy.url_hash]

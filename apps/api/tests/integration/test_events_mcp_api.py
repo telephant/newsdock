@@ -59,12 +59,13 @@ def _event(event_id: int, num_mentions: int) -> Event:
     )  # fmt: skip
 
 
-def _mention(event_id: int, url_hash: str) -> Mention:
+def _mention(event_id: int, url_hash: str, *, derived: bool = False) -> Mention:
     return Mention(
         event_id=event_id,
         url_hash=url_hash,
         url=f"https://e.com/{url_hash}",
         mention_time=ADDED,
+        derived=derived,
     )
 
 
@@ -85,8 +86,14 @@ def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
             ]
         )  # fmt: skip
         session.commit()
-        session.add_all([_event(1, 5), _event(2, 9)])
-        session.add_all([_mention(1, "A"), _mention(2, "A"), _mention(2, "X")])
+        session.add_all([_event(1, 5), _event(2, 9), _event(3, 1)])
+        session.add_all(
+            [
+                _mention(1, "A"), _mention(2, "A"), _mention(2, "X"),
+                # event 3 is mentioned by a copy of A only: the sink's derived row
+                _mention(3, "X3"), _mention(3, "A", derived=True),
+            ]
+        )  # fmt: skip
         session.commit()
     yield eng
     eng.dispose()
@@ -175,7 +182,7 @@ def test_search_articles_include_events(base: str, key: str) -> None:
     got = rows(ok(base, key, "search_articles", include=["events"]))
     assert set(got["A"]) == GOLDEN | {"events"}
     events = got["A"]["events"]
-    assert [e["event_id"] for e in events] == [2, 1]
+    assert [e["event_id"] for e in events] == [2, 1, 3]
     assert set(events[0]) == EVENT_KEYS
     assert events[0]["mention_count"] == 2 and events[0]["num_mentions"] == 9
     assert events[0]["location"]["country"] == "FR"
@@ -188,7 +195,7 @@ def test_list_new_articles_include_events_keeps_the_cursor(base: str, key: str) 
     assert [a["article_id"] for a in asked["articles"]] == [
         a["article_id"] for a in plain["articles"]
     ]
-    assert [e["event_id"] for e in rows(asked)["A"]["events"]] == [2, 1]
+    assert [e["event_id"] for e in rows(asked)["A"]["events"]] == [2, 1, 3]
 
 
 @pytest.mark.parametrize("mode", ["vector", "hybrid"])
@@ -199,12 +206,12 @@ def test_semantic_search_include_events(base: str, key: str, mode: str) -> None:
     )  # fmt: skip
     found = rows(got)
     assert set(found["A"]) == GOLDEN | HIT | {"events"}
-    assert [e["event_id"] for e in found["A"]["events"]] == [2, 1]
+    assert [e["event_id"] for e in found["A"]["events"]] == [2, 1, 3]
 
 
 def test_get_article_always_carries_events(base: str, key: str) -> None:
     detail = ok(base, key, "get_article", article_id="A")
-    assert [e["event_id"] for e in detail["events"]] == [2, 1]
+    assert [e["event_id"] for e in detail["events"]] == [2, 1, 3]
     assert ok(base, key, "get_article", article_id="B")["events"] == []
 
 
@@ -247,3 +254,14 @@ def test_unknown_include_name_is_a_named_tool_error(
     assert "invalid_include" in error_text(base, key, tool, include=["bogus"], **extra)
     mixed = error_text(base, key, tool, include=["events", "bogus"], **extra)
     assert "invalid_include" in mixed
+
+
+# --- TC-11 (AC-9), TC-4: an event reached through a copy shows on the canonical ------
+def test_event_of_a_copy_shows_on_the_canonical_with_real_mention_count(
+    base: str, key: str
+) -> None:
+    listed = rows(ok(base, key, "search_articles", include=["events"]))["A"]["events"]
+    detail = ok(base, key, "get_article", article_id="A")["events"]
+    for events in (listed, detail):
+        third = next(e for e in events if e["event_id"] == 3)
+        assert third["mention_count"] == 1  # the copy's own mention, not the link

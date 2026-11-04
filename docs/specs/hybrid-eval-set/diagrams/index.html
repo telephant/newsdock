@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hybrid-eval-set diagrams</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6570; --card:#f5f7fa; --line:#d5dbe3; --accent:#0a7d5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --fg:#e6e9ed; --muted:#9aa5b1; --card:#1c2229; --line:#2f3842; --accent:#4cc9a0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  nav a { margin-right:12px; color:var(--accent); }
+  section { margin:32px 0; }
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .check { border-left:4px solid var(--accent); background:var(--card); padding:8px 16px; margin-top:8px; border-radius:4px; }
+  .check b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>hybrid-eval-set: diagrams</h1>
+<p style="color:var(--muted)">Spec and design: <code>spec.md</code>, <code>design.md</code>.</p>
+<nav><a href="#d1">1 Components</a><a href="#d2">2 Sequence</a><a href="#d3">3 Data model</a></nav>
+
+<section id="d1">
+<h2>1. Components</h2>
+<pre class="mermaid">
+flowchart LR
+  F[Frozen corpus + queries, M3f] --> B[C-94 Hard builder, offline]
+  B --> H[C-95 Hard queries file]
+  F --> E[C-92 Harness: events-hard]
+  H --> E
+  E --> P[(Throwaway Postgres)]
+  E --> R[C-93 Report and decision]
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Is the corpus really untouched?</li>
+<li>Does the builder need network or a model? (no)</li>
+<li>Does anything in the platform change? (no)</li></ul></div>
+</section>
+
+<section id="d2">
+<h2>2. Build and run</h2>
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Builder
+  participant F as Frozen files
+  participant H as Harness
+  B->>F: read corpus and queries
+  B->>B: names from seed titles, entity queries
+  B->>B: grade members by word overlap, low-overlap queries
+  B->>F: write hard queries file
+  H->>H: load events-hard, embed corpus per prefix
+  H->>H: run 4 methods, drop seed and ignored ids
+  H-->>H: tables by kind, noise, sweep, clear wins
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Why are ignored members removed instead of counted as wrong?</li>
+<li>Is the output identical on a second build?</li>
+<li>Where would a bad name (a verb) be caught?</li></ul></div>
+</section>
+
+<section id="d3">
+<h2>3. Hard queries file</h2>
+<pre class="mermaid">
+erDiagram
+  HARD_QUERY {
+    text query
+    text kind "entity or lowoverlap"
+    bigint cluster
+    text seed FK
+  }
+  HARD_QUERY }o--o{ CORPUS_ARTICLE : "expected (graded)"
+  HARD_QUERY }o--o{ CORPUS_ARTICLE : "ignore (relevant, not graded)"
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Are expected and ignore always disjoint?</li>
+<li>Do the two lists plus the seed equal the cluster?</li></ul></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+</body>
+</html>

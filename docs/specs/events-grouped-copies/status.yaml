@@ -1,0 +1,6 @@
+feature: events-grouped-copies
+stage: done
+updated: 2026-11-04
+decisions: {D-1: decided, D-2: decided, D-3: decided, D-4: decided, D-5: decided}
+gates: {init: approved, design: approved, plan: approved, implement: approved, verify: approved}
+acs: {AC-1: {status: passing}, AC-2: {status: passing}, AC-3: {status: passing}, AC-4: {status: passing}, AC-5: {status: passing}, AC-6: {status: passing}, AC-7: {status: passing}, AC-8: {status: passing}, AC-9: {status: passing}, AC-10: {status: passing}}

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>harder-search-eval diagrams</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6570; --card:#f5f7fa; --line:#d5dbe3; --accent:#0a7d5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --fg:#e6e9ed; --muted:#9aa5b1; --card:#1c2229; --line:#2f3842; --accent:#4cc9a0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  nav a { margin-right:12px; color:var(--accent); }
+  section { margin:32px 0; }
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .check { border-left:4px solid var(--accent); background:var(--card); padding:8px 16px; margin-top:8px; border-radius:4px; }
+  .check b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>harder-search-eval: diagrams</h1>
+<p style="color:var(--muted)">Spec and design: <code>spec.md</code>, <code>design.md</code>, ADR-0039.</p>
+<nav><a href="#d1">1 Components</a><a href="#d2">2 Sequence</a><a href="#d3">3 Data model</a></nav>
+
+<section id="d1">
+<h2>1. Components</h2>
+<pre class="mermaid">
+flowchart LR
+  G[GDELT slots: GKG + Mentions] --> B[C-90 Builder]
+  O[Ollama chat model] --> B
+  B --> F[C-91 Fixture: corpus + queries]
+  F --> H[C-92 Harness]
+  E[Ollama embeddings] --> H
+  H --> P[(Throwaway Postgres)]
+  H --> R[C-93 Report and decision]
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Is anything in the running platform changed? (no)</li>
+<li>Is the builder kept out of CI?</li>
+<li>Does the harness reuse the real search service, not a copy?</li></ul></div>
+</section>
+
+<section id="d2">
+<h2>2. Build once, run many times</h2>
+<pre class="mermaid">
+sequenceDiagram
+  participant B as Builder
+  participant G as GDELT
+  participant O as Ollama
+  participant H as Harness
+  B->>G: fetch N slots (GKG + Mentions)
+  B->>B: collapse copies, event clusters, seeds
+  B->>O: paraphrase and keywords per seed
+  B->>B: check_fixture, write files
+  H->>H: load fixture, embed corpus per prefix
+  H->>H: run 4 methods, remove the seed
+  H->>H: metrics, noise, sweep, bootstrap
+  H-->>H: print tables, winners
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Why is the seed removed before scoring?</li>
+<li>Is the same fixture used for every run (deterministic)?</li>
+<li>Where is a weak query caught?</li></ul></div>
+</section>
+
+<section id="d3">
+<h2>3. Fixture data model</h2>
+<pre class="mermaid">
+erDiagram
+  CORPUS_ARTICLE {
+    text id PK "url_hash"
+    text title
+    text url
+    text slot
+  }
+  QUERY {
+    text query
+    text kind "paraphrase or keywords"
+    bigint cluster "GDELT event id"
+    text seed FK
+  }
+  QUERY }o--o{ CORPUS_ARTICLE : "expected (cluster minus seed)"
+</pre>
+<div class="check"><b>Check</b>
+<ul><li>Is "expected" always inside the corpus?</li>
+<li>Do distractors need a label? (no)</li></ul></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+</body>
+</html>

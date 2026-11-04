@@ -50,10 +50,10 @@ def _event(event_id: int, num_mentions: int) -> Event:
     )  # fmt: skip
 
 
-def _mention(event_id: int, url_hash: str) -> Mention:
+def _mention(event_id: int, url_hash: str, *, derived: bool = False) -> Mention:
     return Mention(
         event_id=event_id, url_hash=url_hash, url=f"https://e.com/{url_hash}",
-        mention_time=ADDED,
+        mention_time=ADDED, derived=derived,
     )  # fmt: skip
 
 
@@ -72,9 +72,17 @@ def engine(side_db: tuple[str, str]) -> Iterator[Engine]:
             ]
         )
         session.commit()
-        session.add_all([_event(1, 5), _event(2, 9)])
+        session.add_all([_event(1, 5), _event(2, 9), _event(3, 1)])
         session.add_all(
-            [_mention(1, "A"), _mention(2, "A"), _mention(1, "X1"), _mention(2, "X2")]
+            [
+                _mention(1, "A"),
+                _mention(2, "A"),
+                _mention(1, "X1"),
+                _mention(2, "X2"),
+                # event 3 is mentioned by a copy of A only: the sink's derived row
+                _mention(3, "X3"),
+                _mention(3, "A", derived=True),
+            ]
         )
         session.commit()
     yield eng
@@ -127,7 +135,7 @@ def test_feed_include_events_adds_the_events_key(
     rows = by_id(feed(client, agent, include="events"))
     assert set(rows["A"]) == GOLDEN | {"events"}
     events = rows["A"]["events"]
-    assert [e["event_id"] for e in events] == [2, 1]  # most mentioned first
+    assert [e["event_id"] for e in events] == [2, 1, 3]  # most mentioned first
     assert set(events[0]) == EVENT_KEYS
     assert events[0]["mention_count"] == 2 and events[0]["num_mentions"] == 9
     assert events[0]["date"] == "2026-11-02"
@@ -156,7 +164,7 @@ def test_detail_always_carries_events(
 ) -> None:
     detail = client.get("/api/articles/A", headers=headers(agent))
     assert detail.status_code == 200
-    assert [e["event_id"] for e in detail.json()["events"]] == [2, 1]
+    assert [e["event_id"] for e in detail.json()["events"]] == [2, 1, 3]
     quiet = client.get("/api/articles/B", headers=headers(agent))
     assert quiet.json()["events"] == []
 
@@ -171,3 +179,16 @@ def test_unknown_include_is_a_422(
     )
     assert response.status_code == 422
     assert response.json()["detail"] == "invalid_include"
+
+
+# --- TC-11 (AC-9), TC-4: an event reached through a copy shows on the canonical ------
+def test_event_of_a_copy_shows_on_the_canonical_with_real_mention_count(
+    client: TestClient, agent: tuple[str, str]
+) -> None:
+    feed_events = by_id(feed(client, agent, include="events"))["A"]["events"]
+    detail_events = client.get("/api/articles/A", headers=headers(agent)).json()[
+        "events"
+    ]
+    for events in (feed_events, detail_events):
+        third = next(e for e in events if e["event_id"] == 3)
+        assert third["mention_count"] == 1  # the copy's own mention, not the link
