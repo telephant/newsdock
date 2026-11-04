@@ -8,7 +8,7 @@ Reference only; not required reading for approval.
 ALTER TABLE mentions ADD COLUMN derived boolean NOT NULL DEFAULT false;
 -- backfill: the link statement of §2 over all rows, then done
 ```
-Downgrade deletes `derived` rows, then drops the column. `ix_mentions_url_hash (url_hash, event_id)` already serves the link join and the read path. The `sink_rw` / `extractor_rw` style grants need no change (same table).
+Forward-only (DR-11): `downgrade` is a documented no-op. `ix_mentions_url_hash (url_hash, event_id)` already serves the link join and the read path. The `sink_rw` / `extractor_rw` style grants need no change (same table).
 
 ## 2. Link statement
 

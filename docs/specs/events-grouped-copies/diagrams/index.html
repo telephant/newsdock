@@ -54,7 +54,7 @@ sequenceDiagram
   K->>S: mention (event 8, URL X)
   S->>DB: upsert mention, no link yet
   K->>S: article X arrives as copy of canonical C
-  S->>DB: insert_source(X to C) is new
+  S->>DB: insert_source(X to C), then link (also on a redelivery)
   S->>DB: link: stored mentions of X get (8, C, derived=true)
 </pre>
 <div class="check"><b>Check</b>

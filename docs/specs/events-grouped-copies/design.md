@@ -18,7 +18,7 @@ A copy's mention gets a **derived row** in `mentions` that names the canonical (
 ## Key flows
 
 1. **Mention after grouping:** sink upserts the batch → derived rows for those whose `url_hash` is a copy (diagram 2).
-2. **Mention before grouping:** `insert_source` for a new copy → derived rows for the copy's stored mentions (diagram 2).
+2. **Mention before grouping:** the sink stores a copy (also on a redelivery) → derived rows for the copy's stored mentions (diagram 2).
 3. **Backfill:** migration 0013 runs the same statement over all rows.
 4. **Read:** unchanged query; derived rows look like the canonical's own mentions, so AC-5 dedup is the primary key `(event_id, url_hash)`.
 
