@@ -161,6 +161,7 @@ AC-11  Passages are embedded
   When  the embedder runs
   Then  the body is split into passages, each passage gets a vector from the configured model, passages of another model are re-embedded, and a body is not split twice
   Verify: auto
+  (Changed 2026-11-04, ADR-0036 amendment: the passage pass runs only with `embedder.embed_passages: true`; the default is off until the backlog's retrieval evaluation shows passage vectors beat the keyword leg. The AC's tests drive the pass directly and still hold.)
 
 AC-12  Search over the text
   Given articles whose bodies are embedded and a query phrased differently from the words in the text

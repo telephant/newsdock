@@ -2,6 +2,8 @@
 
 Status: **Accepted 2026-11-02** (spec `body-extraction`, D-1, D-2, D-6; confirmed by the user during `/spec-design`)
 
+Amended **2026-11-04** (approved by the user): the passage pass is **opt-in** — `embedder.embed_passages`, default off. The pass is most of the embedder's compute and vector storage (several vectors per article against one title, continuous HNSW churn under 7-day retention), while `scope=body|all` has no measured retrieval win yet (the search evals grade titles only). Until the backlog's body-scope evaluation shows passage vectors beat the passages' GIN keyword leg, `body` and `all` searches lean on that keyword leg; vectors already stored stay until retention removes them, and turning the flag on resumes decision (a) unchanged.
+
 ## Context
 Every canonical article (50–75 k a day, **[assumption]**) gets a body; text is capped at 20,000 characters and kept 7 days. Ollama serves `nomic-embed-text` with a 2,048-token context, so one vector cannot cover an article: passages of about 1,000 characters are embedded (measured 67–70 passages/s on this machine, **[verified]**). One `vector(768)` is about 3 KB; at roughly 4 passages per article, 7 days is 1.4–2.1 M passages. The embedder polls "vector IS NULL" through a partial index (ADR-0024); polling an anti-join over 500 k articles every few seconds would not scale. pgvector 0.8.7 (image) and `pgvector` 0.5.1 (Python) both support `halfvec`.
 

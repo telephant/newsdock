@@ -98,6 +98,8 @@ api:
 agent: {}
 embedder:
   batch_size: 32                  # titles per Ollama request
+  embed_passages: false           # body passage vectors are opt-in (ADR-0036 amendment):
+                                  # off, scope=body|all searches the passages' keyword leg only
   passage_batch_size: 32          # body passages per Ollama request
   poll_interval_seconds: 10       # pause when nothing is left to embed
   ollama_timeout_seconds: 60

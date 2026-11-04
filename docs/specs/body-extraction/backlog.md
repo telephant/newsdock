@@ -2,7 +2,7 @@
 
 Later items, one line each (P1 highest).
 
-- **Retrieval-quality evaluation (P2):** an evaluation set for text search (recall@k and MRR, like `make eval-search` for titles) so passage size, overlap and hybrid weights can be tuned on data. Why: the 40-title set was already called too easy; text search has no measure yet.
+- **Retrieval-quality evaluation (P2):** an evaluation set for text search (recall@k and MRR, like `make eval-search` for titles) so passage size, overlap and hybrid weights can be tuned on data. Why: the 40-title set was already called too easy; text search has no measure yet. Since 2026-11-04 it also gates `embedder.embed_passages` (ADR-0036 amendment): passage vectors stay off until they measurably beat the passages' keyword leg.
 - **Make `scope=all` the default (P2):** flip `api.semantic_default_scope` once the evaluation set shows fused title-and-text search beats titles. Why: the owner wants the most accurate search; the default stays `titles` until it is measured.
 - **Fetch copies and refresh (P2):** also fetch the copies in `article_sources` when the canonical fails, and refetch a body that changed. Why: some canonicals are blocked while a copy on another site is not.
 - **Digest agent reads bodies (P2):** use the stored text to write better one-sentence summaries in `agents/whathappen`. Why: the owner judged the title-only summaries poor (`digest-top-stories` verify F-8).

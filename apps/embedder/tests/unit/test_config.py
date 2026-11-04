@@ -40,6 +40,14 @@ def test_defaults() -> None:
     assert s.backoff_max_seconds == 60.0
     assert s.skip_after_failures == 3
     assert s.ollama_timeout_seconds == 60.0
+    assert s.embed_passages is False
+
+
+def test_embed_passages_switches_on_from_the_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    write(tmp_path, monkeypatch, "embedder:\n  embed_passages: true\n")
+    assert Settings().embed_passages is True
 
 
 def test_section_and_common_keys_reach_the_embedder(
