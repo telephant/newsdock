@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session
 HERE = Path(__file__).parent
 FIXTURES = Path(__file__).resolve().parents[4] / "packages/core/tests/fixtures"
 K = 5
+EMBED_BATCH = 64  # titles per Ollama request while loading a corpus
 MODEL = "nomic-embed-text"
 METHODS = ("keyword", "fulltext", "vector", "hybrid")
 LABELS = {
@@ -200,10 +201,13 @@ def load_corpus(
     url: str,
 ) -> None:
     """Embed the dataset's titles and replace the articles table with them."""
-    vectors = embed(
-        [document_text(c["title"], doc_prefix) for c in dataset.corpus],
-        model=MODEL, url=url, timeout=120.0, client=client,
-    )  # fmt: skip
+    texts = [document_text(c["title"], doc_prefix) for c in dataset.corpus]
+    vectors: list[list[float]] = []
+    for start in range(0, len(texts), EMBED_BATCH):  # one huge request crashes Ollama
+        vectors += embed(
+            texts[start : start + EMBED_BATCH],
+            model=MODEL, url=url, timeout=120.0, client=client,
+        )  # fmt: skip
     with engine.begin() as conn:
         conn.execute(text("TRUNCATE articles CASCADE"))
     with Session(engine) as session:

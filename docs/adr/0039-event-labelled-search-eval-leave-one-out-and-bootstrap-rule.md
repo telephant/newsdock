@@ -16,6 +16,21 @@ The 40-title hand-labelled eval scores 1.000 for vector and hybrid, so it cannot
 
 **Clean-up rules (T-03, 2026-11-04):** a rejected candidate whose title shares 80% or more of the significant words with the seed is left out of the corpus (the judge often refuses near-identical headlines, so it is ambiguous, not a negative); one cluster per seed; one query text per kind. Measured: the judge said yes to 95 of 1,119 pairs; 73 clusters and 146 queries remain.
 
+## Result (2026-11-04, real model `nomic-embed-text`, `events` dataset: 146 queries, 1,557 articles)
+
+| Method | recall@5 | MRR |
+|---|---|---|
+| keyword (substring, `search_articles`) | 0.000 | 0.000 |
+| fulltext (hybrid's keyword leg) | 0.103 | 0.099 |
+| vector | 0.764 | 0.660 |
+| hybrid | 0.764 | 0.660 |
+
+The set separates keyword and full-text from vector (the old 40-title set scored vector and hybrid 1.000 and still does). Vector and hybrid tie. Hybrid noise (F-6): of 120 relevant vector top-5 hits, hybrid dropped 0; keyword noise did not displace vector hits at this scale, because the full-text leg rarely fires (16 relevant hits in total).
+
+Sweep (24 rows, prefix on/off × `semantic_rrf_k` 10/30/60/100 × `semantic_candidates` 20/50/100): every `rrf_k` and `candidates` row is identical (vector and hybrid only see their top 5 and the full-text leg is too weak to reorder them); without prefixes vector is 0.768 / 0.645 and hybrid 0.765 / 0.651. **Clear wins over the defaults under the bootstrap rule: 0.**
+
+Decision per setting (nothing changed): **prefix: kept** (`search_document: ` / `search_query: `; on is slightly better on MRR, not a clear win either way); **`semantic_rrf_k`: kept at 60**; **`semantic_candidates`: kept at 50**. The numbers cannot tell these settings apart, which is a statement about this set, not a proof that they do not matter: the relevant articles are mostly rewordings of one headline (the judge keeps near-duplicates), so vector search finds them alike under any setting. A set with more keyword-heavy and entity queries would be needed to test the hybrid weighting (backlog of `harder-search-eval`).
+
 ## Consequences
 + Objective, repeatable labels without hand work; confusable by construction (same topic, different events).
 + Leave-one-out keeps the benchmark from saturating; the bootstrap keeps a handful of queries from steering defaults.
