@@ -4,19 +4,82 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, TypeVar
 
-from newsdock_db.models import Analysis, Article, ArticleSource, IngestSlot
+from newsdock_db.models import (
+    Analysis,
+    Article,
+    ArticleBody,
+    ArticleSource,
+    Event,
+    IngestSlot,
+    Mention,
+)
 from sqlalchemy import REAL, Engine, Select, cast, func, literal, select, text
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
+from newsdock_api.domain.include import BODY_FIELD, EVENTS_FIELD, TONE_FIELDS
 from newsdock_api.domain.records import (
     AnalysisRecord,
     ArticleDetail,
     ArticleSummary,
+    EventActor,
+    EventLocation,
+    EventOut,
     SourceRecord,
 )
 from newsdock_api.domain.service import escape_like
 from newsdock_api.domain.subscriptions import split_theme
+
+DEFAULT_EVENTS_PER_ARTICLE = 20
+
+
+def _event_out(event: Event, mention_count: int) -> EventOut:
+    has_place = any(
+        v is not None
+        for v in (
+            event.geo_name,
+            event.geo_country,
+            event.geo_adm1,
+            event.geo_lat,
+            event.geo_lon,
+        )
+    )
+    return EventOut(
+        event_id=event.event_id,
+        date=event.event_date,
+        cameo_code=event.cameo_code,
+        cameo_root=event.cameo_root,
+        goldstein=event.goldstein,
+        quad_class=event.quad_class,
+        num_mentions=event.num_mentions,
+        num_sources=event.num_sources,
+        avg_tone=event.avg_tone,
+        actor1=EventActor(
+            code=event.actor1_code,
+            name=event.actor1_name,
+            country=event.actor1_country,
+            type=event.actor1_type,
+        ),
+        actor2=EventActor(
+            code=event.actor2_code,
+            name=event.actor2_name,
+            country=event.actor2_country,
+            type=event.actor2_type,
+        ),
+        location=(
+            EventLocation(
+                name=event.geo_name,
+                country=event.geo_country,
+                adm1=event.geo_adm1,
+                lat=event.geo_lat,
+                lon=event.geo_lon,
+            )
+            if has_place
+            else None
+        ),
+        source_url=event.source_url,
+        mention_count=mention_count,
+    )
 
 
 def _summary(
@@ -24,8 +87,11 @@ def _summary(
     scores: dict[str, float] | None = None,
     source_count: int = 1,
     include: Sequence[str] = (),
+    events: list[EventOut] | None = None,
+    body: str | None = None,
 ) -> ArticleSummary:
-    tone = {name: getattr(row, name) for name in include}  # only what was asked for
+    # only what was asked for: tone numbers by name, events when `events` was given
+    tone = {name: getattr(row, name) for name in include if name in TONE_FIELDS}
     return ArticleSummary(
         article_id=row.url_hash,
         title=row.title,
@@ -36,6 +102,8 @@ def _summary(
         seq=row.seq,
         scores=scores,
         source_count=source_count,
+        events=events,
+        body=body,
         **tone,
     )
 
@@ -88,8 +156,11 @@ def apply_filters(
 
 
 class SqlArticleRepo:
-    def __init__(self, engine: Engine) -> None:
+    def __init__(
+        self, engine: Engine, *, events_per_article: int = DEFAULT_EVENTS_PER_ARTICLE
+    ) -> None:
         self._engine = engine
+        self._events_per_article = events_per_article
 
     def search(
         self,
@@ -131,8 +202,17 @@ class SqlArticleRepo:
             ids = [r.url_hash for r in rows]
             scores = self._scores(session, ids)
             counts = self._source_counts(session, ids)
+            events = self._events_if_asked(session, ids, include)
+            bodies = self._bodies_if_asked(session, ids, include)
             return [
-                _summary(r, scores.get(r.url_hash), counts.get(r.url_hash, 1), include)
+                _summary(
+                    r,
+                    scores.get(r.url_hash),
+                    counts.get(r.url_hash, 1),
+                    include,
+                    events.get(r.url_hash),
+                    bodies.get(r.url_hash),
+                )
                 for r in rows
             ]
 
@@ -151,9 +231,16 @@ class SqlArticleRepo:
             ids = [r.url_hash for r in rows]
             scores = self._scores(session, ids)
             counts = self._source_counts(session, ids)
+            events = self._events_if_asked(session, ids, include)
+            bodies = self._bodies_if_asked(session, ids, include)
             return {
                 r.url_hash: _summary(
-                    r, scores.get(r.url_hash), counts.get(r.url_hash, 1), include
+                    r,
+                    scores.get(r.url_hash),
+                    counts.get(r.url_hash, 1),
+                    include,
+                    events.get(r.url_hash),
+                    bodies.get(r.url_hash),
                 )
                 for r in rows
             }
@@ -191,9 +278,18 @@ class SqlArticleRepo:
             statement = statement.where(Article.ingested_at >= since)
         with Session(self._engine) as session:
             rows: list[Article] = list(session.scalars(statement).all())
-            counts = self._source_counts(session, [r.url_hash for r in rows])
+            ids = [r.url_hash for r in rows]
+            counts = self._source_counts(session, ids)
+            events = self._events_if_asked(session, ids, include)
+            bodies = self._bodies_if_asked(session, ids, include)
             return [
-                _summary(r, source_count=counts.get(r.url_hash, 1), include=include)
+                _summary(
+                    r,
+                    source_count=counts.get(r.url_hash, 1),
+                    include=include,
+                    events=events.get(r.url_hash),
+                    body=bodies.get(r.url_hash),
+                )
                 for r in rows
             ]
 
@@ -212,6 +308,14 @@ class SqlArticleRepo:
                 .where(ArticleSource.article_id == article_id)
                 .order_by(ArticleSource.published_at)
             ).all()
+            events = self._events_for(session, [article_id]).get(article_id, [])
+            stored = session.execute(
+                select(ArticleBody.status, ArticleBody.text).where(
+                    ArticleBody.url_hash == article_id
+                )
+            ).first()
+            body_status = stored[0] if stored else "none"
+            body = stored[1] if stored and stored[0] == "ok" else None
             return ArticleDetail(
                 article_id=row.url_hash,
                 title=row.title,
@@ -245,6 +349,9 @@ class SqlArticleRepo:
                     for src in sources
                 ],
                 source_count=max(len(sources), 1),  # pre-feature rows: 1
+                events=events,
+                body=body,
+                body_status=body_status,
             )
 
     def upsert_analysis(
@@ -265,6 +372,62 @@ class SqlArticleRepo:
             session.execute(statement)
             session.commit()
             return True
+
+    def _bodies_if_asked(
+        self, session: Session, article_ids: list[str], include: Sequence[str]
+    ) -> dict[str, str | None]:
+        """Page text per article, only when `include` names it (else no query runs).
+
+        The text is given only for an `ok` row; a pending, failed or missing row is
+        None (the detail route says which through `body_status`)."""
+        if BODY_FIELD not in include or not article_ids:
+            return {}
+        rows = session.execute(
+            select(ArticleBody.url_hash, ArticleBody.text).where(
+                ArticleBody.url_hash.in_(article_ids), ArticleBody.status == "ok"
+            )
+        ).all()
+        return {str(url_hash): body for url_hash, body in rows}
+
+    def _events_if_asked(
+        self, session: Session, article_ids: list[str], include: Sequence[str]
+    ) -> dict[str, list[EventOut]]:
+        """Events per article, only when `include` names them (else no query runs)."""
+        if EVENTS_FIELD not in include:
+            return {}
+        found = self._events_for(session, article_ids)
+        return {article_id: found.get(article_id, []) for article_id in article_ids}
+
+    def _events_for(
+        self, session: Session, article_ids: list[str]
+    ) -> dict[str, list[EventOut]]:
+        """The events each article is mentioned in, one query per page (ADR-0033).
+
+        Joins `mentions` to `events` on `event_id` (no foreign key, so an event we have
+        not stored yet is simply absent). Per article: most mentioned first, then by
+        id, cut to `events_per_article`. `mention_count` counts the stored mentions.
+        """
+        if not article_ids:
+            return {}
+        others = aliased(Mention)
+        mention_count = (
+            select(func.count())
+            .select_from(others)
+            .where(others.event_id == Event.event_id)
+            .scalar_subquery()
+        )
+        rows = session.execute(
+            select(Mention.url_hash, Event, mention_count)
+            .join(Event, Event.event_id == Mention.event_id)
+            .where(Mention.url_hash.in_(article_ids))
+            .order_by(Mention.url_hash, Event.num_mentions.desc(), Event.event_id)
+        ).all()
+        out: dict[str, list[EventOut]] = {}
+        for url_hash, event, count in rows:
+            found = out.setdefault(str(url_hash), [])
+            if len(found) < self._events_per_article:
+                found.append(_event_out(event, int(count)))
+        return out
 
     def _source_counts(
         self, session: Session, article_ids: list[str]

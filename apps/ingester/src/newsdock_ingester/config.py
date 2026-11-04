@@ -16,6 +16,8 @@ class Settings(LayeredSettings):
     gdelt_index_path: str = "/lastupdate.txt"
     http_timeout_seconds: float = 60.0
     max_attempts: int = 4
+    fetch_events: bool = True  # events-mentions (ADR-0032); False = GKG only
+    fetch_mentions: bool = True
     poll_interval_seconds: int = MIN_POLL_INTERVAL_SECONDS
     heartbeat_file: str = "/tmp/healthy"
     heartbeat_max_age_seconds: int = 0  # 0 = derive: 4/3 x poll interval (R-4)

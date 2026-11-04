@@ -12,7 +12,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-APPS = ("ingester", "processor", "sink", "api", "agent", "web")
+APPS = ("ingester", "processor", "sink", "api", "agent", "embedder", "extractor", "web")
 SECTIONS = ("Purpose", "Entrypoint", "Dependencies", "Run/Test")
 SKIP_DIRS = {".git", ".venv", "node_modules", ".next", "__pycache__"}
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")

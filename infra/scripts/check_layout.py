@@ -40,7 +40,7 @@ IGNORED = {
     ".DS_Store",
     ".claude",  # Claude Code local state (worktrees, scheduled-task lock)
 }
-PYTHON_APPS = ("ingester", "processor", "sink", "api", "agent", "embedder")
+PYTHON_APPS = ("ingester", "processor", "sink", "api", "agent", "embedder", "extractor")
 APP_NAMES = {*PYTHON_APPS, "web"}
 PYTHON_APP_FILES = ("pyproject.toml", "Dockerfile", "README.md")
 WEB_FILES = ("package.json", "Dockerfile", "README.md")

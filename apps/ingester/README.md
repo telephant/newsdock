@@ -4,7 +4,7 @@ Python app, component C-1. Milestone M0 provides the skeleton only; the behaviou
 
 ## Purpose
 
-Polls the GDELT GKG index every 15 minutes (never faster), downloads each new slot, checks its md5 and publishes one raw message per row to Kafka topic `gkg.raw` (default; `kafka.topics.raw` in `infra/config/newsdock.yaml`). Tracks slot state (`pending`, `published`, `failed`) in Postgres.
+Polls the GDELT GKG index every 15 minutes (never faster), downloads each new slot, checks its md5 and publishes one raw message per row to Kafka topic `gkg.raw` (default; `kafka.topics.raw` in `infra/config/newsdock.yaml`). Tracks slot state (`pending`, `published`, `failed`) in Postgres. Since M3c `events-mentions` (ADR-0032) it also downloads the slot's Events (`*.export.CSV.zip`) and Mentions (`*.mentions.CSV.zip`) files, each with its own state in `ingest_file` and handled after GKG, so a missing file never blocks GKG or the other file; their lines go to the same topic with `kind` set to `events` or `mentions` (key `slot:kind:row_no`). `fetch_events` and `fetch_mentions` (both true by default) switch them off; slots listed before the feature was on are not back-filled.
 
 ## Entrypoint
 

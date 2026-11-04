@@ -14,6 +14,7 @@ class Settings(LayeredSettings):
     # longer than one worst-case loop: Ollama timeout plus the largest backoff
     heartbeat_max_age_seconds: int = 360
     batch_size: int = 32
+    passage_batch_size: int = 32  # body passages per Ollama request
     poll_interval_seconds: float = 10.0  # pause when nothing is left to embed
     ollama_timeout_seconds: float = 60.0
     backoff_seconds: float = 5.0

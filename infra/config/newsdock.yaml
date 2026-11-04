@@ -16,6 +16,8 @@ common:
       raw: gkg.raw
       clean: gkg.clean
       dlq: gkg.dlq
+      events_clean: events.clean      # events-mentions (ADR-0032); raw and dlq are shared
+      mentions_clean: mentions.clean
   # semantic-search (ADR-0024): shared by the embedder and the API, which must agree.
   # A model mismatch hides rows from vector search until re-embedded, it never mixes them.
   embedding_model: nomic-embed-text
@@ -30,15 +32,34 @@ ingester:
   poll_interval_seconds: 900     # GDELT rule: never below 900, enforced in code
   http_timeout_seconds: 60
   max_attempts: 4
+  fetch_events: true             # events-mentions (ADR-0032): also fetch the Events file
+  fetch_mentions: true           # ... and the Mentions file; both false = GKG only
 
 processor: {}
 sink: {}
+# body-extraction (ADR-0035, ADR-0036): the only component that fetches the open web
+extractor:
+  concurrency: 16                  # pages fetched at once, never two for one site
+  per_host_delay_seconds: 5        # wait between two requests to one site (or its Crawl-delay)
+  max_crawl_delay_seconds: 30      # a site asking for more is skipped as blocked_robots
+  max_bytes: 2000000               # response size cap
+  max_redirects: 3
+  max_attempts: 3                  # for 429, 5xx, timeouts
+  retry_backoff_minutes: "5,30"
+  min_chars: 200                   # shorter extracted text is no_text
+  text_cap_chars: 20000            # decided: text kept per article
+  passage_chars: 1000              # about one passage per 1,000 characters
+  retention_days: 7                # keep equal to sink.retention_days
+  backfill_hours: 6                # first run only: articles of the last hours
 api:
   semantic_candidates: 50             # hits taken from each search leg before fusing
   semantic_rrf_k: 60                  # reciprocal-rank constant: score = 1 / (k + rank)
   semantic_query_max_length: 500      # characters of a semantic_search query
   semantic_ef_search: 100             # HNSW candidate list size per query
   semantic_ollama_timeout_seconds: 10 # embedding the query; then vector mode errors
+  semantic_default_scope: titles      # what semantic_search searches without a scope: titles | body | all
+  semantic_passage_candidates: 150    # passages taken from each text leg before folding to articles
+  events_per_article: 20        # most events an article returns with include=events (ADR-0033)
   auth_required: true           # MCP needs an agent API key (ADR-0016); false = anonymous
   rate_limit_per_minute: 600     # per agent; anonymous traffic shares one bucket; 0 = off
   subscriptions_max_per_agent: 20     # saved filters one agent may hold (409 above)
@@ -77,6 +98,7 @@ api:
 agent: {}
 embedder:
   batch_size: 32                  # titles per Ollama request
+  passage_batch_size: 32          # body passages per Ollama request
   poll_interval_seconds: 10       # pause when nothing is left to embed
   ollama_timeout_seconds: 60
   backoff_seconds: 5              # first retry delay while Ollama or the database is down

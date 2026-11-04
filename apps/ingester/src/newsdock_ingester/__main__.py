@@ -10,7 +10,7 @@ from newsdock_db.engine import make_engine
 from newsdock_ingester.adapters.gdelt import HttpGdeltSource
 from newsdock_ingester.adapters.heartbeat import Heartbeat
 from newsdock_ingester.adapters.kafka import KafkaRawPublisher
-from newsdock_ingester.adapters.slots import SqlSlotRepo
+from newsdock_ingester.adapters.slots import SqlFileRepo, SqlSlotRepo
 from newsdock_ingester.config import Settings
 from newsdock_ingester.domain.cycle import Ingester
 
@@ -29,6 +29,15 @@ async def run(settings: Settings) -> None:
         SqlSlotRepo(engine),
         base_url=settings.gdelt_base_url,
         max_attempts=settings.max_attempts,
+        file_repo=SqlFileRepo(engine),
+        file_kinds=tuple(
+            kind
+            for kind, enabled in (
+                ("events", settings.fetch_events),
+                ("mentions", settings.fetch_mentions),
+            )
+            if enabled
+        ),
     )
     heartbeat = Heartbeat(
         settings.heartbeat_file, max_age_seconds=settings.heartbeat_max_age_seconds

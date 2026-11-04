@@ -39,13 +39,21 @@ def test_topics_are_created_with_configured_partitions_and_are_idempotent(
         kafka_topics_raw="test.raw",
         kafka_topics_clean="test.clean",
         kafka_topics_dlq="test.dlq",
+        kafka_topics_events_clean="test.events",
+        kafka_topics_mentions_clean="test.mentions",
         kafka_topic_partitions=1,
         kafka_topic_replication_factor=1,
     )
     first = ensure_topics(settings)
-    assert sorted(first) == ["test.clean", "test.dlq", "test.raw"]
+    assert sorted(first) == [
+        "test.clean",
+        "test.dlq",
+        "test.events",
+        "test.mentions",
+        "test.raw",
+    ]
     assert ensure_topics(settings) == []  # second run: nothing to do, no error
 
     meta = AdminClient({"bootstrap.servers": kafka}).list_topics(timeout=10)
-    for name in ("test.raw", "test.clean", "test.dlq"):
+    for name in ("test.raw", "test.clean", "test.dlq", "test.events", "test.mentions"):
         assert len(meta.topics[name].partitions) == 1

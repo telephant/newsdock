@@ -14,6 +14,8 @@ NEW_DEFAULTS = {
     "retention_days": 7,
     "kafka_topics_clean": "gkg.clean",
     "kafka_topics_dlq": "gkg.dlq",
+    "kafka_topics_events_clean": "events.clean",
+    "kafka_topics_mentions_clean": "mentions.clean",
     "kafka_group_id": "sink",
     "kafka_auto_offset_reset": "earliest",
     "heartbeat_max_age_seconds": 120,

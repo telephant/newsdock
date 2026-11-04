@@ -62,3 +62,48 @@ def test_the_detail_schema_has_all_four_tone_numbers(
 ) -> None:
     detail = generated["components"]["schemas"]["ArticleDetail"]
     assert TONE <= set(detail["properties"])
+
+
+# events-mentions TC-21 (AC-10, AC-11): the optional `events` key is documented
+def test_the_feed_schema_lists_events_as_an_optional_key(
+    generated: dict[str, Any],
+) -> None:
+    ok = generated["paths"]["/api/articles"]["get"]["responses"]["200"]
+    ref = ok["content"]["application/json"]["schema"]["$ref"]
+    page = generated["components"]["schemas"][ref.rsplit("/", 1)[-1]]
+    item_ref = page["properties"]["articles"]["items"]["$ref"]
+    item = generated["components"]["schemas"][item_ref.rsplit("/", 1)[-1]]
+    assert "events" in item["properties"]
+    assert "events" not in item.get("required", [])  # optional, never required
+    assert TONE <= set(item["properties"])  # the tone keys stay documented
+
+
+def test_the_event_schema_has_the_curated_fields(generated: dict[str, Any]) -> None:
+    schemas = generated["components"]["schemas"]
+    event = schemas["EventOut"]
+    assert {
+        "event_id", "date", "cameo_code", "cameo_root", "goldstein", "quad_class",
+        "num_mentions", "num_sources", "avg_tone", "actor1", "actor2", "location",
+        "source_url", "mention_count",
+    } == set(event["properties"])  # fmt: skip
+    assert {"code", "name", "country", "type"} == set(
+        schemas["EventActor"]["properties"]
+    )
+    assert {"name", "country", "adm1", "lat", "lon"} == set(
+        schemas["EventLocation"]["properties"]
+    )
+
+
+def test_the_detail_schema_always_has_events(generated: dict[str, Any]) -> None:
+    detail = generated["components"]["schemas"]["ArticleDetail"]
+    assert "events" in detail["properties"]
+    # always sent (the integration tests prove it); the schema gives it a default of [],
+    # which the web type generator turns into a required property
+    assert detail["properties"]["events"].get("default") == []
+
+
+def test_the_detail_schema_documents_body_and_status(generated: dict[str, Any]) -> None:
+    """TC-31 (body-extraction AC-9, AC-10)."""
+    schemas = generated["components"]["schemas"]
+    assert {"body", "body_status"} <= set(schemas["ArticleDetail"]["properties"])
+    assert "body" in schemas["ArticleSummaryEvents"]["properties"]

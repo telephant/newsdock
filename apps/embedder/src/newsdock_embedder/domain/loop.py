@@ -111,8 +111,106 @@ class EmbedWorker:
         return PassResult("embedded", embedded=embedded, skipped=skipped)
 
 
+@dataclass(frozen=True)
+class PassageRow:
+    url_hash: str
+    idx: int
+    text: str
+
+
+class PassageRepo(Protocol):
+    def invalidate_stale(self, model: str) -> int:
+        """Clear passage vectors written by a model other than `model`."""
+        ...
+
+    def next_batch(self, limit: int, exclude: frozenset[str]) -> list[PassageRow]:
+        """Passages with no vector yet, newest article first; `exclude` holds
+        skip-listed keys written as `url_hash:idx`."""
+        ...
+
+    def store(self, url_hash: str, idx: int, vector: list[float], model: str) -> bool:
+        """Write the vector if the passage still needs it; False otherwise."""
+        ...
+
+
+class PassageWorker:
+    """The passage pass (spec body-extraction AC-11): same rules as the title pass."""
+
+    def __init__(
+        self,
+        repo: PassageRepo,
+        embedder: DocumentEmbedder,
+        *,
+        model: str,
+        batch_size: int,
+        skip: SkipList,
+    ) -> None:
+        self._repo = repo
+        self._embedder = embedder
+        self._model = model
+        self._batch_size = batch_size
+        self._skip = skip
+        self._prepared = False
+
+    def run_pass(self) -> PassResult:
+        try:
+            if not self._prepared:
+                cleared = self._repo.invalidate_stale(self._model)
+                self._prepared = True
+                if cleared:
+                    logger.info("cleared %d passage vectors of another model", cleared)
+            rows = self._repo.next_batch(self._batch_size, self._skip.excluded())
+            if not rows:
+                return PassResult("idle")
+            vectors = self._embedder.embed_documents([r.text for r in rows])
+            embedded = skipped = 0
+            for row, vector in zip(rows, vectors, strict=True):
+                key = f"{row.url_hash}:{row.idx}"
+                if vector is None:
+                    self._skip.fail(key)
+                    skipped += 1
+                    logger.warning("vector rejected for passage %s", key)
+                elif self._repo.store(row.url_hash, row.idx, vector, self._model):
+                    self._skip.forget(key)
+                    embedded += 1
+        except EmbedderUnavailable as exc:
+            logger.warning("ollama unavailable, passages left untouched: %s", exc)
+            return PassResult("unavailable")
+        except DbUnavailable as exc:
+            logger.warning("database unavailable: %s", exc)
+            return PassResult("db_unavailable")
+        logger.info("embedded %d passages (%d skipped)", embedded, skipped)
+        return PassResult("embedded", embedded=embedded, skipped=skipped)
+
+
 class Passes(Protocol):
     def run_pass(self) -> PassResult: ...
+
+
+class Round:
+    """One round = a title pass, then a passage pass (titles first, never starved).
+
+    An outage stops the round at once: both passes need the same Ollama and database.
+    """
+
+    def __init__(self, titles: Passes, passages: Passes) -> None:
+        self._titles = titles
+        self._passages = passages
+
+    def run_pass(self) -> PassResult:
+        first = self._titles.run_pass()
+        if first.outcome in ("unavailable", "db_unavailable"):
+            return first
+        second = self._passages.run_pass()
+        if second.outcome in ("unavailable", "db_unavailable"):
+            return second
+        if first.outcome == "idle" and second.outcome == "idle":
+            return PassResult("idle")
+        return PassResult(
+            "embedded",
+            embedded=first.embedded + second.embedded,
+            skipped=first.skipped + second.skipped,
+        )
 
 
 def run(

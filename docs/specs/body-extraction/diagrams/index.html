@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>body-extraction diagrams</title>
+<style>
+  :root { --bg:#ffffff; --fg:#1b1f24; --muted:#5b6570; --card:#f5f7fa; --line:#d5dbe3; --accent:#0a7d5a; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181d; --fg:#e6e9ed; --muted:#9aa5b1; --card:#1c2229; --line:#2f3842; --accent:#4cc9a0; } }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  nav a { margin-right:12px; color:var(--accent); }
+  section { margin:32px 0; }
+  .mermaid { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px; overflow-x:auto; }
+  .check { border-left:4px solid var(--accent); background:var(--card); padding:8px 16px; margin-top:8px; border-radius:4px; }
+  .check b { color:var(--accent); }
+</style>
+</head>
+<body>
+<main>
+<h1>body-extraction: diagrams</h1>
+<p style="color:var(--muted)">Spec and design: <code>spec.md</code>, <code>design.md</code>. Each diagram has a Check box with questions to answer before approving.</p>
+<nav><a href="#d1">1 Components</a><a href="#d2">2 Sequence</a><a href="#d3">3 Data model</a><a href="#d4">4 Body status</a><a href="#d5">5 Networks</a></nav>
+
+<section id="d1">
+<h2>1. Components</h2>
+<pre class="mermaid">
+flowchart LR
+  A[(articles)] --> X[C-80 extractor]
+  X --> F[C-81 fetcher: robots, address guard]
+  F --> W[(open web)]
+  X --> E[C-82 extract and split]
+  E --> B[(C-83 article_bodies)]
+  E --> P[(C-84 article_passages)]
+  M[C-85 embedder, 2nd pass] --> P
+  B --> API[C-86 API]
+  P --> API
+  API --> AG[agents: MCP and REST]
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Is the extractor the only box that touches the open web, and is that what you want?</li>
+<li>Is it right that the ingester, processor and sink do not appear here at all?</li>
+<li>Should passages be split by the extractor (as drawn) rather than by the embedder?</li>
+</ul></div>
+</section>
+
+<section id="d2">
+<h2>2. Discover, fetch, embed, search</h2>
+<pre class="mermaid">
+sequenceDiagram
+  participant X as Extractor
+  participant D as Postgres
+  participant W as Site
+  participant M as Embedder
+  participant A as API
+  X->>D: discover: pending rows for new articles
+  X->>D: pick newest pending, one per site
+  X->>W: robots.txt, then the page (pinned address)
+  W-->>X: HTML or an error
+  X->>D: body and status, passages (no vector yet)
+  M->>D: passages without a vector
+  M->>D: store halfvec vectors
+  A->>D: scope titles, body or all: up to 4 legs
+  A-->>A: fuse by rank, best passage per article
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>If the site is slow or blocks us, does anything else wait? (It should not.)</li>
+<li>Between the body being stored and the vectors arriving, what does search return for that article?</li>
+<li>Is "one page per site per round" polite enough for a site with thousands of articles a day?</li>
+</ul></div>
+</section>
+
+<section id="d3">
+<h2>3. Data model</h2>
+<pre class="mermaid">
+erDiagram
+  ARTICLES ||--o| ARTICLE_BODIES : "url_hash, cascade"
+  ARTICLES ||--o{ ARTICLE_PASSAGES : "url_hash, cascade"
+  ARTICLES {
+    text url_hash PK
+    bigint seq
+    text url
+    timestamptz ingested_at
+  }
+  ARTICLE_BODIES {
+    text url_hash PK
+    bigint seq
+    text status
+    text text
+    smallint http_status
+    smallint attempts
+    timestamptz next_attempt_at
+  }
+  ARTICLE_PASSAGES {
+    text url_hash PK
+    smallint idx PK
+    text text
+    halfvec embedding
+    text embedding_model
+  }
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Is cascade from <code>articles</code> (7-day retention) the right way to remove text and vectors?</li>
+<li>Is <code>halfvec(768)</code> acceptable for the passage vectors?</li>
+<li>Is <code>body_status</code> = <code>none</code> the right answer for articles from before the feature?</li>
+</ul></div>
+</section>
+
+<section id="d4">
+<h2>4. Body status</h2>
+<pre class="mermaid">
+stateDiagram-v2
+  [*] --> pending : discovered
+  pending --> ok : text stored
+  pending --> blocked_robots : robots or Crawl-delay
+  pending --> blocked_address : address or redirect refused
+  pending --> http_error : 4xx
+  pending --> not_html
+  pending --> too_large
+  pending --> no_text : empty or too short
+  pending --> pending : 5xx or timeout, retry later
+  pending --> failed : retries used up
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>Are 4xx, <code>not_html</code>, <code>too_large</code> and <code>no_text</code> right as final (no retry)?</li>
+<li>Are 3 attempts with 5 and 30 minute delays reasonable for 5xx and timeouts?</li>
+</ul></div>
+</section>
+
+<section id="d5">
+<h2>5. Network placement</h2>
+<pre class="mermaid">
+flowchart LR
+  subgraph data
+    EX[extractor]
+    PG[(postgres)]
+    KF[kafka]
+    WK[ingester, processor, sink, embedder]
+  end
+  subgraph agent
+    API[api]
+    AGT[agent, web]
+  end
+  EX -->|address guard| NET((internet))
+  EX -.->|refused by the guard| KF
+</pre>
+<div class="check"><b>Check</b>
+<ul>
+<li>The extractor shares the data network with Kafka (decided); is the address guard enough of a wall?</li>
+<li>Should the embedder also be able to reach the web? (Drawn: no, it only talks to host Ollama.)</li>
+</ul></div>
+</section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mermaid/11.4.1/mermaid.min.js"></script>
+<script>
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  mermaid.initialize({ startOnLoad: true, theme: dark ? 'dark' : 'default' });
+</script>
+</body>
+</html>

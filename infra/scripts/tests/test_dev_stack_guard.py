@@ -89,3 +89,38 @@ def test_the_same_test_runs_when_the_ports_are_free(
     result = run_guarded(pytester, monkeypatch, {free_port(): "Postgres"})
     result.assert_outcomes(passed=3)
     assert "FIXTURE-STARTED" in result.stdout.str()
+
+
+SHARED_STACK_FILE = """
+import socket
+import pytest
+
+@pytest.fixture(scope="module")
+def stack():
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", {port}))
+    sock.listen()  # stands for a module-wide `compose up` taking the port
+    yield
+    sock.close()
+
+@pytest.mark.docker
+def test_first(stack):
+    pass
+
+@pytest.mark.docker
+def test_second(stack):
+    pass
+"""
+
+
+def test_a_module_scoped_stack_does_not_trip_the_guard_for_later_tests(
+    pytester: pytest.Pytester, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    port = free_port()
+    monkeypatch.setattr(dev_stack_guard, "FIXED_PORTS", {port: "Postgres"})
+    monkeypatch.setattr(dev_stack_guard, "_cleared_modules", set())
+    pytester.makepyfile(SHARED_STACK_FILE.format(port=port))
+    result = pytester.runpytest_inprocess(
+        "-p", "dev_stack_guard", "-m", "docker or not docker", "-q"
+    )
+    result.assert_outcomes(passed=2)

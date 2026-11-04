@@ -7,12 +7,12 @@ over `ORDER BY seq DESC` with a "not embedded" filter had to walk past every emb
 row (measured: 78 ms per idle poll at 67,000 rows).
 """
 
-from newsdock_db.models import Article
-from sqlalchemy import Engine, select, update
+from newsdock_db.models import Article, ArticlePassage
+from sqlalchemy import Engine, func, select, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
-from newsdock_embedder.domain.loop import DbUnavailable, Row
+from newsdock_embedder.domain.loop import DbUnavailable, PassageRow, Row
 
 
 class SqlEmbedRepo:
@@ -57,6 +57,70 @@ class SqlEmbedRepo:
         statement = (
             update(Article)
             .where(Article.url_hash == url_hash, Article.embedding.is_(None))
+            .values(embedding=vector, embedding_model=model)
+        )
+        try:
+            with Session(self._engine) as session:
+                result = session.execute(statement)
+                session.commit()
+                return bool(getattr(result, "rowcount", 0))
+        except OperationalError as exc:
+            raise DbUnavailable(str(exc)) from exc
+
+
+class SqlPassageRepo:
+    """Implements PassageRepo; the queue is the partial index on missing vectors."""
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+
+    def invalidate_stale(self, model: str) -> int:
+        statement = (
+            update(ArticlePassage)
+            .where(
+                ArticlePassage.embedding.is_not(None),
+                ArticlePassage.embedding_model.is_distinct_from(model),
+            )
+            .values(embedding=None, embedding_model=None)
+        )
+        try:
+            with Session(self._engine) as session:
+                result = session.execute(statement)
+                session.commit()
+                return int(getattr(result, "rowcount", 0) or 0)
+        except OperationalError as exc:
+            raise DbUnavailable(str(exc)) from exc
+
+    def next_batch(self, limit: int, exclude: frozenset[str]) -> list[PassageRow]:
+        statement = (
+            select(ArticlePassage.url_hash, ArticlePassage.idx, ArticlePassage.text)
+            .join(Article, Article.url_hash == ArticlePassage.url_hash)
+            .where(ArticlePassage.embedding.is_(None))
+        )
+        if exclude:
+            statement = statement.where(
+                func.concat(ArticlePassage.url_hash, ":", ArticlePassage.idx).not_in(
+                    exclude
+                )
+            )
+        statement = statement.order_by(Article.seq.desc(), ArticlePassage.idx).limit(
+            limit
+        )
+        try:
+            with Session(self._engine) as session:
+                rows = session.execute(statement).all()
+                return [PassageRow(r[0], r[1], r[2]) for r in rows]
+        except OperationalError as exc:
+            raise DbUnavailable(str(exc)) from exc
+
+    def store(self, url_hash: str, idx: int, vector: list[float], model: str) -> bool:
+        statement = (
+            update(ArticlePassage)
+            .where(
+                ArticlePassage.url_hash == url_hash,
+                ArticlePassage.idx == idx,
+                ArticlePassage.embedding.is_(None),
+            )
             .values(embedding=vector, embedding_model=model)
         )
         try:

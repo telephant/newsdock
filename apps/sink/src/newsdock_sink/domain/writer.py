@@ -33,6 +33,7 @@ class RowRejected(Exception):
 class SinkItem:
     key: str  # url_hash (gkg.clean key)
     value: bytes  # CleanArticle JSON
+    topic: str = ""  # source topic; the loop uses it to tell the three streams apart
 
 
 @dataclass(frozen=True)

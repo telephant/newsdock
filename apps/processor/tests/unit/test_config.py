@@ -14,6 +14,8 @@ NEW_DEFAULTS = {
     "kafka_topics_raw": "gkg.raw",
     "kafka_topics_clean": "gkg.clean",
     "kafka_topics_dlq": "gkg.dlq",
+    "kafka_topics_events_clean": "events.clean",
+    "kafka_topics_mentions_clean": "mentions.clean",
     "kafka_group_id": "processor",
     "kafka_auto_offset_reset": "earliest",
     "kafka_topic_partitions": 1,

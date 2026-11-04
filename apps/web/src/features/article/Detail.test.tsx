@@ -18,6 +18,9 @@ const detail: ArticleDetail = {
   tone: 1.2,
   word_count: 300,
   analyses: [],
+  events: [],
+  body: null,
+  body_status: "none",
   source_count: 2,
   sources: [
     {

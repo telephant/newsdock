@@ -12,7 +12,16 @@ members = ["apps/*", "packages/*"]
 exclude = ["apps/web"]
 
 [dependency-groups]
-dev = ["pytest", "ruff", "mypy", "import-linter", "alembic", "pyyaml", "types-pyyaml"]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+    "import-linter",
+    "alembic",
+    "pyyaml",
+    "types-pyyaml",
+    "trustme",
+]
 
 [tool.pytest.ini_options]
 addopts = "--import-mode=importlib -m 'not rules and not docker'"
@@ -46,6 +55,7 @@ mypy_path = [
     "apps/api/src",
     "apps/agent/src",
     "apps/embedder/src",
+    "apps/extractor/src",
     "packages/core/src",
     "packages/config/src",
     "packages/db/src",
@@ -65,6 +75,7 @@ root_packages = [
     "newsdock_api",
     "newsdock_agent",
     "newsdock_embedder",
+    "newsdock_extractor",
 ]
 include_external_packages = true
 
@@ -78,6 +89,7 @@ modules = [
     "newsdock_api",
     "newsdock_agent",
     "newsdock_embedder",
+    "newsdock_extractor",
 ]
 
 [[tool.importlinter.contracts]]
@@ -94,6 +106,7 @@ forbidden_modules = [
     "newsdock_api",
     "newsdock_agent",
     "newsdock_embedder",
+    "newsdock_extractor",
     "confluent_kafka",
     "psycopg",
     "sqlalchemy",
@@ -112,6 +125,7 @@ source_modules = [
     "newsdock_api.domain",
     "newsdock_agent.domain",
     "newsdock_embedder.domain",
+    "newsdock_extractor.domain",
 ]
 forbidden_modules = [
     "newsdock_ingester.adapters",
@@ -120,6 +134,7 @@ forbidden_modules = [
     "newsdock_api.adapters",
     "newsdock_agent.adapters",
     "newsdock_embedder.adapters",
+    "newsdock_extractor.adapters",
     "newsdock_config",
     "newsdock_db",
     "newsdock_embedding",
@@ -144,6 +159,7 @@ forbidden_modules = [
     "newsdock_api",
     "newsdock_agent",
     "newsdock_embedder",
+    "newsdock_extractor",
 ]
 
 [[tool.importlinter.contracts]]
@@ -160,4 +176,5 @@ forbidden_modules = [
     "newsdock_api",
     "newsdock_agent",
     "newsdock_embedder",
+    "newsdock_extractor",
 ]

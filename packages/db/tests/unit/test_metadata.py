@@ -12,6 +12,8 @@ def test_metadata_holds_exactly_the_known_tables() -> None:
     # M1 + article_sources (M2a) + agent-platform and subscriptions (M2, 2026-10-14)
     # + users and sessions (ui-login, 2026-10-27)
     # + password_resets (forgot-password, 2026-10-29)
+    # + events, mentions and ingest_file (events-mentions, 2026-11-02)
+    # + article_bodies and article_passages (body-extraction, 2026-11-02)
     assert set(metadata.tables) == {
         "articles",
         "analyses",
@@ -24,6 +26,11 @@ def test_metadata_holds_exactly_the_known_tables() -> None:
         "users",
         "sessions",
         "password_resets",
+        "events",
+        "mentions",
+        "ingest_file",
+        "article_bodies",
+        "article_passages",
     }
 
 

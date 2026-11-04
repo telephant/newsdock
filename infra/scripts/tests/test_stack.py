@@ -116,7 +116,7 @@ def test_down_then_up_recovers_and_keeps_data(env_file: Path) -> None:  # TC-22
     assert psql("select id from survive") == "7"
 
 
-TOPICS = ["gkg.raw", "gkg.clean", "gkg.dlq"]
+TOPICS = ["gkg.raw", "gkg.clean", "gkg.dlq", "events.clean", "mentions.clean"]
 
 
 def describe_topics() -> list[str]:
@@ -135,10 +135,10 @@ def describe_topics() -> list[str]:
     )
 
 
-def test_up_creates_the_three_single_partition_topics(env_file: Path) -> None:  # TC-23
+def test_up_creates_the_five_single_partition_topics(env_file: Path) -> None:  # TC-23
     assert make("up").returncode == 0
     described = describe_topics()
-    assert len(described) == 3
+    assert len(described) == 5
     for topic in TOPICS:
         row = next(d for d in described if d.startswith(f"Topic: {topic} "))
         assert "1 ReplicationFactor: 1" in row, row
@@ -157,7 +157,7 @@ def test_topics_job_waits_for_a_restarting_kafka(env_file: Path) -> None:  # TC-
     assert compose("--env-file", ".env.example", "restart", "kafka").returncode == 0
     result = make("topics")
     assert result.returncode == 0, result.stdout + result.stderr
-    assert len(describe_topics()) == 3
+    assert len(describe_topics()) == 5  # raw, clean, dlq, events.clean, mentions.clean
 
 
 def test_migrate_twice_keeps_one_revision_and_the_extension(
@@ -166,7 +166,10 @@ def test_migrate_twice_keeps_one_revision_and_the_extension(
     assert make("up").returncode == 0  # includes the first migrate run
     second = make("migrate")
     assert second.returncode == 0, second.stdout + second.stderr
-    assert psql("select version_num from alembic_version") == "0010"  # M2f head
+    head = max(
+        p.name[:4] for p in (ROOT / "infra" / "migrations" / "versions").glob("0*.py")
+    )
+    assert psql("select version_num from alembic_version") == head
     assert psql("select extname from pg_extension where extname='vector'") == "vector"
 
 

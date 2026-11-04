@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import check_config
+import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -79,6 +80,16 @@ def test_topic_literal_in_app_code_is_reported(tmp_path: Path) -> None:
     assert "gkg.clean" in text and "adapters/x.py" in text
 
 
+@pytest.mark.parametrize("topic", ["events.clean", "mentions.clean"])
+def test_new_topic_literal_in_app_code_is_reported(tmp_path: Path, topic: str) -> None:
+    root = tree(
+        tmp_path,
+        files={"apps/sink/src/newsdock_sink/adapters/x.py": f"TOPIC = '{topic}'\n"},
+    )
+    text = messages(root)
+    assert topic in text and "adapters/x.py" in text
+
+
 def test_constant_name_in_app_code_is_reported(tmp_path: Path) -> None:
     root = tree(
         tmp_path,
@@ -107,3 +118,8 @@ def test_web_poll_constant_is_reported(tmp_path: Path) -> None:
         files={"apps/web/src/features/f.ts": "const POLL_MS = 60000;\n"},
     )
     assert "POLL_MS" in messages(root)
+
+
+def test_the_extractor_section_is_checked() -> None:
+    """body-extraction: its settings are validated against the file like every app's."""
+    assert "extractor" in check_config.SERVICES

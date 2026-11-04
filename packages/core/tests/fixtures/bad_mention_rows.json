@@ -1,0 +1,37 @@
+[
+ {
+  "name": "bad_column_count_15",
+  "expect": "bad_column_count",
+  "line": "1331041263\t20261102110000\t20261102110000\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t"
+ },
+ {
+  "name": "bad_column_count_17",
+  "expect": "bad_column_count",
+  "line": "1331041263\t20261102110000\t20261102110000\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t\t\tx"
+ },
+ {
+  "name": "missing_event_id",
+  "expect": "missing_event_id",
+  "line": "\t20261102110000\t20261102110000\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t\t"
+ },
+ {
+  "name": "non_numeric_event_id",
+  "expect": "missing_event_id",
+  "line": "n/a\t20261102110000\t20261102110000\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t\t"
+ },
+ {
+  "name": "missing_url",
+  "expect": "missing_url",
+  "line": "1331041263\t20261102110000\t20261102110000\t1\tcbsnews.com\t\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t\t"
+ },
+ {
+  "name": "bad_mention_time",
+  "expect": "bad_field",
+  "line": "1331041263\t20261102110000\tsoon\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\t100\t14683\t-3.30129544504806\t\t"
+ },
+ {
+  "name": "bad_confidence",
+  "expect": "bad_field",
+  "line": "1331041263\t20261102110000\t20261102110000\t1\tcbsnews.com\thttps://www.cbsnews.com/news/migrant-children-stranded-us-shelters/\t16\t5408\t5434\t5293\t1\thigh\t14683\t-3.30129544504806\t\t"
+ }
+]

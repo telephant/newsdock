@@ -30,6 +30,7 @@ jobs:
               - 'apps/api/**'
               - 'apps/agent/**'
               - 'apps/embedder/**'
+              - 'apps/extractor/**'
               - 'packages/**'
               - 'pyproject.toml'
               - 'uv.lock'
@@ -71,6 +72,11 @@ jobs:
               - 'packages/**'
               - 'pyproject.toml'
               - 'uv.lock'
+            extractor:
+              - 'apps/extractor/**'
+              - 'packages/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
             web:
               - 'apps/web/**'
             migrate:
@@ -86,6 +92,7 @@ jobs:
           API: ${{ steps.filter.outputs.api }}
           AGENT: ${{ steps.filter.outputs.agent }}
           EMBEDDER: ${{ steps.filter.outputs.embedder }}
+          EXTRACTOR: ${{ steps.filter.outputs.extractor }}
           WEB: ${{ steps.filter.outputs.web }}
           MIGRATE: ${{ steps.filter.outputs.migrate }}
         run: |
@@ -96,6 +103,7 @@ jobs:
           [ "$API" = true ] && apps+=(api)
           [ "$AGENT" = true ] && apps+=(agent)
           [ "$EMBEDDER" = true ] && apps+=(embedder)
+          [ "$EXTRACTOR" = true ] && apps+=(extractor)
           [ "$WEB" = true ] && apps+=(web)
           [ "$MIGRATE" = true ] && apps+=(migrate)
           if [ "${#apps[@]}" -eq 0 ]; then

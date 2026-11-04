@@ -1,0 +1,18 @@
+[
+ {
+  "row_no": 0,
+  "event_id": 1331000341,
+  "url": "https://www.kelownadailycourier.ca/news/national_news/article_f9bf8bda-6e22-5b03-bcf1-b5988436594e.html",
+  "source_name": "kelownadailycourier.ca",
+  "mention_time": "2026-11-02T11:00:00Z",
+  "confidence": 20
+ },
+ {
+  "row_no": 1,
+  "event_id": 1331000341,
+  "url": "https://www.kelownadailycourier.ca/news/national_news/article_f9bf8bda-6e22-5b03-bcf1-b5988436594e.html",
+  "source_name": "kelownadailycourier.ca",
+  "mention_time": "2026-11-02T11:00:00Z",
+  "confidence": 20
+ }
+]
