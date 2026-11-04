@@ -14,7 +14,7 @@
 | D-2 | Meaning of `mention_count` | Decided: unchanged, counts real stored mentions of the event, not derived rows (2026-11-04) |
 | D-3 | Which surfaces change | Decided: all that serve `events` (`get_article`, REST detail, `include=events` on lists and search) with no new argument (2026-11-04) |
 | D-4 | ADR | Decided: a new ADR amends ADR-0033's consequence; the old text is kept and marked (2026-11-04, requested by the user) |
-| D-5 | How derived rows are marked and kept out of `mention_count`, and how late grouping and backfill are handled | Open: for `/spec-design` |
+| D-5 | How derived rows are marked and kept out of `mention_count`, and how late grouping and backfill are handled | Decided: flagged derived rows in `mentions`, linked by the sink on both arrival orders, backfill in migration 0013, ADR-0038 (2026-11-04) |
 
 **D-5.** Write time has three traps the design must solve: (1) a mention can arrive before its URL is grouped as a copy, so grouping must also link already-stored mentions; (2) rows already in the database need a one-time backfill; (3) if derived rows are plain `mentions` rows, `mention_count` (a row count per event) would grow, so they must be told apart or excluded. Recommendation: mark derived rows and exclude them from the count. The read-time join stays the fallback if write time proves fragile (it needs no migration).
 
