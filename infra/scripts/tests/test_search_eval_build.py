@@ -346,6 +346,22 @@ def test_names_are_cut_cleanly_from_a_title(
     assert build.extract_names(title) == names
 
 
+def test_common_words_are_lower_case_words_seen_in_several_titles() -> None:
+    titles = [f"story {i} goes ahead with talks in Texas" for i in range(4)]
+    titles += ["Texas Senate talks continue", "Texas heat wave", "Texas Rangers win"]
+    common = build.common_words(titles, minimum=4)
+    assert {"ahead", "with", "goes", "story"} <= common
+    assert "texas" not in common  # always capitalised: a name
+    assert "rangers" not in common and "heat" not in common  # seen once, lower-case
+
+
+def test_a_capitalised_common_word_is_not_a_name() -> None:
+    common = frozenset({"presses", "ahead", "with", "protests"})
+    title = "Union Presses Ahead With Mathanga Protests"
+    assert build.extract_names(title) == ["Presses", "Ahead", "With"]  # no filter
+    assert build.extract_names(title, common=common) == ["Mathanga"]
+
+
 def test_the_name_limit_can_be_lowered() -> None:
     assert build.extract_names("Said Berlin Rome Madrid", limit=2) == ["Berlin", "Rome"]
 
@@ -394,6 +410,23 @@ def test_hard_queries_have_entity_and_low_overlap_rows() -> None:  # TC-3, TC-4
     # cluster 2: one name only ("Oregon"), and its member is a near rewording
     assert ("entity", 2) not in by_kind and ("lowoverlap", 2) not in by_kind
     build.check_hard_fixture(corpus, rows)  # valid by the spec's rules
+
+
+def test_a_name_phrase_may_sit_inside_a_title_but_a_copy_may_not() -> None:  # TC-2
+    corpus, queries = _frozen()
+    rows = build.build_hard_queries(corpus, queries)
+    entity = next(r for r in rows if r["kind"] == "entity")
+    # "Amy Acton" is a name phrase inside the seed title: fine for an entity query
+    build.check_hard_fixture(corpus, [{**entity, "query": "Amy Acton"}])
+    # but a query that contains a whole title is a copy, and one that equals it too
+    for copy in ("who is Democrat Amy Acton wins Ohio governor race now",
+                 "Democrat Amy Acton wins Ohio governor race"):  # fmt: skip
+        with pytest.raises(build.FixtureError):
+            build.check_hard_fixture(corpus, [{**entity, "query": copy}])
+    # a low-overlap query keeps the strict rule: sitting inside a title is rejected
+    low = next(r for r in rows if r["kind"] == "lowoverlap")
+    with pytest.raises(build.FixtureError):
+        build.check_hard_fixture(corpus, [{**low, "query": "Acton wins Ohio governor"}])
 
 
 def test_a_repeated_entity_text_is_kept_once() -> None:

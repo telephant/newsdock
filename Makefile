@@ -119,6 +119,9 @@ eval-search-sweep: ## Sweep prefix x semantic_rrf_k x semantic_candidates on the
 eval-search-build: ## Rebuild the search eval fixture from real GDELT slots (network, Ollama chat model; not CI)
 	uv run python infra/scripts/build_search_eval.py
 
+eval-search-build-hard: ## Rebuild the hard search eval queries (entity, low-overlap) from the frozen fixture (offline)
+	uv run python infra/scripts/build_search_eval_hard.py
+
 up: ## Start Kafka and Postgres, wait until healthy (needs .env)
 	@test -f .env || { echo "missing .env: copy .env.example to .env (cp .env.example .env)" >&2; exit 1; }
 	$(COMPOSE) up -d --wait kafka postgres

@@ -22,7 +22,7 @@
 |---|---|---|---|
 | T-01 | Spike: do entity queries make the full-text leg fire? — done 2026-11-04 (48 entity queries, full-text recall@5 0.444) | measurements | none |
 | T-02 | Builder pure functions (`extract_names`, `grade_members`, `build_hard_queries`, `check_hard_fixture`) — done 2026-11-04 | AC-1, AC-2, AC-3, AC-4 | T-01 |
-| T-03 | Wrapper, `make eval-search-build-hard`, generate and freeze the file | AC-2, AC-4, AC-5 (on real data) | T-02 |
+| T-03 | Wrapper, `make eval-search-build-hard`, generate and freeze the file — done 2026-11-04 (42 entity + 32 low-overlap queries) | AC-2, AC-4, AC-5 (on real data) | T-02 |
 | T-04 | Harness: `ignore`, `without`, dataset `events-hard`, tests | AC-6, AC-7, AC-9 | T-03 |
 | T-05 | Real-model run, sweep, decision, ADR Result | AC-8, AC-10, AC-11 | T-04 |
 | T-06 | Docs sync, earlier fixtures unchanged, full suites | AC-12 | T-05 |

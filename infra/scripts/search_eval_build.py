@@ -82,12 +82,21 @@ def word_overlap(a: str, b: str) -> float:
     return len(wa & wb) / max(1, min(len(wa), len(wb)))
 
 
-def query_ok(text: str, lowered_titles: Iterable[str]) -> bool:
-    """AC-3: non-empty, and neither equal to nor containing (nor inside) a title."""
+def query_ok(
+    text: str, lowered_titles: Iterable[str], *, allow_inside: bool = False
+) -> bool:
+    """AC-3: non-empty, and neither equal to nor containing (nor inside) a title.
+
+    `allow_inside` lets a short phrase sit inside a title, as a name does (entity
+    queries, M3g); equal to a title or containing a whole title is always a copy.
+    """
     wanted = text.strip().casefold()
     if not wanted:
         return False
-    return not any(title in wanted or wanted in title for title in lowered_titles)
+    return not any(
+        title in wanted or (wanted in title and not allow_inside)
+        for title in lowered_titles
+    )
 
 
 def _one_line(text: str) -> str:
@@ -216,12 +225,31 @@ TITLE_WORDS = frozenset(
 _EDGE = ".,:;!?\"'()[]—–-‘’“”"
 
 
-def extract_names(title: str, *, limit: int = 3) -> list[str]:
+COMMON_MIN = 4  # titles in which a word must appear in lower case to count as common
+
+
+def common_words(titles: Iterable[str], *, minimum: int = COMMON_MIN) -> frozenset[str]:
+    """Lower-case words seen in `minimum` or more titles: ordinary words, not names.
+
+    Title-case headlines capitalise verbs and prepositions (`Presses Ahead With`); a
+    real name is almost never written in lower case elsewhere in the corpus.
+    """
+    counts: Counter[str] = Counter()
+    for title in titles:
+        words = re.findall(r"[A-Za-z][A-Za-z'-]*", html.unescape(title))
+        counts.update({w for w in words if w.islower()})
+    return frozenset(w for w, n in counts.items() if n >= minimum)
+
+
+def extract_names(
+    title: str, *, limit: int = 3, common: frozenset[str] = frozenset()
+) -> list[str]:
     """Proper names of a title: capitalised words and acronyms, at most `limit`.
 
     The outlet suffix (` | Outlet`), HTML entities, punctuation and possessives are
     cut; the first word of the title and of each sentence is skipped (it is
-    capitalised anyway), as are `TITLE_WORDS`. A stand-in for a name recogniser.
+    capitalised anyway), as are `TITLE_WORDS` and any word in `common`. A stand-in
+    for a name recogniser.
     """
     text = re.split(r"\s+\|\s+", html.unescape(title))[0]
     text = re.sub(r"\s+-\s+[A-Z][^-]*$", "", text)
@@ -230,7 +258,9 @@ def extract_names(title: str, *, limit: int = 3) -> list[str]:
     for raw in text.split():
         token = re.sub(r"['’]s$", "", raw.strip(_EDGE))
         initial, sentence_start = sentence_start, raw[-1:] in ".?!:"
-        if not token or initial or token.lower() in TITLE_WORDS or token in names:
+        if not token or initial or token in names:
+            continue
+        if token.lower() in TITLE_WORDS or token.lower() in common:
             continue
         if (token[0].isupper() and len(token) >= 3) or (
             token.isupper() and len(token) >= 2
@@ -266,6 +296,7 @@ def build_hard_queries(
     """Entity and low-overlap queries for the clusters of the frozen queries."""
     titles = {str(c["id"]): str(c["title"]) for c in corpus}
     lowered = [t.casefold() for t in titles.values()]
+    common = common_words(titles.values())
     clusters: dict[int, dict[str, Any]] = {}
     paraphrase: dict[int, str] = {}
     for q in queries:
@@ -279,9 +310,10 @@ def build_hard_queries(
         seed = str(q["seed"])
         members = sorted(str(m) for m in q["members"])
         others = [m for m in members if m != seed]
-        names = extract_names(titles[seed])
+        names = extract_names(titles[seed], common=common)
         text = " ".join(names)
-        if len(names) >= 2 and query_ok(text, lowered) and ("entity", text) not in seen:
+        fits = query_ok(text, lowered, allow_inside=True)
+        if len(names) >= 2 and fits and ("entity", text) not in seen:
             seen.add(("entity", text))
             rows.append(
                 {"query": text, "kind": "entity", "cluster": cluster, "seed": seed,
@@ -313,7 +345,7 @@ def check_hard_fixture(
         seed = str(r["seed"])
         if kind == "entity" and len(str(r["query"]).split()) < 2:
             raise FixtureError(f"entity query of cluster {cluster} needs 2+ names")
-        if not query_ok(str(r["query"]), lowered):
+        if not query_ok(str(r["query"]), lowered, allow_inside=kind == "entity"):
             raise FixtureError(f"query is empty or a title: {r['query']!r}")
         if (kind, str(r["query"])) in seen:
             raise FixtureError(f"query text repeated within {kind}: {r['query']!r}")

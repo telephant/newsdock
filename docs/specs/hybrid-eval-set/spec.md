@@ -65,7 +65,7 @@ AC-1  Names come from the seed title
 AC-2  Entity queries follow the old rules
   Given the entity queries built from the frozen seeds
   When  each is checked
-  Then  none is empty or equals, contains or sits inside a corpus title, and each has 2 or more names
+  Then  none is empty, equals a corpus title or contains a whole one (a short name phrase may sit inside a title, as a name does; amended at T-03 from "sits inside" after the strict rule rejected 15 of 48 good name queries), and each has 2 or more names
   Verify: auto
 
 AC-3  Graded members are the low-overlap ones

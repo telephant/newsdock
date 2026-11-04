@@ -14,7 +14,7 @@ Derived from the ACs in [spec.md](spec.md) §6. Levels: unit (no I/O), integrati
 | TC | AC | Level | Case |
 |---|---|---|---|
 | TC-1 | AC-1 | unit | Given seed titles with names, an outlet suffix, an HTML entity, a sentence-initial word, an acronym, and one with no name, When `extract_names` runs, Then at most 3 names come back in title order without punctuation, sentence-initial and stoplist words are skipped, acronyms are kept, and the no-name title gives `[]` |
-| TC-2 | AC-2 | unit | Given the frozen hard-queries file and corpus, When each entity query is checked, Then none is empty or equals, contains or sits inside a corpus title and each has 2 or more name words |
+| TC-2 | AC-2 | unit | Given the frozen hard-queries file and corpus, When each entity query is checked, Then none is empty, equals a corpus title or contains a whole one (a name phrase may sit inside a title) and each has 2 or more name words |
 | TC-3 | AC-3 | unit | Given a cluster with a high-overlap and a low-overlap member, When `grade_members` runs, Then the low-overlap one is graded and the other ignored; a cluster whose members are all high-overlap makes no low-overlap query |
 | TC-4 | AC-4 | unit | Given hard-queries rows with an unknown id, overlapping `expected` and `ignore`, a member outside the cluster, or a repeated text within a kind, When `check_hard_fixture` runs, Then each is rejected; the frozen file passes |
 | TC-5 | AC-5 | unit | Given the frozen files and a socket that raises on use, When the builder runs twice, Then it makes no network call and both outputs are byte-identical |
