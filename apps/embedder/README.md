@@ -4,7 +4,7 @@ Python app, component C-35 (spec `semantic-search`, [ADR-0024](../../docs/adr/00
 
 ## Purpose
 
-Fills `articles.embedding` so agents can search by meaning. It polls Postgres for canonical articles with no embedding (or one from another model), newest first, embeds their titles in batches through Ollama (`nomic-embed-text`, 768 dimensions) and writes the vector and the model name. It never touches Kafka or the sink: an article insert never waits on it, and Ollama being down leaves rows empty until the next pass (backoff, heartbeat kept). Old rows and rows from a previous model are picked up by the same query.
+Fills `articles.embedding` so agents can search by meaning. It polls Postgres for canonical articles with no embedding (or one from another model), newest first, embeds their titles in batches through Ollama (`nomic-embed-text`, 768 dimensions) and writes the vector and the model name. It never touches Kafka or the sink: an article insert never waits on it, and Ollama being down leaves rows empty until the next pass (backoff, heartbeat kept). Old rows and rows from a previous model are picked up by the same query. Since M3d `body-extraction` ([ADR-0036](../../docs/adr/0036-bodies-and-passages-tables-halfvec-and-a-discovery-queue.md)) each round also embeds the passages that the extractor split out of fetched page text into `article_passages.embedding` (`halfvec(768)`, `embedder.passage_batch_size` per request), titles first so a flood of passages never starves them.
 
 ## Entrypoint
 

@@ -14,5 +14,4 @@ Later items, one line each (P1 highest).
 - **Language filter or multilingual model (P3):** many sites are not English. Why: `nomic-embed-text` is English-biased.
 - **Event and body together (P3):** combine `include=events` and body passages in one answer, for example the passage that mentions an event. Why: both are now per-article extras.
 - **Per-site fetch statistics screen (P3):** which sites block us and how often. Why: the operator sees only counts today.
-- **Run the unrun stack and Kafka modules (P2, verify F-1):** `make down`, then `make test-infra SCENE=stack` and `SCENE=kafka` (TC-25 and the Events/Mentions topics). Why: the dev stack holds their ports.
-- **Read the live measurements (P2, verify F-2):** M-1…M-7 after a day on the live stack, and the owner's checklist (AC-16). Why: size and `ok` share are estimates from the T-01 spike.
+- **Read the live measurements (P2, verify F-2):** M-1…M-7 after a day on the live stack (AC-16 itself passed on 2026-11-03; only the first minutes were read). Why: size and `ok` share are estimates from the T-01 spike and a first reading.
