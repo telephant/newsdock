@@ -38,3 +38,7 @@ Reads the two frozen files from `packages/core/tests/fixtures/`, calls `build_ha
 ## 5. Security and data
 
 Offline, deterministic, reads and writes files in `packages/core/tests/fixtures/` only; the fixture holds the same real headlines as the frozen corpus.
+
+## 6. Spike result (T-01, 2026-11-04) [verified]
+
+A prototype extractor (capitalised words after the first token, outlet suffix and HTML entities cut, a small stoplist, acronyms kept, at most 3 names) on the 73 frozen seeds gave **48 entity queries** (2 or more names). On a throwaway Postgres loaded with the frozen corpus, the full-text leg alone scored **recall@5 0.444 and MRR 0.364** on them and returned a hit for 29 of 48, against 0.01 (paraphrase) and 0.19 (keywords) on the old kinds. So name-only queries do make the full-text leg matter and D-1 stands. Read of 15 queries: most are the story's names (`Amy Acton Ohio`, `James Talarico Texas`, `Nick Mansour`); defects to fix in `extract_names` at T-02: possessives (`Trump's`, `Florida's` should lose the `'s`), filler tokens (`AP`, `NY AP`), generic words that join a name (`Midterms`, `Democratic`). The throwaway test module was deleted after the run.
