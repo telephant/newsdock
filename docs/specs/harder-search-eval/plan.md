@@ -23,7 +23,7 @@
 | T-01 | Spike: clusters across several real slots — done 2026-11-04 (8 slots enough: 580 tight clusters) | measurements | none |
 | T-02 | Builder pure functions (`collapse`, `derive_clusters`, `drop_roundups`, `pick_seeds`, `check_fixture`, `assemble` with the judge) — done 2026-11-04 | AC-1, AC-2, AC-3, AC-4, AC-13 | T-01 |
 | T-03 | Builder CLI, `make eval-search-build`, build and freeze the fixture — done 2026-11-04 (73 clusters, 146 queries; judge added after label noise was measured) | AC-1, AC-3, AC-4 (on real data), AC-13 | T-02 |
-| T-04 | Harness: dataset loader, leave-one-out, noise, bootstrap, sweep | AC-5, AC-6, AC-8, AC-9 | T-03 |
+| T-04 | Harness: dataset loader, leave-one-out, noise, bootstrap, sweep — done 2026-11-04 | AC-5, AC-6, AC-8, AC-9 | T-03 |
 | T-05 | Real-model run, sweep, decision, defaults | AC-7, AC-10, AC-11 | T-04 |
 | T-06 | Docs sync and full API suite | AC-12 | T-05 |
 

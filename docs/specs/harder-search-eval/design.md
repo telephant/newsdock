@@ -12,7 +12,7 @@ Build the benchmark once, freeze it, run it many times. A **builder** reads seve
 |---|---|---|
 | C-90 builder | slots → articles, mentions → event clusters (candidates) → seeds → judge each member against the seed → queries → fixture. Pure functions (`derive_clusters`, `pick_seeds`, `check_fixture`) plus a thin network + Ollama wrapper; run by hand (`make eval-search-build`), never in CI | `infra/scripts/build_search_eval.py`, `infra/scripts/search_eval_build.py` |
 | C-91 fixture | `search_eval_corpus.json` (articles) and `search_eval_queries.json` (queries); real GDELT titles, DR-10 location | `packages/core/tests/fixtures/` |
-| C-92 harness | loads a dataset, embeds the corpus per prefix pair, scores `keyword`, `fulltext`, `vector`, `hybrid` leave-one-out, noise measure, sweep, paired bootstrap | `apps/api/tests/eval/` (extends `test_search_eval.py`, new `harness.py` support module) |
+| C-92 harness | loads a dataset, embeds the corpus per prefix pair, scores `keyword`, `fulltext`, `vector`, `hybrid` leave-one-out, noise measure, sweep, paired bootstrap | `apps/api/tests/eval/` (extends `test_search_eval.py`, new `search_eval_harness.py` support module) |
 | C-93 report | the printed tables, then the decision in an ADR or `verify.md` | stdout, docs |
 
 Existing search code (`SemanticService`, repos) is reused unchanged; the old 40-title set stays as the "easy" baseline dataset.

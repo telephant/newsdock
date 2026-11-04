@@ -111,7 +111,10 @@ else
 endif
 
 eval-search: ## Search recall@5 and MRR for keyword, vector and hybrid, real model (needs Docker, Ollama with nomic-embed-text)
-	uv run pytest -m "docker and ollama" apps/api/tests/eval -s
+	uv run pytest -m "docker and ollama" -k "not sweep" apps/api/tests/eval -s
+
+eval-search-sweep: ## Sweep prefix x semantic_rrf_k x semantic_candidates on the events eval, real model (Docker, Ollama)
+	uv run pytest -m "docker and ollama" -k sweep apps/api/tests/eval -s
 
 eval-search-build: ## Rebuild the search eval fixture from real GDELT slots (network, Ollama chat model; not CI)
 	uv run python infra/scripts/build_search_eval.py
