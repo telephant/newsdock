@@ -1,6 +1,6 @@
 # Verify — events-mentions (M3c)
 
-Run 2026-11-02 on branch `agents-whathappen` (worktree `p2-delivery`), nothing committed.
+Run 2026-11-02 on branch `agents-whathappen` (worktree `p2-delivery`); the work was committed and merged later (PR #8, 2026-11-04).
 
 **Verdict: pass with follow-ups, 14 of 14 ACs.** AC-1…AC-13 passed on 2026-11-02; AC-14 (one real slot on a real stack) was run on 2026-11-03 and passed (below). F-3 is closed; the open follow-ups are F-1, F-2 and F-4.
 
