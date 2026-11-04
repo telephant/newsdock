@@ -20,6 +20,10 @@ MARKER = "<!-- whathappen:story-first -->"
 _NOTICE_FIRST = (
     "> New this hour, from headlines only. Ranked by outlets covering a story"
 )
+_NOTICE_FIRST_GROUNDED = (
+    "> New this hour, from headlines and stored article text. "
+    "Ranked by outlets covering a story"
+)
 _NOTICE_SECOND = (
     "> Summaries are written by a small local model and can be wrong; open the links."
 )
@@ -52,10 +56,9 @@ def _story(
 ) -> list[str]:
     group = item.group
     lines = [_story_line(prefix, item)]
-    if len(group.variants) >= 2:  # one headline needs no model sentence
-        summary = summaries.get(group.key)
-        if summary and clean_text(summary):
-            lines.append(indent + escape_text(summary))
+    summary = summaries.get(group.key)  # the cycle decides which groups get one
+    if summary and clean_text(summary):
+        lines.append(indent + escape_text(summary))
     also = group.also[:also_limit]
     if also:
         lines.append(indent + "Also: " + ", ".join(_link(a) for a in also))
@@ -71,17 +74,19 @@ def render_story_digest(
     summaries: Mapping[str, str | None],
     min_sources: int,
     also_limit: int,
+    body_grounded: bool = False,
 ) -> str:
     """The whole file: marker, heading, notice, Top stories, labelled sections."""
     listed = len(selection.top) + sum(len(s.groups) for s in selection.sections)
     how = "." if ranking != RANKING_TONE else " and negative tone."
+    first = _NOTICE_FIRST_GROUNDED if body_grounded else _NOTICE_FIRST
     lines = [
         MARKER,
         f"# What happened · {now:%Y-%m-%d %H:%M} UTC "
         f"({_count(article_count, 'new article', 'new articles')} · "
         f"{_count(listed, 'story', 'stories')})",
         "",
-        _NOTICE_FIRST + how,
+        first + how,
         _NOTICE_SECOND,
     ]
     if listed == 0:

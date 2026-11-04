@@ -96,6 +96,12 @@ class McpClient:
         page = self._call("list_new_articles", arguments)
         return page["articles"], page["next_cursor"]
 
+    def get_article(self, article_id: str) -> dict[str, Any]:
+        """One article with everything the platform keeps for it, among that the
+        extracted page text: `body` (null unless `body_status` is "ok")."""
+        result = self._call("get_article", {"article_id": article_id})
+        return result if isinstance(result, dict) else {}
+
     def ack_cursor(self, cursor: str) -> None:
         try:
             self._call("ack_cursor", {"cursor": cursor})

@@ -8,7 +8,7 @@ scores and selects, and a failed sentence costs one line, never the digest.
 """
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -27,6 +27,14 @@ logger = logging.getLogger(__name__)
 TONE_INCLUDE = ["tone_neg"]  # the extra field asked of the platform (spec D-7)
 
 
+def _clip(text: str, cap: int) -> str:
+    """At most `cap` characters, cut at a word boundary."""
+    if len(text) <= cap:
+        return text
+    head, _, _ = text[:cap].rpartition(" ")
+    return (head or text[:cap]).rstrip() + "…"
+
+
 class DigestMcpPort(Protocol):
     def list_new_articles(
         self,
@@ -35,11 +43,15 @@ class DigestMcpPort(Protocol):
         include: Sequence[str] | None = None,
     ) -> tuple[list[dict[str, object]], str]: ...
 
+    def get_article(self, article_id: str) -> Mapping[str, object]: ...
+
     def ack_cursor(self, cursor: str) -> None: ...
 
 
 class SummaryPort(Protocol):
-    def summarise(self, titles: Sequence[str]) -> str | None: ...
+    def summarise(
+        self, titles: Sequence[str], excerpt: str | None = None
+    ) -> str | None: ...
 
 
 class DigestSinkPort(Protocol):
@@ -58,6 +70,10 @@ class DigestParams:
     section_min_hits: int
     tone_divisor: float
     labels: SectionLabels
+    # Article text sent to the model per story (`get_article`'s stored `body`,
+    # clipped); 0 = headlines only, exactly the digest before body grounding.
+    summary_body_chars: int = 0
+    body_lookups_per_group: int = 3  # distinct headlines asked for a body, per story
 
 
 @dataclass(frozen=True)
@@ -108,11 +124,7 @@ class DigestCycle:
             ),
         )
         listed = [*selection.top, *(g for s in selection.sections for g in s.groups)]
-        summaries = {
-            item.group.key: self._summarise(item.group)
-            for item in listed
-            if len(item.group.variants) >= 2  # one headline needs no sentence
-        }
+        summaries = {item.group.key: self._summarise(item.group) for item in listed}
         text = render_story_digest(
             now=now,
             article_count=len(articles),
@@ -121,6 +133,7 @@ class DigestCycle:
             summaries=summaries,
             min_sources=p.min_group_sources,
             also_limit=p.also_per_group,
+            body_grounded=p.summary_body_chars > 0,
         )
 
         path = self._sink.write(now, text)  # OSError here: no ack, window read again
@@ -148,9 +161,37 @@ class DigestCycle:
                 return articles, cursor, rows
 
     def _summarise(self, group: StoryGroup) -> str | None:
+        excerpt = self._excerpt(group)
+        if excerpt is None and len(group.variants) < 2:
+            return None  # one headline and no stored text: a sentence adds nothing
         titles = [v.title for v in group.variants[: 1 + self._params.also_per_group]]
         try:
-            return self._summariser.summarise(titles)
+            return self._summariser.summarise(titles, excerpt)
         except Exception as exc:  # noqa: BLE001 - the model must never stop a digest
             logger.warning("summary for a group failed: %s", type(exc).__name__)
             return None
+
+    def _excerpt(self, group: StoryGroup) -> str | None:
+        """The stored page text of the group's best headline, clipped; None without
+        one. Tries the shown headline first, then the other distinct ones. One failed
+        call gives the whole group up: the platform is in trouble and headlines still
+        work, while retrying every member would multiply the load."""
+        cap = self._params.summary_body_chars
+        if cap <= 0:
+            return None
+        for article in group.variants[: self._params.body_lookups_per_group]:
+            try:
+                full = self._mcp.get_article(article.article_id)
+            except Exception as exc:  # noqa: BLE001 - bodies are optional extras
+                logger.warning(
+                    "get_article %s failed: %s", article.article_id, type(exc).__name__
+                )
+                return None
+            body = full.get("body")
+            if (
+                full.get("body_status") == "ok"
+                and isinstance(body, str)
+                and body.strip()
+            ):
+                return _clip(body.strip(), cap)
+        return None

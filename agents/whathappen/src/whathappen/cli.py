@@ -52,6 +52,8 @@ def build_cycle(settings: Settings) -> DigestCycle:
             section_min_hits=settings.section_min_hits,
             tone_divisor=settings.tone_divisor,
             labels=settings.section_label_map,
+            summary_body_chars=settings.summary_body_chars,
+            body_lookups_per_group=settings.body_lookups_per_group,
         ),
     )
 

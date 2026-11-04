@@ -59,6 +59,10 @@ class Settings(BaseSettings):
     match_jaccard: float = 0.5
     match_min_shared: int = 3
     tone_divisor: float = 10.0  # score = sources x (1 + tone_neg / divisor)
+    # Body-grounded summaries: for each listed story the agent asks `get_article` for
+    # the stored page text and gives the model this much of it (0 = headlines only).
+    summary_body_chars: int = 1200
+    body_lookups_per_group: int = 3  # distinct headlines asked for a body, per story
     section_min_hits: int = 1  # theme hits a label needs to claim a group
     section_labels: str = ""  # JSON label -> theme prefixes; empty = the built-in map
 

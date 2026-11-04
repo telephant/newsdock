@@ -10,6 +10,7 @@ from whathappen.adapters.summarize import OllamaSummariser
 from whathappen.domain.prompt import group_prompt
 
 TITLES = ["ECB holds rates as inflation cools", "US CPI eases for third month"]
+EXCERPT = "Rate setters left the deposit rate unchanged on Thursday."
 
 
 def summariser(
@@ -46,6 +47,18 @@ def test_request_is_a_plain_chat_call_with_the_group_prompt() -> None:
     assert "format" not in body  # prose, no JSON schema
     assert body["options"] == {"temperature": 0.0}
     assert body["messages"] == [{"role": "user", "content": group_prompt(TITLES)}]
+
+
+def test_an_excerpt_reaches_the_prompt() -> None:
+    bodies: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        bodies.append(json.loads(request.content))
+        return httpx.Response(200, json={"message": {"content": "Rates held."}})
+
+    assert summariser(handler).summarise(TITLES, EXCERPT) == "Rates held."
+    messages = bodies[0]["messages"]
+    assert messages == [{"role": "user", "content": group_prompt(TITLES, EXCERPT)}]
 
 
 def test_timeout_is_applied_to_the_client() -> None:
