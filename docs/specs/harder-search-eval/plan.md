@@ -20,7 +20,7 @@
 
 | Task | Title | Implements | Depends on |
 |---|---|---|---|
-| T-01 | Spike: clusters across several real slots | measurements | none |
+| T-01 | Spike: clusters across several real slots — done 2026-11-04 (8 slots enough: 580 tight clusters) | measurements | none |
 | T-02 | Builder pure functions (`collapse`, `derive_clusters`, `pick_seeds`, `check_fixture`) | AC-1, AC-2, AC-3, AC-4 | T-01 |
 | T-03 | Builder CLI, `make eval-search-build`, build and freeze the fixture | AC-1, AC-3, AC-4 (on real data) | T-02 |
 | T-04 | Harness: dataset loader, leave-one-out, noise, bootstrap, sweep | AC-5, AC-6, AC-8, AC-9 | T-03 |

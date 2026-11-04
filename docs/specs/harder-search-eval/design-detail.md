@@ -11,6 +11,7 @@ Steps (pure functions first, I/O last):
 1. `parse_slot(gkg_text, mentions_text, slot)` → articles (`newsdock_core.gkg.parse_row`) and mentions (`newsdock_core.mentions.parse_mention_row`); bad rows dropped.
 2. `collapse(articles)` → one article per `story_key` (first by id), so syndicated copies are one.
 3. `derive_clusters(articles, mentions)` → `{event_id: [article ids]}` for events whose collapsed members number 2 or more. An article appears in every cluster whose event it mentions.
+3b. `drop_roundups(clusters, max_events=3)` → removes from every cluster the articles that appear in more than `max_events` clusters (roundup pieces that mention many events and blur the labels), then drops clusters left with fewer than 2 articles and duplicates of the same member set. `derive_clusters` stays exact (spec AC-2); this is a separate, explicit step. Added at T-01 from measurement; the threshold 3 is a starting value **[assumption]**.
 4. `pick_seeds(clusters)` → one seed per cluster, the member with the lowest id (deterministic); optional cap per theme so one story cannot fill the set **[assumption]**.
 5. Paraphrase (I/O): for each seed, two prompts to Ollama `/api/chat` (temperature 0, seed fixed): kind `paraphrase` ("write one short search query a reader would type to find news about this event; do not reuse the title's distinctive words") and kind `keywords` ("2 to 4 keywords"). The output is trimmed to one line.
 6. `check_fixture(corpus, queries)` → the AC-1/3/4 rules, raising on a violation. Queries failing AC-3 (equal to or containing a title) are dropped, not retried.
@@ -41,6 +42,8 @@ After the real-model run the numbers and the keep/change per setting go in ADR-0
 ## 5. Sizing (provisional)
 
 One real slot gave 83 events with 2 or more different titles (spec §3). The builder starts with 8 slots and reports the cluster count; it stops with an error below a floor set when first run (not a requirement). Fixture size is reported; the target is a few hundred KB.
+
+**Spike result (T-01, 2026-11-04) [verified]:** 8 consecutive slots (`20261104070000`…`084500`), 8 of 8 downloads valid (the earlier empty files came from a bare `curl -O` without redirects). 10,514 articles, 28,697 mentions; 7,122 articles after collapsing by `story_key`; 1,697 events with 2 or more collapsed articles, 1,101 distinct member sets, 568 articles in 3 or more clusters (up to 53: roundups). After `drop_roundups(max_events=3)`: 580 distinct clusters over 1,281 articles (size 2: 367, 3: 100, 4: 47, 5+: 66). Sampled clusters are real confusable stories (several US midterm races, a Delhi extortion case). Cluster members alone are about 0.43 MB of JSON before distractors, so the corpus should use a smaller distractor sample, or titles only, to stay near the target. 8 slots are enough.
 
 ## 6. Failure table
 
