@@ -113,6 +113,9 @@ endif
 eval-search: ## Search recall@5 and MRR for keyword, vector and hybrid, real model (needs Docker, Ollama with nomic-embed-text)
 	uv run pytest -m "docker and ollama" apps/api/tests/eval -s
 
+eval-search-build: ## Rebuild the search eval fixture from real GDELT slots (network, Ollama chat model; not CI)
+	uv run python infra/scripts/build_search_eval.py
+
 up: ## Start Kafka and Postgres, wait until healthy (needs .env)
 	@test -f .env || { echo "missing .env: copy .env.example to .env (cp .env.example .env)" >&2; exit 1; }
 	$(COMPOSE) up -d --wait kafka postgres

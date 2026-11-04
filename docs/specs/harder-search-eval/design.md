@@ -4,13 +4,13 @@ Reading order: this file → `diagrams/index.html` (components, sequence, data) 
 
 ## Idea
 
-Build the benchmark once, freeze it, run it many times. A **builder** reads several real GDELT slots, finds articles that mention the same event (GDELT's own label), asks the local model for a paraphrase query per cluster, and writes a **fixture**. The existing **harness** loads that fixture, scores the four methods leave-one-out, sweeps the settings, measures hybrid noise, and applies a stated rule for "a clear win".
+Build the benchmark once, freeze it, run it many times. A **builder** reads several real GDELT slots, finds articles that mention the same event (candidates), keeps the members a local model judges to be about the seed's story, asks the model for queries, and writes a **fixture**. The existing **harness** loads that fixture, scores the four methods leave-one-out, sweeps the settings, measures hybrid noise, and applies a stated rule for "a clear win".
 
 ## Components (new ids C-90…C-93; nothing in the running platform changes)
 
 | Id | Job | Where |
 |---|---|---|
-| C-90 builder | slots → articles, mentions → event clusters → seeds → paraphrase queries → fixture. Pure functions (`derive_clusters`, `pick_seeds`, `check_fixture`) plus a thin network + Ollama wrapper; run by hand (`make eval-search-build`), never in CI | `infra/scripts/build_search_eval.py`, `infra/scripts/search_eval_build.py` |
+| C-90 builder | slots → articles, mentions → event clusters (candidates) → seeds → judge each member against the seed → queries → fixture. Pure functions (`derive_clusters`, `pick_seeds`, `check_fixture`) plus a thin network + Ollama wrapper; run by hand (`make eval-search-build`), never in CI | `infra/scripts/build_search_eval.py`, `infra/scripts/search_eval_build.py` |
 | C-91 fixture | `search_eval_corpus.json` (articles) and `search_eval_queries.json` (queries); real GDELT titles, DR-10 location | `packages/core/tests/fixtures/` |
 | C-92 harness | loads a dataset, embeds the corpus per prefix pair, scores `keyword`, `fulltext`, `vector`, `hybrid` leave-one-out, noise measure, sweep, paired bootstrap | `apps/api/tests/eval/` (extends `test_search_eval.py`, new `harness.py` support module) |
 | C-93 report | the printed tables, then the decision in an ADR or `verify.md` | stdout, docs |
@@ -60,6 +60,7 @@ Python stdlib (`random`, `statistics`), existing `newsdock_core` parsers, `httpx
 |---|---|
 | AC-1, AC-4 | C-90 `check_fixture`, C-91 |
 | AC-2 | C-90 `derive_clusters` |
+| AC-13 | C-90 `assemble` (judge step) |
 | AC-3 | C-90 query check, C-91 |
 | AC-5, AC-8, AC-9 | C-92 run and noise (flow 2) |
 | AC-6 | C-92 sweep (flow 3) |

@@ -28,6 +28,7 @@ Derived from the ACs in [spec.md](spec.md) §6. Levels: unit (no I/O), integrati
 | TC-13 | AC-7 | manual | Given the real model and the fixture, When `make eval-search` runs, Then keyword, vector and hybrid do not all score the same recall@5 and MRR |
 | TC-14 | AC-10 | manual | Given the real-model sweep, When the owner reads the result, Then ADR-0039's Result section (or `verify.md`) names the chosen prefix, `semantic_rrf_k` and `semantic_candidates` with their numbers and says kept or changed for each |
 | TC-15 | AC-11 | integration | Given any default changed or none, When `make config-python` runs, Then it passes |
+| TC-17 | AC-13 | unit | Given candidates and a judge that rejects one member, When the fixture is assembled, Then the rejected member is not in `members` or `expected` but is in the corpus; and a cluster with no verified member makes no queries |
 | TC-16 | AC-12 | integration | Given the existing API suite, When it runs, Then it passes with no change to tools, routes or payloads |
 
 ## Manual checklist (TC-13, TC-14)
@@ -39,7 +40,7 @@ Derived from the ACs in [spec.md](spec.md) §6. Levels: unit (no I/O), integrati
 
 ## Coverage
 
-AC-1 TC-1 · AC-2 TC-2, TC-3 · AC-3 TC-4 · AC-4 TC-5 · AC-5 TC-6, TC-7 · AC-6 TC-8, TC-12 · AC-7 TC-13 · AC-8 TC-9, TC-10 · AC-9 TC-11 · AC-10 TC-14 · AC-11 TC-15 · AC-12 TC-16.
+AC-1 TC-1 · AC-2 TC-2, TC-3 · AC-3 TC-4 · AC-4 TC-5 · AC-5 TC-6, TC-7 · AC-6 TC-8, TC-12 · AC-7 TC-13 · AC-8 TC-9, TC-10 · AC-9 TC-11 · AC-10 TC-14 · AC-11 TC-15 · AC-12 TC-16 · AC-13 TC-17.
 
 ## Measurements (provisional, not pass/fail)
 

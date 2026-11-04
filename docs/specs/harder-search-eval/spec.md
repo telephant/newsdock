@@ -20,14 +20,14 @@ flowchart LR
 
 | ID | Decision | Status |
 |---|---|---|
-| D-1 | Corpus and labels | Decided: real titles from several slots, labelled by GDELT event: two articles are relevant to each other when their URLs mention the same event (2026-11-04) |
+| D-1 | Corpus and labels | Decided, amended 2026-11-04 after measurement: real titles from several slots; GDELT event clusters are only candidates (event links join unrelated articles at confidence 100, T-01/T-03), and a member counts as relevant only if a local model judges it about the same story as the seed |
 | D-2 | Query author | Decided: local LLM paraphrases, frozen into the fixture (2026-11-04) |
 | D-3 | What the eval may change | Decided: report, then change a default in `newsdock.yaml` only on a clear win, recorded in an ADR; otherwise keep and document (2026-11-04) |
 | D-4 | Body scope | Decided: titles only here; body recall stays a live check (body-extraction F-2), goes to the backlog (2026-11-04) |
 | D-5 | Corpus size: several consecutive slots frozen as one fixture | Decided: default, not asked; the number of slots is set by the builder until enough clusters exist (2026-11-04) |
 | D-6 | What counts as a "clear win" | Decided: default, not asked; MRR and recall@5 both improve and no kind of query gets worse; the rule is a paired bootstrap over queries: the 95% interval of the MRR difference excludes 0 (set in `/spec-design`, ADR-0039) (2026-11-04) |
 
-**Open risks:** a 1B-parameter paraphraser may write poor or near-copy queries (mitigated by AC-3 and by reading a sample); event labels say "same event", not "same wording", so some relevant articles are not title-similar (that is realistic, and it lowers every method equally); the fixture holds real headlines (attribution is the same as `docs/research.md`).
+**Open risks:** a 1B-parameter paraphraser may write poor or near-copy queries (mitigated by AC-3 and by reading a sample); the model judge is strict and has its own bias toward similar wording (it is a different model from the embedder, every judgment is logged for audit, and rejected candidates stay in the corpus as hard negatives); event labels say "same event", not "same wording"; the fixture holds real headlines (attribution is the same as `docs/research.md`).
 **Prerequisites the user owns:** Ollama with `nomic-embed-text` and a small chat model (`llama3.2:1b` is pulled) for the builder; network access to GDELT once.
 
 ## 1. Problem
@@ -133,6 +133,12 @@ AC-12  Search behaviour unchanged unless a default changed
   Then  it passes with no change to tools, routes or payloads
   Verify: auto
 
+AC-13  Members are verified
+  Given event-cluster candidates and a judge that rejects some members
+  When  the fixture is assembled
+  Then  rejected members are in no query's `members` or `expected` but stay in the corpus, and a cluster left with fewer than 2 verified articles makes no queries
+  Verify: auto
+
 ## 7. Non-functional requirements
 
 Provisional targets (measure first): the fixture stays small enough to keep in the repo and the eval finishes in minutes on this machine; the builder is deterministic given its inputs once the paraphrases are frozen.
@@ -144,7 +150,7 @@ GDELT slots can be fetched again (public); the paraphrases are generated once an
 ## Glossary
 
 - **recall@5:** share of a query's relevant articles found in the first 5 results. **MRR:** mean of 1 / rank of the first relevant result.
-- **Cluster:** the articles that mention one GDELT event; the unit of relevance. **Distractor:** an article in the corpus that is in no query's cluster.
+- **Cluster:** the articles that mention one GDELT event and that the judge confirms are about the seed's story; the unit of relevance. **Judge:** a local model asked whether two headlines are about the same specific story. **Distractor:** an article in the corpus that is in no query's cluster.
 - **Kind of query:** a label on each query (for example paraphrase, entity, short keywords) used to show where a method is weak.
 - **Hybrid noise:** a relevant article that vector search ranks in its top 5 but the fused list drops from its top 5.
 - **RRF (`semantic_rrf_k`):** reciprocal-rank fusion constant. **`semantic_candidates`:** hits taken from each leg before fusion.
